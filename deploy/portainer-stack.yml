@@ -1,0 +1,42 @@
+# Supply DEEPHARNESS_IMAGE (immutable @sha256 digest) and DSH_BASIC_AUTH_USERS
+# as Portainer environment variables. Never commit credentials or hashes.
+services:
+  web:
+    image: ${DEEPHARNESS_IMAGE:?Provide a tested GHCR image digest}
+    restart: unless-stopped
+    init: true
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 256
+    mem_limit: 2g
+    cpus: 1.5
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=128m,mode=1777
+    environment:
+      NARB_DISABLE_NATIVE_CACHE: "1"
+    volumes:
+      - dsh_data:/data/dsh
+      - dsh_workspace:/workspace
+    networks:
+      - traefik-public
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-public
+      - traefik.http.routers.deepharness.rule=Host(`deep.wandora.com.br`)
+      - traefik.http.routers.deepharness.entrypoints=websecure
+      - traefik.http.routers.deepharness.tls=true
+      - traefik.http.routers.deepharness.tls.certresolver=letsencrypt
+      - traefik.http.routers.deepharness.middlewares=deepharness-auth
+      - traefik.http.middlewares.deepharness-auth.basicauth.users=${DSH_BASIC_AUTH_USERS:?Configure BasicAuth credential hash in Portainer}
+      - traefik.http.services.deepharness.loadbalancer.server.port=3080
+
+volumes:
+  dsh_data:
+  dsh_workspace:
+
+networks:
+  traefik-public:
+    external: true

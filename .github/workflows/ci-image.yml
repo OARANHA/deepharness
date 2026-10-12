@@ -1,0 +1,53 @@
+name: CI — DeepHarness bootstrap image
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deepharness-image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker:
+    if: github.repository == 'OARANHA/deepharness'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Avoid release before upstream import
+        id: state
+        shell: bash
+        run: |
+          if test -f .bootstrap/IMPORT_REQUEST || ! test -f LICENSE || ! test -f package.json; then
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Build pinned image in CI (never on 28server)
+        if: steps.state.outputs.ready == 'true'
+        run: docker build --pull -f deploy/Dockerfile -t local/deepharness:ci .
+      - name: Native addon probe under container runtime restrictions
+        if: steps.state.outputs.ready == 'true'
+        run: |
+          docker run --rm --read-only \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=128m,mode=1777 \
+            --tmpfs /data/dsh:rw,nosuid,nodev,size=128m \
+            --tmpfs /workspace:rw,nosuid,nodev,size=128m \
+            local/deepharness:ci \
+            node -e "const a=require('/opt/dsh/node_modules/node-addon-require-builtin'); console.log(a.getBindingInfo().backend)"
+      - name: Log in to GHCR
+        if: steps.state.outputs.ready == 'true' && github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish exact commit image to GHCR
+        if: steps.state.outputs.ready == 'true' && github.event_name == 'push'
+        run: |
+          docker tag local/deepharness:ci ghcr.io/oaranha/deepharness:sha-${GITHUB_SHA}
+          docker push ghcr.io/oaranha/deepharness:sha-${GITHUB_SHA}
