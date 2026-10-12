@@ -46,7 +46,17 @@ jobs:
         run: |
           set -euo pipefail
           name="deepharness-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
+          cleanup() {
+            local rc="$?"
+            if [[ "$rc" -ne 0 ]]; then
+              echo "::group::Sanitized DSH startup diagnostics"
+              docker inspect --format='container_status={{.State.Status}} exit_code={{.State.ExitCode}}' "$name" 2>/dev/null || true
+              docker logs --tail 140 "$name" 2>&1 | python3 -c 'import re,sys; [print("[redacted potentially sensitive log line]" if re.search(r"(?i)(?:https?://|token|passphrase|password|secret|api[_-]?key|authorization|bearer|cookie)", line) else line.rstrip()) for line in sys.stdin]' || true
+              echo "::endgroup::"
+            fi
+            docker rm -f "$name" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
           docker run -d --name "$name" --init --read-only \
             --security-opt no-new-privileges --cap-drop ALL \
             --pids-limit 256 --memory 2g --cpus 1.5 \
