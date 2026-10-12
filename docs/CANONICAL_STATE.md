@@ -29,6 +29,10 @@ Updated: 2026-10-12
 - Fix proposed in this PR: remove **only** `--public-url` from container CMD; retain `--trusted-host deep.wandora.com.br`, concrete bind IP, non-root execution and all security restrictions. Must rerun full Web UI startup smoke before merge; publication skipped on failure.
 - The historical Dependabot `npm_and_yarn in /` job was still running on old upstream-import commit after `.github/dependabot.yml` was removed. It is not a DSH build or 28server process. Cancel it via Actions UI if needed.
 
+## CI red: pinned npm rejects container-specific bind IP (verified 2026-10-12)
+- Run #38322385643, job #115053233774, built image and passed native addon probe, but failed the Web UI smoke. Sanitized logs: `webserver (required) ValidationError: $.host expected "127.0.0.1" | "0.0.0.0" but got "172.17.0.2"`. Thus the package `@deepseek-ai/dsh@0.2.0-rc.2` does not permit a concrete Docker bridge IP for `--host`; its runtime behavior differs from current upstream public-deployment documentation.
+- Proposed targeted fix on PR #1: use direct exec-form `CMD ["dsh","web","--no-open","--port","3080","--host","0.0.0.0","--trusted-host","deep.wandora.com.br"]`. Keep container **without published port**; only Traefik on isolated Docker network may reach 3080. This is **untested until PR CI is green**, and is not a change to 28server.
+
 ## Strict next gates
 A. Verify source-import workflow outcome, LICENSE, source tree and pinned source SHA.
 B. Verify full Web UI runtime smoke in PR CI and record the next immutable GHCR digest.

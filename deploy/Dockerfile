@@ -26,5 +26,6 @@ WORKDIR /workspace
 USER node
 EXPOSE 3080
 # DSH npm 0.2.0-rc.2 does not support --public-url (verified in CI startup logs).
-# Use only supported flags and retain trusted-host for the reverse proxy.
-CMD ["sh", "-c", "exec dsh web --no-open --port 3080 --host \"$(hostname -i | awk '{print $1}')\" --trusted-host deep.wandora.com.br"]
+# Version-pinned npm 0.2.0-rc.2 accepts only 127.0.0.1 or 0.0.0.0.
+# 0.0.0.0 binds only inside this isolated container; Stack must not publish 3080.
+CMD ["dsh", "web", "--no-open", "--port", "3080", "--host", "0.0.0.0", "--trusted-host", "deep.wandora.com.br"]
