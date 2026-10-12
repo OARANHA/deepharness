@@ -39,6 +39,53 @@ jobs:
             --tmpfs /workspace:rw,nosuid,nodev,size=128m \
             local/deepharness:ci \
             node -e "const a=require('/opt/dsh/node_modules/node-addon-require-builtin'); console.log(a.getBindingInfo().backend)"
+      - name: Web UI startup smoke (no launch tokens in CI logs)
+        if: steps.state.outputs.ready == 'true'
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          set -euo pipefail
+          name="deepharness-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
+          docker run -d --name "$name" --init --read-only \
+            --security-opt no-new-privileges --cap-drop ALL \
+            --pids-limit 256 --memory 2g --cpus 1.5 \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=128m,mode=1777 \
+            --tmpfs /data/dsh:rw,nosuid,nodev,size=256m,mode=0700,uid=1000,gid=1000 \
+            --tmpfs /workspace:rw,nosuid,nodev,size=128m,mode=0700,uid=1000,gid=1000 \
+            local/deepharness:ci >/dev/null
+          ip="$(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$name")"
+          test -n "$ip" || { echo "::error::Missing container IP"; exit 1; }
+          ready=0
+          response=000
+          for _ in $(seq 1 60); do
+            state="$(docker inspect --format '{{.State.Status}}' "$name")"
+            if [[ "$state" != running ]]; then
+              echo "::error::DSH exited during startup (state=$state)"
+              docker inspect --format 'exit_code={{.State.ExitCode}}' "$name"
+              exit 1
+            fi
+            response="$(curl -sS --max-time 2 --output /dev/null --write-out '%{http_code}' \
+              --header 'Host: deep.wandora.com.br' "http://${ip}:3080/index.html" 2>/dev/null || true)"
+            if [[ "$response" == 401 ]]; then
+              rejected="$(curl -sS --max-time 2 --output /dev/null --write-out '%{http_code}' \
+                --header 'Host: untrusted.example.invalid' "http://${ip}:3080/index.html" 2>/dev/null || true)"
+              if [[ "$rejected" != 403 ]]; then
+                echo "::error::Untrusted Host check failed (HTTP $rejected)"
+                exit 1
+              fi
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [[ "$ready" != 1 ]]; then
+            echo "::error::Web did not return expected HTTP 401 after startup (last HTTP $response)"
+            exit 1
+          fi
+          sleep 3
+          test "$(docker inspect --format '{{.State.Status}}' "$name")" = running
+          echo "Web startup smoke OK: unauthorized index 401, untrusted Host 403, container alive"
       - name: Log in to GHCR
         if: steps.state.outputs.ready == 'true' && github.event_name == 'push'
         uses: docker/login-action@v3
@@ -48,6 +95,16 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Publish exact commit image to GHCR
         if: steps.state.outputs.ready == 'true' && github.event_name == 'push'
+        shell: bash
         run: |
-          docker tag local/deepharness:ci ghcr.io/oaranha/deepharness:sha-${GITHUB_SHA}
-          docker push ghcr.io/oaranha/deepharness:sha-${GITHUB_SHA}
+          set -euo pipefail
+          image="ghcr.io/oaranha/deepharness:sha-${GITHUB_SHA}"
+          docker tag local/deepharness:ci "$image"
+          push_tail="$(docker push "$image" | tail -n 1)"
+          digest="$(printf '%s\n' "$push_tail" | sed -nE 's/.*digest: (sha256:[[:xdigit:]]{64}).*/\1/p')"
+          if [[ ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+            echo "::error::GHCR push returned no validated manifest digest"
+            exit 1
+          fi
+          echo "Published image: ghcr.io/oaranha/deepharness@${digest}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Verified GHCR manifest digest: $digest"

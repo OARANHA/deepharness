@@ -1,0 +1,6 @@
+# Bootstrap image only installs pinned npm artifacts; no source COPY.
+# Do not send the entire upstream checkout to the Docker daemon.
+**
+!deploy/
+!deploy/Dockerfile
+!.dockerignore
