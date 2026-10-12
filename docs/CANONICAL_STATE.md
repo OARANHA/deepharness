@@ -24,6 +24,11 @@ Updated: 2026-10-12
 - Follow-up commit `dae15d6164b44a9565aba227c36588f890b689e7` adds sanitized startup logs to the same PR (not a proven fix). No production cutover until diagnosis, then green smoke.
 - The earlier published image digest `sha256:450f80d53933b1e9ed41c767191042bd4e0d7b1dafc8df8bd7c5426f9fc5228b` remains from the native-only checks and must **not** be promoted to Portainer.
 
+## PR #1 reproduced startup failure (verified 2026-10-12)
+- Run #38321939900 failed after addon smoke **success**; application logs revealed `error: unknown option '--public-url'`. The npm distribution `@deepseek-ai/dsh@0.2.0-rc.2` does not recognize this flag, although newer upstream docs mention it.
+- Fix proposed in this PR: remove **only** `--public-url` from container CMD; retain `--trusted-host deep.wandora.com.br`, concrete bind IP, non-root execution and all security restrictions. Must rerun full Web UI startup smoke before merge; publication skipped on failure.
+- The historical Dependabot `npm_and_yarn in /` job was still running on old upstream-import commit after `.github/dependabot.yml` was removed. It is not a DSH build or 28server process. Cancel it via Actions UI if needed.
+
 ## Strict next gates
 A. Verify source-import workflow outcome, LICENSE, source tree and pinned source SHA.
 B. Verify full Web UI runtime smoke in PR CI and record the next immutable GHCR digest.

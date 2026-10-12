@@ -25,4 +25,6 @@ ENV HOME=/data/dsh \
 WORKDIR /workspace
 USER node
 EXPOSE 3080
-CMD ["sh", "-c", "exec dsh web --no-open --port 3080 --host \"$(hostname -i | awk '{print $1}')\" --public-url https://deep.wandora.com.br/ --trusted-host deep.wandora.com.br"]
+# DSH npm 0.2.0-rc.2 does not support --public-url (verified in CI startup logs).
+# Use only supported flags and retain trusted-host for the reverse proxy.
+CMD ["sh", "-c", "exec dsh web --no-open --port 3080 --host \"$(hostname -i | awk '{print $1}')\" --trusted-host deep.wandora.com.br"]
