@@ -19,6 +19,11 @@ Updated: 2026-10-12
 - Valid TLS, working Web UI, workspace, Chutes.ai models.
 - Private ChatGPT ↔ MCP ↔ DeepSeek Harness connector.
 
+## Last verified CI gate
+- PR #1 Web smoke run `38321434997` completed with **failure**: Docker build and isolated native-addon probe succeeded, but DSH exited before HTTP became available (`container state=exited`, `exit_code=1`). The first workflow did not emit application logs, therefore cause is **unknown**.
+- Follow-up commit `dae15d6164b44a9565aba227c36588f890b689e7` adds sanitized startup logs to the same PR (not a proven fix). No production cutover until diagnosis, then green smoke.
+- The earlier published image digest `sha256:450f80d53933b1e9ed41c767191042bd4e0d7b1dafc8df8bd7c5426f9fc5228b` remains from the native-only checks and must **not** be promoted to Portainer.
+
 ## Strict next gates
 A. Verify source-import workflow outcome, LICENSE, source tree and pinned source SHA.
 B. Verify full Web UI runtime smoke in PR CI and record the next immutable GHCR digest.
