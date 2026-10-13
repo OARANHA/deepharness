@@ -130,7 +130,11 @@ try {
   writeFileSync(bridgeManifestPath, JSON.stringify(bridgeManifest, null, 2) + '\n');
   console.log('ALPHA_TEST_ONLY_PEER_METADATA_ADAPTATION: five exact RC2 peers → 0.2.1-alpha.2 (disposable copy, not upstream, not exemption)');
 
-  // Apply the reviewed, versioned adapter only to the disposable install.\n  adaptAlphaWebSurface(installed);\n  console.log('ALPHA_TEST_ONLY_WEB_SERVER_ADAPTER: versioned adapter applied');\n\n  cpSync(join(upstream, 'test', 'integration'), join(installed, 'test', 'integration'), { recursive: true });
+  // Apply the reviewed, versioned adapter only to the disposable install.
+  adaptAlphaWebSurface(installed);
+  console.log('ALPHA_TEST_ONLY_WEB_SERVER_ADAPTER: versioned adapter applied');
+
+  cpSync(join(upstream, 'test', 'integration'), join(installed, 'test', 'integration'), { recursive: true });
   // Instrument only the copied upstream test to identify which official
   // alpha health capability is absent. Preserve all original assertions.
   const cliTestPath = join(installed, 'test', 'integration', 'dsh-cli.test.mjs');
