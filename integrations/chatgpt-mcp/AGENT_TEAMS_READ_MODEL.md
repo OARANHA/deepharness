@@ -282,3 +282,21 @@ and a dedicated `npm ci --ignore-scripts` CI job is still pending: the
 local execution environment could not resolve `registry.npmjs.org`
 (`EAI_AGAIN`). The CI on this new HEAD must be explicitly verified before
 claiming its regression test passed. No production integration or deploy.
+
+## Official DSH probe preflight prepared — 2026-10-13
+
+`host-probe/package.json` now pins the published DSH session,
+session-projection, workspace and Agent Teams packages to
+`0.2.1-alpha.2`, Cordis to `4.0.5-alpha.1`, and MCP SDK/Zod to
+`1.30.0`/`4.4.3`. A separate preflight test checks the official
+published class method/DI surfaces. **No npm package lock has been
+generated and the preflight has not been executed.** The runtime
+cannot currently resolve registry.npmjs.org (EAI_AGAIN), and its npm
+cache has no relevant packages. Do not run `npm ci` or wire this
+preflight into CI until the lockfile is safely generated and read back.
+
+The full host-service HTTP/MCP integration scenario is NOT delivered:
+it still requires initializing the official Cordis services, storage,
+JSONL persistence, projection registration and TeamService in isolated
+temporary directories, then a real SDK roundtrip and negative grants.
+The published preflight is a preparation step, not evidence of that gate.
