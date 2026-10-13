@@ -40,3 +40,15 @@ npm dependency or version-metadata failure. Do not invert/omit the assertion,
 forge the health response, or count the gate as green. Investigate the official
 alpha Web service contract and implement a reviewed compatibility adapter in a
 separate port slice before re-running the unchanged security assertions.
+
+## Scoped Web runtime alpha adapter probe
+
+The alpha Web bundle provides `webRuntime` as a Cordis service after its host
+startup barrier. In the pinned bridge, health checks `ctx.get('webRuntime')`
+from the bridge context, which may not have the Web service in scope. This CI
+slice patches **only the disposable installed bridge JS**, wiring a Cordis
+`ctx.inject(['webRuntime'])` observer. `webSurface` becomes true only after an
+actual service object can be retrieved from the injected context; the existing
+apiProxy check is preserved. Existing bearer-token, origin, session and MCP
+assertions remain unchanged. The pin, packed source, and production remain
+untouched. A green result is still a compatibility probe, not a release.
