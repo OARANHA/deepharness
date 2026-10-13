@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test dsh-host-read.test.mjs"
+    "test": "node --test dsh-host-read.test.mjs dsh-host-http.test.mjs"
   },
   "dependencies": {
     "@deepseek-ai/cordis": "4.0.5-alpha.1",
