@@ -9,7 +9,7 @@ import { createScopedMcpReadIdentity } from './scoped-mcp-read-identity.mjs';
 import { createScopedReadGrants } from './scoped-read-grants.mjs';
 const deny = () => { throw new Error('Agent Teams read denied'); };
 export function createMcpReadRequestContext({
-  currentCredential, grants = [], allowedOrigins = [], allowMissingOrigin = false, ...host
+  currentCredential, authenticateTransport, grants = [], allowedOrigins = [], allowMissingOrigin = false, ...host
 }) {
   if (!Array.isArray(allowedOrigins) || typeof allowMissingOrigin !== 'boolean') deny();
   const origins = new Set();
@@ -21,15 +21,26 @@ export function createMcpReadRequestContext({
     origins.add(origin);
   }
   const policy = createScopedReadGrants(grants);
-  const authenticate = createBearerServiceAuthenticator(currentCredential);
+  // Only the embedding server may supply this already-verified identity resolver.
+  // Never treat user headers or MCP arguments as verified principal claims.
+  if (authenticateTransport !== undefined && typeof authenticateTransport !== 'function') deny();
+  const authenticate = authenticateTransport ?? createBearerServiceAuthenticator(currentCredential);
+  const verified = async request => {
+    const identity = await authenticate(request);
+    if (typeof identity?.principalId !== 'string' ||
+        identity.principalId.length === 0 || identity.principalId.length > 256 ||
+        !['service', 'individual'].includes(identity.kind)) deny();
+    return { principalId: identity.principalId, kind: identity.kind };
+  };
   const contexts = new AsyncLocalStorage();
   const reader = createScopedMcpReadIdentity({
     ...host,
     authenticateRequest: async request => {
       const context = contexts.getStore();
       if (!context?.active || context.request !== request) deny();
-      const identity = await authenticate(request);
-      if (!context.active || identity.principalId !== context.principalId) deny();
+      const identity = await verified(request);
+      if (!context.active || identity.principalId !== context.principalId ||
+          identity.kind !== context.kind) deny();
       return identity;
     },
     hasReadGrant: policy.hasReadGrant,
@@ -44,8 +55,8 @@ export function createMcpReadRequestContext({
         authorization: serverRequest?.headers?.authorization, origin,
       }) });
       let identity;
-      try { identity = await authenticate(request); } catch { deny(); }
-      const context = { request, principalId: identity.principalId, active: true };
+      try { identity = await verified(request); } catch { deny(); }
+      const context = { request, principalId: identity.principalId, kind: identity.kind, active: true };
       return contexts.run(context, async () => {
         try { return await dispatch(); } finally { context.active = false; }
       });
