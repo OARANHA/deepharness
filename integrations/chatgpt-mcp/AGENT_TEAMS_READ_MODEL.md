@@ -478,3 +478,30 @@ verified and the DSH Web UI's own authentication is not established by the
 service-Bearer bridge tests. External deployment, approval/origin controls,
 and per-user identity mapping need separate review before any real ChatGPT
 connection. No permission to deploy, merge or expose a public MCP endpoint.
+
+## Trusted transport-verified MCP identity gate (2026-10-13)
+
+`createMcpReadRequestContext` now supports a server-injected
+`authenticateTransport(request)` callback as an alternative to the
+previous exact service-Bearer credential. Its result must be a validated
+`{ principalId, kind: 'individual' | 'service' }` identity. The same
+authenticated principal **and kind** must survive every authorization
+recheck during a single HTTP request. Exact principal/workspace/Lead
+grants, workspace membership, origin validation, active request context
+and revocation remain independent mandatory gates. The default path
+without the callback still uses the existing exact service Bearer.
+
+The callback is **a trusted server-side integration contract, not an
+OAuth verifier**. In particular, ChatGPT identity cannot be accepted
+from MCP arguments, an unverified JWT, `X-User` headers, session IDs
+or arbitrary client-supplied values. A deployable implementation must
+verify issuer, audience, signature and token validity against the
+configured identity provider and handle rotation/revocation, with
+security review and explicit owner approval before remote use.
+
+The isolated `verified-transport-identity.test.mjs` tests principals,
+wrong-target/identity spoofing, same-request identity/kind switching,
+malformed assertions, origin and credential rejection and grant
+revocation. **New CI is not yet verified.** No real ChatGPT login,
+OAuth authorization, external endpoint, merge or deployment is part of
+this slice.
