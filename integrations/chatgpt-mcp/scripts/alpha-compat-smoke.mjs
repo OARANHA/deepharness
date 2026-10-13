@@ -104,6 +104,31 @@ try {
     if (pass === 5) throw new Error('Required official host peer closure did not converge');
   }
 
+  // The official alpha host deliberately blocks RC2 peer declarations. Do NOT
+  // grant allow-version. Adapt ONLY the installed throwaway package manifest
+  // to the exact alpha after proving all five original peer pins match RC2.
+  // This tests the actual code contracts, NOT publishable metadata compatibility.
+  const bridgeManifestPath = join(installed, 'package.json');
+  const bridgeManifest = JSON.parse(readFileSync(bridgeManifestPath, 'utf8'));
+  const hostPeers = [
+    '@deepseek-ai/dsh-llm',
+    '@deepseek-ai/dsh-agent',
+    '@deepseek-ai/dsh-agent-preset-registry',
+    '@deepseek-ai/dsh-session',
+    '@deepseek-ai/dsh-session-title',
+  ];
+  for (const name of hostPeers) {
+    assert.equal(bridgeManifest.peerDependencies?.[name], '0.2.0-rc.2',
+      `Unexpected upstream peer; do not silently adapt ${name}`);
+    assert.equal(
+      JSON.parse(readFileSync(join(temp, 'node_modules', name, 'package.json'), 'utf8')).version,
+      DSH_VERSION, `Official host peer is not exact alpha: ${name}`,
+    );
+    bridgeManifest.peerDependencies[name] = DSH_VERSION;
+  }
+  writeFileSync(bridgeManifestPath, JSON.stringify(bridgeManifest, null, 2) + '\n');
+  console.log('ALPHA_TEST_ONLY_PEER_METADATA_ADAPTATION: five exact RC2 peers → 0.2.1-alpha.2 (disposable copy, not upstream, not exemption)');
+
   cpSync(join(upstream, 'test', 'integration'), join(installed, 'test', 'integration'), { recursive: true });
   // The original tests assert 23 MCP tools, bearer auth, session operations,
   // Web origin fence and clean shutdown; no real model or production runtime.
