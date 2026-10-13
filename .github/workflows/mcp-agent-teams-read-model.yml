@@ -71,17 +71,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Generate pinned dependency lock without install scripts
-        run: npm install --prefix integrations/chatgpt-mcp/host-probe --package-lock-only --ignore-scripts --no-audit --no-fund
-      - name: Install from generated lock without install scripts
+      - name: Install from committed lock without install scripts
         run: npm ci --prefix integrations/chatgpt-mcp/host-probe --ignore-scripts --no-audit --no-fund
       - name: Verify published official DSH package surfaces
         run: npm test --prefix integrations/chatgpt-mcp/host-probe
-      - name: Preserve generated lockfile for reviewed publication
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: dsh-host-probe-lock-preflight
-          path: integrations/chatgpt-mcp/host-probe/package-lock.json
-          if-no-files-found: warn
-          retention-days: 3
