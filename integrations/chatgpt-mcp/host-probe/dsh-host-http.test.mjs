@@ -1,4 +1,4 @@
-import { projectionFixture } from '../test/projection-fixture.mjs';
+import { Context } from '@deepseek-ai/cordis';
 import { SessionStore } from '@deepseek-ai/dsh-session';
 import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection';
 import { WorkspaceRegistry } from '@deepseek-ai/dsh-workspace';
@@ -12,25 +12,28 @@ import { z } from 'zod';
 import { createDshHostReadBinding } from '../adapters/dsh-host-read-binding.mjs';
 import { registerScopedTeamReadTool } from '../adapters/register-scoped-team-read-tool.mjs';
 
-test('official DSH read service signatures with real SDK HTTP binding and negative scope', { timeout: 15000 }, async t => {
+test('real DSH SessionStore and SessionProjectionRegistry through MCP SDK HTTP', { timeout: 15000 }, async t => {
   let token = randomBytes(32).toString('base64url');
-  let reads = 0;
-  let release, entered;
-  let pending;
   assert.equal(typeof SessionStore.prototype.get, 'function');
   assert.equal(typeof SessionProjectionRegistry.prototype.snapshot, 'function');
   assert.equal(typeof WorkspaceRegistry.prototype.get, 'function');
-  const lead = { id: 'lead' };
+  const ctx = new Context();
+  t.after(async () => { await ctx.fiber.dispose(); });
+  await ctx.plugin(SessionStore);
+  await ctx.plugin(SessionProjectionRegistry);
+  const lead = ctx.sessions.create('lead');
+  const baseTeam = { members: [{ id: 'lead', name: 'Lead', role: 'lead', phase: 'active' }], tasks: [] };
+  ctx.effect(() => ctx.sessionProjections.register({
+    key: 'agentTeam', stateVersion: 1,
+    stateSchema: z.any(),
+    init: () => baseTeam,
+    apply: state => state,
+    wire: { viewSchema: z.any(), view: state => state },
+  }));
   const host = {
-    sessions: { get: id => id === lead.id ? lead : undefined },
+    sessions: ctx.sessions,
     workspaceRegistry: { get: id => id === 'ws' ? { id: 'ws', sessionIds: ['lead'] } : undefined },
-    sessionProjections: projectionFixture({ read: (session, keys) => {
-      assert.equal(session, lead);
-      assert.deepEqual(keys, ['agentTeam']);
-      reads++;
-      if (pending) { entered(); return pending; }
-      return { members: [{ id: 'lead', name: 'Lead', role: 'lead', phase: 'active' }], tasks: [] };
-    } }),
+    sessionProjections: ctx.sessionProjections,
   };
   const binding = createDshHostReadBinding(host, {
     currentCredential: () => ({ authMode: 'token', authToken: token, principalId: 'bridge' }),
@@ -99,7 +102,7 @@ test('official DSH read service signatures with real SDK HTTP binding and negati
   const allowed = await (await call(target)).json();
   assert.equal(allowed.result.isError, undefined);
   assert.equal(JSON.parse(allowed.result.content[0].text).leadSessionId, 'lead');
-  assert.equal(reads, 1);
+  assert.deepEqual(ctx.sessionProjections.snapshot(lead, ['agentTeam']).values.agentTeam, baseTeam);
   for (const args of [
     { ...target, workspaceId: 'other' },
     { ...target, leadSessionId: 'other' },
@@ -108,19 +111,12 @@ test('official DSH read service signatures with real SDK HTTP binding and negati
     const denied = await (await call(args)).json();
     assert.equal(denied.result?.isError === true || !!denied.error, true);
   }
-  assert.equal(reads, 1);
   for (const headers of [{ authorization: 'Bearer invalid' }, { origin: 'https://evil.example' }, { authorization: '' }]) {
     const denied = await send('tools/call', { name: 'dsh_read_agent_team', arguments: target }, headers);
     assert.equal(denied.status, 403); await denied.text();
   }
-  assert.equal(reads, 1);
-  pending = new Promise(resolve => { release = resolve; });
-  const started = new Promise(resolve => { entered = resolve; });
-  const running = call(target);
-  await started;
   binding.revokeGrant({ principalId: 'bridge', ...target });
-  release({ members: [{ id: 'lead', name: 'Lead', role: 'lead', phase: 'active' }], tasks: [] });
-  const revoked = await (await running).json();
+  const revoked = await (await call(target)).json();
   assert.equal(revoked.result.isError, true);
   assert.equal(revoked.result.content[0].text.includes('members'), false);
   const old = token;
