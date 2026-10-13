@@ -129,6 +129,27 @@ try {
   writeFileSync(bridgeManifestPath, JSON.stringify(bridgeManifest, null, 2) + '\n');
   console.log('ALPHA_TEST_ONLY_PEER_METADATA_ADAPTATION: five exact RC2 peers → 0.2.1-alpha.2 (disposable copy, not upstream, not exemption)');
 
+  // DSH alpha provides webRuntime in a scoped Cordis plugin context after
+  // web startup. A direct ctx.get from a sibling bridge can miss it.
+  // Review-only adapter: require a real injected service, never fake health.
+  const bridgeJsPath = join(installed, 'lib', 'bridge.js');
+  let bridgeJs = readFileSync(bridgeJsPath, 'utf8');
+  const marker = 'this.apiProxy = asApiProxy(this.ctx.get(\'apiProxy\'));';
+  const healthMarker = "webSurface: this.apiProxy !== undefined || this.ctx.get('webRuntime') !== undefined,";
+  assert.equal(bridgeJs.split(marker).length, 2, 'Bridge start() changed: review adapter');
+  assert.equal(bridgeJs.split(healthMarker).length, 2, 'Bridge health changed: review adapter');
+  bridgeJs = bridgeJs.replace(marker, marker + `
+        // Alpha adapter: Cordis scoped injection; no service or auth bypass.
+        this.alphaWebRuntimeObserved = false;
+        this.ctx.inject(['webRuntime'], webCtx => {
+            this.alphaWebRuntimeObserved = webCtx.get('webRuntime') !== undefined;
+        });
+  `);
+  bridgeJs = bridgeJs.replace(healthMarker,
+    "webSurface: this.apiProxy !== undefined || this.ctx.get('webRuntime') !== undefined || this.alphaWebRuntimeObserved === true,");
+  writeFileSync(bridgeJsPath, bridgeJs);
+  console.log('ALPHA_TEST_ONLY_SCOPED_WEB_RUNTIME_ADAPTER: requires actual webRuntime injection');
+
   cpSync(join(upstream, 'test', 'integration'), join(installed, 'test', 'integration'), { recursive: true });
   // Instrument only the copied upstream test to identify which official
   // alpha health capability is absent. Preserve all original assertions.
