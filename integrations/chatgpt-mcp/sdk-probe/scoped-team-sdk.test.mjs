@@ -1,3 +1,4 @@
+import { projectionFixture } from '../test/projection-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -19,11 +20,11 @@ test('SDK 1.30.0 stateful HTTP propagates fresh authenticated context for each c
     allowedOrigins: ['https://client.example'],
     workspaceRegistry: { get: () => ({ id: 'ws', sessionIds: ['lead', 'other'] }) },
     resolveLiveLeadSession: async () => ({}),
-    sessionProjections: { stateOf: () => {
+    sessionProjections: projectionFixture({ read: () => {
       reads++;
       if (pending) { entered(); return pending; }
       return { members: [{ id: 'lead', name: 'Lead', role: 'lead', phase: 'active' }], tasks: [] };
-    } },
+    } }),
   });
   const sessions = new Map();
   const http = createServer(async (req, res) => {
