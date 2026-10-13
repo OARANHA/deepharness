@@ -172,6 +172,20 @@ test('initialized official TeamService WorkspaceRegistry JSONL host through SDK 
     const denied = await send('tools/call', { name: 'dsh_read_agent_team', arguments: target }, headers);
     assert.equal(denied.status, 403); await denied.text();
   }
+  // Workspace membership is an independent gate: an existing grant and a
+  // valid Bearer must not authorize a detached Lead on the same MCP session.
+  await workspace.detachSession(lead.id);
+  assert.equal(workspace.sessionIds.includes(lead.id), false);
+  const detached = await (await call(target)).json();
+  assert.equal(detached.result.isError, true);
+  assert.equal(detached.result.content[0].text.includes('members'), false);
+  // Reattaching via the official validated workspace API restores only the
+  // membership gate; the separate grant remains necessary.
+  await workspace.attachSession(lead.id);
+  assert.equal(workspace.sessionIds.includes(lead.id), true);
+  const reattached = await (await call(target)).json();
+  assert.equal(reattached.result.isError, undefined);
+  assert.equal(JSON.parse(reattached.result.content[0].text).leadSessionId, lead.id);
   binding.revokeGrant({ principalId: 'bridge', ...target });
   const revoked = await (await call(target)).json();
   assert.equal(revoked.result.isError, true);
