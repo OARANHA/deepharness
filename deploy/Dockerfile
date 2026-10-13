@@ -1,6 +1,6 @@
 # Bootstrap image: pinned official npm distribution, until source-build packaging is validated.
 FROM node:22-bookworm-slim
-ARG DSH_VERSION=0.2.0-rc.2
+ARG DSH_VERSION=0.2.1-alpha.2
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends bash git ca-certificates curl \
@@ -25,7 +25,6 @@ ENV HOME=/data/dsh \
 WORKDIR /workspace
 USER node
 EXPOSE 3080
-# DSH npm 0.2.0-rc.2 does not support --public-url (verified in CI startup logs).
-# Version-pinned npm 0.2.0-rc.2 accepts only 127.0.0.1 or 0.0.0.0.
-# 0.0.0.0 binds only inside this isolated container; Stack must not publish 3080.
-CMD ["dsh", "web", "--no-open", "--port", "3080", "--host", "0.0.0.0", "--trusted-host", "deep.wandora.com.br"]
+# CI preview only: bind solely to container loopback; no remote listener.
+# Do NOT use this image with the public Traefik Portainer Stack.
+CMD ["dsh", "web", "--no-open", "--port", "3080", "--host", "127.0.0.1"]

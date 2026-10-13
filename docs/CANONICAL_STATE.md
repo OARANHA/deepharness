@@ -33,6 +33,12 @@ Updated: 2026-10-12
 - Run #38322385643, job #115053233774, built image and passed native addon probe, but failed the Web UI smoke. Sanitized logs: `webserver (required) ValidationError: $.host expected "127.0.0.1" | "0.0.0.0" but got "172.17.0.2"`. Thus the package `@deepseek-ai/dsh@0.2.0-rc.2` does not permit a concrete Docker bridge IP for `--host`; its runtime behavior differs from current upstream public-deployment documentation.
 - Proposed targeted fix on PR #1: use direct exec-form `CMD ["dsh","web","--no-open","--port","3080","--host","0.0.0.0","--trusted-host","deep.wandora.com.br"]`. Keep container **without published port**; only Traefik on isolated Docker network may reach 3080. This is **untested until PR CI is green**, and is not a change to 28server.
 
+## Alpha release evaluation (not a Portainer deploy)
+- **Why old version is blocked:** CI #38322682966 proved that the pinned RC intentionally rejects wildcard remote binding to prevent network exposure of code execution tools. This guard must not be disabled.
+- **Scoped change in PR #1:** switch to official npm package `@deepseek-ai/dsh@0.2.1-alpha.2` but run Web UI **only on 127.0.0.1** inside a `--network none` CI container. HTTP checks run by `docker exec`, not from the runner network. No `--public-url`, `--trusted-host`, or Traefik exposure in this test.
+- **No release authorization:** passing this local smoke would show the alpha can bootstrap with an isolated listener, **not** that it is safe for internet access. The public Portainer Stack remains blocked until a separate explicit security review, protected ingress design, valid origin TLS and reviewed immutable image. No automatic production upgrade from this result.
+- Verified alpha upstream source (for comparison): `https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.1-alpha.2/packages/bundle/web-app/src/startup.ts`.
+
 ## Strict next gates
 A. Verify source-import workflow outcome, LICENSE, source tree and pinned source SHA.
 B. Verify full Web UI runtime smoke in PR CI and record the next immutable GHCR digest.

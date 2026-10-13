@@ -57,15 +57,16 @@ jobs:
             docker rm -f "$name" >/dev/null 2>&1 || true
           }
           trap cleanup EXIT
-          docker run -d --name "$name" --init --read-only \
+          docker run -d --name "$name" --init --read-only --network none \
             --security-opt no-new-privileges --cap-drop ALL \
             --pids-limit 256 --memory 2g --cpus 1.5 \
             --tmpfs /tmp:rw,nosuid,nodev,noexec,size=128m,mode=1777 \
             --tmpfs /data/dsh:rw,nosuid,nodev,size=256m,mode=0700,uid=1000,gid=1000 \
             --tmpfs /workspace:rw,nosuid,nodev,size=128m,mode=0700,uid=1000,gid=1000 \
             local/deepharness:ci >/dev/null
-          ip="$(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$name")"
-          test -n "$ip" || { echo "::error::Missing container IP"; exit 1; }
+          test "$(docker inspect --format '{{.HostConfig.NetworkMode}}' "$name")" = none || {
+            echo "::error::Preview container must have no external network"; exit 1;
+          }
           ready=0
           response=000
           for _ in $(seq 1 60); do
@@ -75,11 +76,11 @@ jobs:
               docker inspect --format 'exit_code={{.State.ExitCode}}' "$name"
               exit 1
             fi
-            response="$(curl -sS --max-time 2 --output /dev/null --write-out '%{http_code}' \
-              --header 'Host: deep.wandora.com.br' "http://${ip}:3080/index.html" 2>/dev/null || true)"
+            response="$(docker exec "$name" curl -sS --max-time 2 --output /dev/null --write-out '%{http_code}' \
+              --header 'Host: 127.0.0.1:3080' "http://127.0.0.1:3080/index.html" 2>/dev/null || true)"
             if [[ "$response" == 401 ]]; then
-              rejected="$(curl -sS --max-time 2 --output /dev/null --write-out '%{http_code}' \
-                --header 'Host: untrusted.example.invalid' "http://${ip}:3080/index.html" 2>/dev/null || true)"
+              rejected="$(docker exec "$name" curl -sS --max-time 2 --output /dev/null --write-out '%{http_code}' \
+                --header 'Host: untrusted.example.invalid' "http://127.0.0.1:3080/index.html" 2>/dev/null || true)"
               if [[ "$rejected" != 403 ]]; then
                 echo "::error::Untrusted Host check failed (HTTP $rejected)"
                 exit 1
@@ -95,7 +96,7 @@ jobs:
           fi
           sleep 3
           test "$(docker inspect --format '{{.State.Status}}' "$name")" = running
-          echo "Web startup smoke OK: unauthorized index 401, untrusted Host 403, container alive"
+          echo "Isolated alpha startup OK: HTTP 401, untrusted Host 403, no network, alive"
       - name: Log in to GHCR
         if: steps.state.outputs.ready == 'true' && github.event_name == 'push'
         uses: docker/login-action@v3
