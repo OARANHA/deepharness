@@ -418,3 +418,7 @@ advancing, retrieve/validate/commit the generated lockfile, then build
 an actual disposable runtime and negative tests using the official
 service graph. Never describe a green dependency preflight as full
 DSH host integration.
+
+## Initialized-host lockfile committed — 2026-10-13
+
+Owner-uploaded 84,435-byte npm v3 lockfile (159 package records, reviewed SHA-256 `ac4f67959557baf5e6303ca6b0cdf1b95de5ab12bf9d64641ffa4103ec5c451b`) was initially placed at repository root. It has been copied byte-for-byte into `integrations/chatgpt-mcp/initialized-host-probe/package-lock.json` (Git blob `02e9cce8308dbb830d74950b0a81471b2e9eb0fa`), verified by GitHub readback, and the root copy removed. The initialized-host CI job now performs `npm ci --ignore-scripts` from the committed lockfile, without dynamic generation or artifact upload. The new CI has not yet been confirmed GREEN. The full TeamService+WorkspaceRegistry+JSONL runtime test remains outstanding.
