@@ -13,7 +13,7 @@ const valid = x => typeof x === 'string' && x.length > 0 && x.length <= 256;
 
 export function createDshAgentTeamHostReader({ workspaceRegistry, sessionProjections, resolveLiveLeadSession, authorizePrincipal, principalFromTransport }) {
   if (typeof workspaceRegistry?.get !== 'function' ||
-      typeof sessionProjections?.stateOf !== 'function' ||
+      typeof sessionProjections?.snapshot !== 'function' ||
       typeof resolveLiveLeadSession !== 'function' ||
       typeof authorizePrincipal !== 'function' ||
       typeof principalFromTransport !== 'function') deny();
@@ -52,11 +52,13 @@ export function createDshAgentTeamHostReader({ workspaceRegistry, sessionProject
         // Re-authorize AFTER the potentially async session resolution:
         // revocation and detach must not return stale sensitive output.
         await readAuthority();
-        const projection = sessionProjections.stateOf(session, 'agentTeam');
+        const projection = sessionProjections.snapshot(session, ['agentTeam']);
         if (!projection) deny();
         // A projection may be async in future host adapters; do not assume a
         // previously granted access survives the read boundary.
-        const resolved = await projection;
+        const snapshot = await projection;
+        const resolved = snapshot?.values?.agentTeam;
+        if (!resolved) deny();
         await readAuthority();
         return resolved;
       },
