@@ -80,6 +80,16 @@ test('initialized official TeamService WorkspaceRegistry JSONL host through SDK 
     allowedOrigins: ['https://client.example'],
 
   });
+  // A real request-scoped HTTP binding, exercised before SDK dispatch.
+  // This tests the auth/host-binding boundary without accepting MCP claims.
+  await binding.runHttpRequest({ headers: {
+    authorization: 'Bearer ' + token,
+    origin: 'https://client.example',
+  } }, async () => {
+    const scoped = await binding.readTeam({ workspaceId: workspace.id, leadSessionId: lead.id });
+    assert.equal(scoped.leadSessionId, lead.id,
+      'stage: authenticated host binding must read Team before SDK transport');
+  });
   const sessions = new Map();
   const http = createServer(async (req, res) => {
     try {
