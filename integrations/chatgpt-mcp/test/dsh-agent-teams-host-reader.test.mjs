@@ -67,3 +67,24 @@ test('unavailable live session fails closed without cold resume', async () => {
 test('rejects missing trusted services', () => {
   assert.throws(() => createDshAgentTeamHostReader({}), /read denied/);
 });
+
+test('revocation during projection resolution denies the result', async () => {
+  let release;
+  let projected = false;
+  let authorized = true;
+  const pending = new Promise(resolve => { release = resolve; });
+  const reader = createDshAgentTeamHostReader({
+    workspaceRegistry: { get: () => ({ id: 'ws-1', sessionIds: ['lead-1'] }) },
+    sessionProjections: { stateOf: () => { projected = true; return pending; } },
+    resolveLiveLeadSession: async () => ({ id: 'lead-1' }),
+    authorizePrincipal: async () => authorized,
+    principalFromTransport: async () => 'owner',
+  });
+  const attempt = reader(request, {});
+  // Advance through transport, admission and live session lookup.
+  for (let i = 0; i < 12 && !projected; i++) await Promise.resolve();
+  assert.equal(projected, true);
+  authorized = false;
+  release({ members: [{ id: 'lead-1', name: 'Lead', role: 'lead', phase: 'active' }], tasks: [] });
+  await assert.rejects(attempt, /read denied/);
+});
