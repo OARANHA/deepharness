@@ -11,8 +11,9 @@ import { readAuthorizedAgentTeam } from './agent-teams-read-authorization.mjs';
 const deny = () => { throw new Error('Agent Teams read denied'); };
 const valid = x => typeof x === 'string' && x.length > 0 && x.length <= 256;
 
-export function createDshAgentTeamHostReader({ workspaceRegistry, resolveLiveLeadSession, authorizePrincipal, principalFromTransport }) {
+export function createDshAgentTeamHostReader({ workspaceRegistry, sessionProjections, resolveLiveLeadSession, authorizePrincipal, principalFromTransport }) {
   if (typeof workspaceRegistry?.get !== 'function' ||
+      typeof sessionProjections?.stateOf !== 'function' ||
       typeof resolveLiveLeadSession !== 'function' ||
       typeof authorizePrincipal !== 'function' ||
       typeof principalFromTransport !== 'function') deny();
@@ -51,7 +52,7 @@ export function createDshAgentTeamHostReader({ workspaceRegistry, resolveLiveLea
         // Re-authorize AFTER the potentially async session resolution:
         // revocation and detach must not return stale sensitive output.
         await readAuthority();
-        const projection = session.agentTeamProjection;
+        const projection = sessionProjections.stateOf(session, 'agentTeam');
         if (!projection) deny();
         return projection;
       },
