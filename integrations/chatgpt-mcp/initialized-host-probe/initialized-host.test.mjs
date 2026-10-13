@@ -43,8 +43,18 @@ test('official WorkspaceRegistry and JSONL persistence initialize on disposable 
   await ctx.plugin(SessionStore);
   await ctx.plugin(SessionProjectionRegistry);
   await ctx.plugin(WorkspaceRegistry);
+  // No agent/model is launched: provide inert read-only dependencies required
+  // by TeamService's declared DI contract, without enabling mutations.
+  ctx.provide('agents', { list: () => [] });
+  ctx.provide('subagents', {});
+  await ctx.plugin(TeamService);
   assert.equal(typeof ctx.workspaceRegistry.get, 'function');
+  assert.equal(typeof ctx.agentTeams.membership, 'function');
   assert.equal(typeof ctx.sessionPersistence.list, 'function');
   const lead = ctx.sessions.create('official-host-lead');
   assert.equal(ctx.sessions.get(lead.id), lead);
+  const snapshot = ctx.sessionProjections.snapshot(lead, ['agentTeam']);
+  assert.ok(snapshot.values.agentTeam, 'TeamService must register the official agentTeam projection');
+  assert.deepEqual(snapshot.values.agentTeam.members, []);
+  assert.deepEqual(snapshot.values.agentTeam.tasks, []);
 });
