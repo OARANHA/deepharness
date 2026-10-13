@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test initialized-host.test.mjs initialized-host-http.test.mjs"
+    "test": "node --test initialized-host.test.mjs initialized-host-http.test.mjs verified-transport-identity.test.mjs"
   },
   "dependencies": {
     "@deepseek-ai/cordis": "4.0.5-alpha.1",
