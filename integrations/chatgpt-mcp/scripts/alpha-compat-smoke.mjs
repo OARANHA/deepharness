@@ -129,26 +129,30 @@ try {
   writeFileSync(bridgeManifestPath, JSON.stringify(bridgeManifest, null, 2) + '\n');
   console.log('ALPHA_TEST_ONLY_PEER_METADATA_ADAPTATION: five exact RC2 peers → 0.2.1-alpha.2 (disposable copy, not upstream, not exemption)');
 
-  // DSH alpha provides webRuntime in a scoped Cordis plugin context after
-  // web startup. A direct ctx.get from a sibling bridge can miss it.
-  // Review-only adapter: require a real injected service, never fake health.
+  // The pinned plugin's own management route uses the real 'webServer'
+  // service, while its health code still looks for older webRuntime/apiProxy.
+  // Probe the same official scoped webServer dependency in the disposable JS.
+  // This is only a capability detector: no HTTP routes or auth are modified.
   const bridgeJsPath = join(installed, 'lib', 'bridge.js');
   let bridgeJs = readFileSync(bridgeJsPath, 'utf8');
-  const marker = 'this.apiProxy = asApiProxy(this.ctx.get(\'apiProxy\'));';
-  const healthMarker = "webSurface: this.apiProxy !== undefined || this.ctx.get('webRuntime') !== undefined,";
+  const marker = "this.apiProxy = asApiProxy(this.ctx.get('apiProxy'));";
+  const healthMarker = "webSurface: this.apiProxy !== undefined || this.ctx.get('webRuntime') !== undefined || this.alphaWebRuntimeObserved === true,";
   assert.equal(bridgeJs.split(marker).length, 2, 'Bridge start() changed: review adapter');
-  assert.equal(bridgeJs.split(healthMarker).length, 2, 'Bridge health changed: review adapter');
+  // The pristine tarball must retain the original contract prior to adaptation.
+  const pristineHealthMarker = "webSurface: this.apiProxy !== undefined || this.ctx.get('webRuntime') !== undefined,";
+  assert.equal(bridgeJs.split(pristineHealthMarker).length, 2,
+    'Upstream health contract changed: review adapter');
   bridgeJs = bridgeJs.replace(marker, marker + `
-        // Alpha adapter: Cordis scoped injection; no service or auth bypass.
-        this.alphaWebRuntimeObserved = false;
-        this.ctx.inject(['webRuntime'], webCtx => {
-            this.alphaWebRuntimeObserved = webCtx.get('webRuntime') !== undefined;
+        this.alphaWebServerObserved = false;
+        this.ctx.inject(['webServer'], webCtx => {
+            this.alphaWebServerObserved = webCtx.get('webServer') !== undefined;
+            return () => { this.alphaWebServerObserved = false; };
         });
   `);
-  bridgeJs = bridgeJs.replace(healthMarker,
-    "webSurface: this.apiProxy !== undefined || this.ctx.get('webRuntime') !== undefined || this.alphaWebRuntimeObserved === true,");
+  bridgeJs = bridgeJs.replace(pristineHealthMarker,
+    "webSurface: this.apiProxy !== undefined || this.ctx.get('webRuntime') !== undefined || this.alphaWebServerObserved === true,");
   writeFileSync(bridgeJsPath, bridgeJs);
-  console.log('ALPHA_TEST_ONLY_SCOPED_WEB_RUNTIME_ADAPTER: requires actual webRuntime injection');
+  console.log('ALPHA_TEST_ONLY_WEB_SERVER_ADAPTER: observes actual webServer service only');
 
   cpSync(join(upstream, 'test', 'integration'), join(installed, 'test', 'integration'), { recursive: true });
   // Instrument only the copied upstream test to identify which official
