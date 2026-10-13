@@ -359,3 +359,23 @@ HTTP host integration test still has not been implemented or executed.
 The current host-probe file is a published-class API preflight only.
 The new HEAD's CI has not been confirmed GREEN. Local npm continues
 to return EAI_AGAIN, so no local package execution is claimed.
+
+## Host-bound MCP SDK HTTP integration gate — 2026-10-13
+
+`host-probe/dsh-host-http.test.mjs` now exercises the *real MCP SDK*
+Streamable HTTP request lifecycle with the *actual* `createDshHostReadBinding`
+rather than only the generic scoped reader. It verifies the DSH
+`SessionStore.get`, `SessionProjectionRegistry.snapshot`, and
+`WorkspaceRegistry.get` published prototype method presence, and
+tests tool enumeration, exact-scope authorization, forged claims,
+invalid Bearer/Origin, mid-read revocation and rotation. The pinned
+host-probe `npm test` command includes this test.
+
+**Evidence boundary:** workspace registry, live session and Team projection
+are still explicit fixtures, not initialized official Cordis services.
+This verifies the HTTP SDK + host *binding* path, **not** a real
+TeamService-written session log or initialized DSH host. The new CI run
+has not been observed. No production plugin, agent execution, shell or deploy.
+The remaining gate is constructing a disposable Cordis runtime with official
+storage/domain/persistence, live session and TeamService registration,
+then repeating this HTTP path without synthetic host service fixtures.
