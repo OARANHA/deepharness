@@ -61,12 +61,24 @@ export function projectAgentTeam(leadSessionId, projection) {
     throw new Error('Agent Teams projection reports a replay failure');
   }
   const members = projection.members.map(member);
-  if (members.filter(m => m.role === 'lead' && m.id === id).length !== 1) {
+  const memberIds = new Set(members.map(m => m.id));
+  if (memberIds.size !== members.length) throw new TypeError('duplicate Team member id');
+  if (members.filter(m => m.role === 'lead').length !== 1 ||
+      members.some(m => m.role === 'lead' && (m.id !== id || m.phase !== 'active'))) {
     throw new TypeError('projection does not identify the requested Lead');
+  }
+  const tasks = projection.tasks.map(task);
+  const taskIds = new Set(tasks.map(t => t.id));
+  if (taskIds.size !== tasks.length) throw new TypeError('duplicate Team task id');
+  for (const item of tasks) {
+    if (new Set(item.blockedBy).size !== item.blockedBy.length ||
+        item.blockedBy.some(dep => dep === item.id || !taskIds.has(dep))) {
+      throw new TypeError('invalid Team task dependency');
+    }
   }
   return {
     leadSessionId: id,
     members,
-    tasks: projection.tasks.map(task),
+    tasks,
   };
 }
