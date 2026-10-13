@@ -15,6 +15,8 @@ on:
       - 'integrations/chatgpt-mcp/test/bearer-scoped-team-reader.test.mjs'
       - 'integrations/chatgpt-mcp/adapters/scoped-read-grants.mjs'
       - 'integrations/chatgpt-mcp/test/scoped-read-grants.test.mjs'
+      - 'integrations/chatgpt-mcp/adapters/mcp-read-request-context.mjs'
+      - 'integrations/chatgpt-mcp/test/mcp-read-request-context.test.mjs'
       - '.github/workflows/mcp-agent-teams-read-model.yml'
   workflow_dispatch:
 
@@ -33,4 +35,4 @@ jobs:
         with:
           node-version: 22
       - name: Read-only projection unit contract
-        run: node --test integrations/chatgpt-mcp/test/agent-teams-read-model.test.mjs integrations/chatgpt-mcp/test/agent-teams-read-authorization.test.mjs integrations/chatgpt-mcp/test/dsh-agent-teams-host-reader.test.mjs integrations/chatgpt-mcp/test/scoped-mcp-read-identity.test.mjs integrations/chatgpt-mcp/test/bearer-scoped-team-reader.test.mjs integrations/chatgpt-mcp/test/scoped-read-grants.test.mjs
+        run: node --test integrations/chatgpt-mcp/test/agent-teams-read-model.test.mjs integrations/chatgpt-mcp/test/agent-teams-read-authorization.test.mjs integrations/chatgpt-mcp/test/dsh-agent-teams-host-reader.test.mjs integrations/chatgpt-mcp/test/scoped-mcp-read-identity.test.mjs integrations/chatgpt-mcp/test/bearer-scoped-team-reader.test.mjs integrations/chatgpt-mcp/test/scoped-read-grants.test.mjs integrations/chatgpt-mcp/test/mcp-read-request-context.test.mjs
