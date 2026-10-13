@@ -36,3 +36,29 @@ test('fails closed on replay failure and unknown task status', () => {
   deleted.tasks[0].status = 'deleted';
   assert.throws(() => projectAgentTeam('lead-1', deleted), /invalid task.status/);
 });
+
+test('rejects duplicate members, extra Leads and inconsistent Lead phase', () => {
+  const duplicated = sample();
+  duplicated.members.push({ ...duplicated.members[1] });
+  assert.throws(() => projectAgentTeam('lead-1', duplicated), /duplicate Team member id/);
+  const extraLead = sample();
+  extraLead.members[1].role = 'lead';
+  assert.throws(() => projectAgentTeam('lead-1', extraLead), /requested Lead/);
+  const inactiveLead = sample();
+  inactiveLead.members[0].phase = 'failed';
+  assert.throws(() => projectAgentTeam('lead-1', inactiveLead), /requested Lead/);
+});
+
+test('rejects ambiguous tasks and invalid dependency references', () => {
+  const duplicated = sample();
+  duplicated.tasks.push({ ...duplicated.tasks[0] });
+  assert.throws(() => projectAgentTeam('lead-1', duplicated), /duplicate Team task id/);
+  for (const blockedBy of [['task-1'], ['absent-task'], ['absent-task', 'absent-task']]) {
+    const invalid = sample();
+    invalid.tasks[0].blockedBy = blockedBy;
+    assert.throws(() => projectAgentTeam('lead-1', invalid), /invalid Team task dependency/);
+  }
+  const valid = sample();
+  valid.tasks.push({ ...valid.tasks[0], id: 'task-2', blockedBy: ['task-1'] });
+  assert.equal(projectAgentTeam('lead-1', valid).tasks.length, 2);
+});
