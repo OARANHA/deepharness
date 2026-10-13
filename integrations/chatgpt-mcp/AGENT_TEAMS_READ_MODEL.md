@@ -326,3 +326,18 @@ integrity. The artifact is valid evidence, but the lockfile has NOT yet been
 committed to the PR. Do not replace the generation step with npm ci-only
 until that exact lockfile is published and read back. Real initialized
 Cordis/TeamService HTTP/MCP integration is still untested.
+
+## Exact generated lockfile artifact provenance — 2026-10-13
+
+Recovered GitHub Actions artifact `11840516151` from run `38450609936`
+as `package-lock.json`. Uncompressed file: 64,552 bytes; SHA-256
+`3c49bd38b4fa5e4a950a88003691f5df217e6004a85612021e5759363254268f`;
+lockfileVersion 3 with 127 package entries.
+
+**Do not claim publication:** the authenticated GitHub contents action
+accepts a complete UTF-8 payload, not a local ZIP/file path; the file
+has not been transferred into that action. The CI generation job remains
+read-only and unchanged. Do not grant workflow write permissions merely
+to bypass this artifact handoff. Upon committing the exact lockfile,
+read back its bytes, verify SHA-256, and only then switch the job to
+`npm ci --ignore-scripts` without generation.
