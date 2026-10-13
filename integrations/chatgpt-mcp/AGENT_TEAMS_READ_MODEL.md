@@ -300,3 +300,16 @@ it still requires initializing the official Cordis services, storage,
 JSONL persistence, projection registration and TeamService in isolated
 temporary directories, then a real SDK roundtrip and negative grants.
 The published preflight is a preparation step, not evidence of that gate.
+
+## Host lock-generation CI preflight — 2026-10-13
+
+The Agent Teams workflow now has an isolated `host-lock-preflight` job
+triggered by host-probe changes or workflow changes. It executes
+`npm install --package-lock-only --ignore-scripts`, then
+`npm ci --ignore-scripts`, and the official published-class surface
+preflight. It uploads the generated lockfile as a short-retention artifact.
+The job has `contents: read`, does not push or install a production plugin,
+and cannot serve as proof of the initialized Cordis/TeamService HTTP gate.
+Review the generated lockfile before committing; replace the temporary
+generation step with pure `npm ci --ignore-scripts` after publication.
+The new CI outcome has not been verified yet.
