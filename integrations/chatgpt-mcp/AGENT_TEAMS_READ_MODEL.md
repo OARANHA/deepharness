@@ -98,3 +98,26 @@ workspace, or `canRead` flag may be accepted in MCP tool arguments.
 An absent or revoked grant must return denied, not fall back to all-workspaces.
 
 Do not treat CI here as production identity integration or as a deploy gate.
+
+## Server-bound scoped identity composition (2026-10-13)
+
+`scoped-mcp-read-identity.mjs` composes the host reader with two trusted
+server dependencies: `authenticateRequest(actualServerRequest)` and
+`hasReadGrant({ principalId, workspaceId, leadSessionId })`.
+The former must validate the incoming Bearer credential against the server's
+current authentication policy; the latter must consult explicit current grants.
+Tool arguments supply target IDs only, never identity or permissions.
+A shared token represents a configured service principal, not a human user.
+Authentication, stable principal binding and exact grants are checked at each
+host authorization boundary and again after model materialization.
+Exceptions, absent identity and non-boolean grants deny access.
+
+**Remaining gate:** this is a server-only composition with injected dependencies,
+not a wired HTTP endpoint or a new credential store. Tests use a trusted
+authentication fixture, not the upstream HTTP Bearer implementation.
+The embedding server must supply reviewed authentication and grant providers,
+pass its real request separately from tool arguments, preserve existing Bearer,
+origin and approval gates, and verify end-to-end negative cases before exposure.
+No DSH per-workspace ACL is inferred. No deployment or write operation is added.
+Revocation is checked before returning; transport delivery after that boundary
+requires server lifecycle handling and is not an atomic grant transaction.
