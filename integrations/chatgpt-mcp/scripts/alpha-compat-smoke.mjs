@@ -96,7 +96,7 @@ try {
     if (!missing.size) break;
     console.log(`Official host missing required peers (pass ${pass + 1}): ${JSON.stringify(Object.fromEntries(missing))}`);
     for (const [name, range] of missing) manifest.dependencies[name] = range;
-    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\\n');
+    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
     run('npm', [
       'install', '--prefix', temp, '--ignore-scripts', '--no-audit',
       '--no-fund', '--package-lock=false', '--legacy-peer-deps',
