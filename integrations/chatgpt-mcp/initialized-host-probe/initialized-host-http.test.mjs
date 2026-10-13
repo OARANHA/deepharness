@@ -18,6 +18,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
 import { createDshHostReadBinding } from '../adapters/dsh-host-read-binding.mjs';
+import { createDshAgentTeamHostReader } from '../adapters/dsh-agent-teams-host-reader.mjs';
 import { projectAgentTeam } from '../adapters/agent-teams-read-model.mjs';
 import { registerScopedTeamReadTool } from '../adapters/register-scoped-team-read-tool.mjs';
 
@@ -58,6 +59,20 @@ test('initialized official TeamService WorkspaceRegistry JSONL host through SDK 
   assert.equal(ctx.sessions.get(lead.id), lead);
   assert.equal(typeof realProjection.failure, 'undefined');
   assert.equal(projectAgentTeam(lead.id, realProjection).leadSessionId, lead.id);
+  // Isolate official DSH workspace/projection adapter from HTTP/Bearer transport.
+  // This is a test-only explicit principal and exact-scope grant, not a
+  // substitute for the separately exercised transport authorization.
+  const directReader = createDshAgentTeamHostReader({
+    workspaceRegistry: ctx.workspaceRegistry,
+    sessionProjections: ctx.sessionProjections,
+    resolveLiveLeadSession: async id => ctx.sessions.get(id),
+    principalFromTransport: async () => 'bridge',
+    authorizePrincipal: async scope => scope.principalId === 'bridge'
+      && scope.workspaceId === workspace.id && scope.leadSessionId === lead.id,
+  });
+  const direct = await directReader({ workspaceId: workspace.id, leadSessionId: lead.id });
+  assert.equal(direct.leadSessionId, lead.id,
+    'stage: official workspace+projection reader must work before Bearer transport');
   const host = ctx;
   const binding = createDshHostReadBinding(host, {
     currentCredential: () => ({ authMode: 'token', authToken: token, principalId: 'bridge' }),
