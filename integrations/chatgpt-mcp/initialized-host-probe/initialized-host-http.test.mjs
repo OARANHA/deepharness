@@ -18,6 +18,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
 import { createDshHostReadBinding } from '../adapters/dsh-host-read-binding.mjs';
+import { projectAgentTeam } from '../adapters/agent-teams-read-model.mjs';
 import { registerScopedTeamReadTool } from '../adapters/register-scoped-team-read-tool.mjs';
 
 test('initialized official TeamService WorkspaceRegistry JSONL host through SDK HTTP', { timeout: 15000 }, async t => {
@@ -51,6 +52,12 @@ test('initialized official TeamService WorkspaceRegistry JSONL host through SDK 
   assert.equal(ctx.sessions.get(lead.id), lead);
   const realProjection = ctx.sessionProjections.snapshot(lead, ['agentTeam']).values.agentTeam;
   assert.deepEqual(realProjection.members, [{ id: lead.id, name: 'lead', role: 'lead', phase: 'active' }]);
+  // Probe the official data shape separately from MCP authentication.
+  assert.equal(ctx.workspaceRegistry.get(workspace.id), workspace);
+  assert.deepEqual([...workspace.sessionIds], [lead.id]);
+  assert.equal(ctx.sessions.get(lead.id), lead);
+  assert.equal(typeof realProjection.failure, 'undefined');
+  assert.equal(projectAgentTeam(lead.id, realProjection).leadSessionId, lead.id);
   const host = ctx;
   const binding = createDshHostReadBinding(host, {
     currentCredential: () => ({ authMode: 'token', authToken: token, principalId: 'bridge' }),
