@@ -76,6 +76,19 @@ export function projectAgentTeam(leadSessionId, projection) {
       throw new TypeError('invalid Team task dependency');
     }
   }
+  // The canonical shared task board is a DAG. Reject forged cyclic views.
+  const byId = new Map(tasks.map(t => [t.id, t]));
+  const active = new Set();
+  const visited = new Set();
+  function visit(taskId) {
+    if (active.has(taskId)) throw new TypeError('cyclic Team task dependency');
+    if (visited.has(taskId)) return;
+    active.add(taskId);
+    for (const dep of byId.get(taskId).blockedBy) visit(dep);
+    active.delete(taskId);
+    visited.add(taskId);
+  }
+  for (const item of tasks) visit(item.id);
   return {
     leadSessionId: id,
     members,
