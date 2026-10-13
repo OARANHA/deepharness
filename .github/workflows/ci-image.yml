@@ -103,6 +103,70 @@ jobs:
           sleep 3
           test "$(docker inspect --format '{{.State.Status}}' "$name")" = running
           echo "Isolated alpha startup OK: index 401, trusted API 401, untrusted API 403, no network, alive"
+      - name: Docker bridge-only ingress canary (no host port)
+        if: steps.state.outputs.ready == 'true'
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          set -euo pipefail
+          net="deepharness-ci-net-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          name="deepharness-ci-bridge-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          cleanup() {
+            rc="$?"
+            if [[ "$rc" -ne 0 ]]; then
+              echo "::group::Sanitized bridge canary diagnostics"
+              docker inspect --format='container_status={{.State.Status}} exit_code={{.State.ExitCode}}' "$name" 2>/dev/null || true
+              docker logs --tail 140 "$name" 2>&1 | python3 -c 'import re,sys; [print("[redacted potentially sensitive log line]" if re.search(r"(?i)(?:https?://|token|passphrase|password|secret|api[_-]?key|authorization|bearer|cookie)", line) else line.rstrip()) for line in sys.stdin]' || true
+              echo "::endgroup::"
+            fi
+            docker rm -f "$name" >/dev/null 2>&1 || true
+            docker network rm "$net" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          docker network create --internal --driver bridge "$net" >/dev/null
+          test "$(docker network inspect --format '{{.Internal}}' "$net")" = true
+          # This is the official concrete-interface mode, tested only on an internal CI network.
+          # No host port, external router, exposed socket or production stack is created.
+          docker run -d --name "$name" --network "$net" --network-alias app \
+            --init --read-only --security-opt no-new-privileges --cap-drop ALL \
+            --pids-limit 256 --memory 2g --cpus 1.5 \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=128m,mode=1777 \
+            --tmpfs /data/dsh:rw,nosuid,nodev,size=256m,mode=0700,uid=1000,gid=1000 \
+            --tmpfs /workspace:rw,nosuid,nodev,size=128m,mode=0700,uid=1000,gid=1000 \
+            local/deepharness:ci \
+            sh -ec 'set -- $(hostname -i); test -n "$1"; exec dsh web --no-open --port 3080 --host "$1" --public-url https://deep.wandora.com.br/ --trusted-host deep.wandora.com.br' >/dev/null
+          test "$(docker inspect --format '{{len .HostConfig.PortBindings}}' "$name")" = 0
+          ready=0
+          for _ in $(seq 1 60); do
+            state="$(docker inspect --format '{{.State.Status}}' "$name")"
+            if [[ "$state" != running ]]; then
+              echo "::error::Bridge canary exited during startup ($state)"
+              exit 1
+            fi
+            response="$(docker run --rm --network "$net" local/deepharness:ci \
+              curl -sS --max-time 2 -o /dev/null -w '%{http_code}' \
+              -H 'Host: deep.wandora.com.br' http://app:3080/api/ 2>/dev/null || true)"
+            if [[ "$response" == 401 ]]; then
+              rejected="$(docker run --rm --network "$net" local/deepharness:ci \
+                curl -sS --max-time 2 -o /dev/null -w '%{http_code}' \
+                -H 'Host: untrusted.example.invalid' http://app:3080/api/ 2>/dev/null || true)"
+              if [[ "$rejected" != 403 ]]; then
+                echo "::error::Bridge Host fence must return 403 (HTTP $rejected)"
+                exit 1
+              fi
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [[ "$ready" != 1 ]]; then
+            echo "::error::Trusted Host API on bridge did not return 401 (last HTTP $response)"
+            exit 1
+          fi
+          sleep 3
+          test "$(docker inspect --format '{{.State.Status}}' "$name")" = running
+          echo "Bridge-only canary OK: isolated Docker network, no published ports, API 401/403"
+
       - name: Log in to GHCR
         if: steps.state.outputs.ready == 'true' && github.event_name == 'push'
         uses: docker/login-action@v3
