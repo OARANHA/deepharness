@@ -90,17 +90,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Resolve pinned official host dependency graph
-        run: npm install --prefix integrations/chatgpt-mcp/initialized-host-probe --package-lock-only --ignore-scripts --no-audit --no-fund
-      - name: Install pinned official host dependencies
+      - name: Install from committed initialized-host lockfile
         run: npm ci --prefix integrations/chatgpt-mcp/initialized-host-probe --ignore-scripts --no-audit --no-fund
       - name: Verify initialized-host prerequisite contracts
         run: npm test --prefix integrations/chatgpt-mcp/initialized-host-probe
-      - name: Save generated dependency lock for readback
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: dsh-initialized-host-lock-preflight
-          path: integrations/chatgpt-mcp/initialized-host-probe/package-lock.json
-          retention-days: 3
-          if-no-files-found: warn
