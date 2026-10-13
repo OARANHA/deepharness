@@ -3,6 +3,8 @@ name: ChatGPT MCP — Agent Teams read model
 on:
   pull_request:
     paths:
+      - 'integrations/chatgpt-mcp/adapters/dsh-host-read-binding.mjs'
+      - 'integrations/chatgpt-mcp/test/dsh-host-read-binding.test.mjs'
       - 'integrations/chatgpt-mcp/adapters/agent-teams-read-model.mjs'
       - 'integrations/chatgpt-mcp/test/agent-teams-read-model.test.mjs'
       - 'integrations/chatgpt-mcp/adapters/agent-teams-read-authorization.mjs'
@@ -38,7 +40,7 @@ jobs:
         with:
           node-version: 22
       - name: Read-only projection unit contract
-        run: node --test integrations/chatgpt-mcp/test/agent-teams-read-model.test.mjs integrations/chatgpt-mcp/test/agent-teams-read-authorization.test.mjs integrations/chatgpt-mcp/test/dsh-agent-teams-host-reader.test.mjs integrations/chatgpt-mcp/test/scoped-mcp-read-identity.test.mjs integrations/chatgpt-mcp/test/bearer-scoped-team-reader.test.mjs integrations/chatgpt-mcp/test/scoped-read-grants.test.mjs integrations/chatgpt-mcp/test/mcp-read-request-context.test.mjs
+        run: node --test integrations/chatgpt-mcp/test/agent-teams-read-model.test.mjs integrations/chatgpt-mcp/test/agent-teams-read-authorization.test.mjs integrations/chatgpt-mcp/test/dsh-agent-teams-host-reader.test.mjs integrations/chatgpt-mcp/test/scoped-mcp-read-identity.test.mjs integrations/chatgpt-mcp/test/bearer-scoped-team-reader.test.mjs integrations/chatgpt-mcp/test/scoped-read-grants.test.mjs integrations/chatgpt-mcp/test/mcp-read-request-context.test.mjs integrations/chatgpt-mcp/test/dsh-host-read-binding.test.mjs
 
   sdk-scoped-read:
     runs-on: ubuntu-latest
