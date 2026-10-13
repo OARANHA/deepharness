@@ -1,0 +1,38 @@
+name: ChatGPT MCP — isolated alpha compatibility
+
+on:
+  pull_request:
+    paths:
+      - 'integrations/chatgpt-mcp/**'
+      - '.github/workflows/mcp-bridge-alpha.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  alpha-contract:
+    name: Pinned bridge ↔ DSH 0.2.1-alpha.2 (no production)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out source with pinned MIT bridge submodule
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          persist-credentials: false
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install locked upstream dependencies
+        run: npm ci --no-audit --no-fund
+        working-directory: integrations/chatgpt-mcp/upstream
+      - name: Typecheck pinned upstream
+        run: npm run typecheck
+        working-directory: integrations/chatgpt-mcp/upstream
+      - name: Build pinned upstream
+        run: npm run build
+        working-directory: integrations/chatgpt-mcp/upstream
+      - name: Prove isolated official-host contracts with pinned alpha
+        run: node integrations/chatgpt-mcp/scripts/alpha-compat-smoke.mjs
