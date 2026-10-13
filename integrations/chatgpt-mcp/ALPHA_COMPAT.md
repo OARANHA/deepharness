@@ -12,8 +12,11 @@ exact `@deepseek-ai/dsh@0.2.1-alpha.2` used in Wandora.
 - Node 22, `npm ci`, typecheck, package build, and native DSH session/Web/MCP
   contract tests run in GitHub Actions; **no VPS, Portainer, Traefik or deployment**.
 - The package declares RC2 peer dependencies. CI uses
-  `--legacy-peer-deps` **only inside the disposable test directory** to test
-  the alpha and reveal runtime incompatibilities; a green run does **not**
+  `--legacy-peer-deps` **only inside the disposable test directory** and installs
+  missing required `@deepseek-ai/*` runtime peers from the exact ranges declared
+  by installed official host manifests. It rejects conflicting ranges and
+  bounds dependency closure; it does not guess npm `latest` or patch upstream.
+  This bypass probes the alpha and reveals runtime incompatibilities; green does **not**
   establish publishable peer compatibility, approval-policy safety, Agent Teams
   membership/task exposure, or connection to ChatGPT.
 
