@@ -462,3 +462,19 @@ No production transport or remote ChatGPT client is involved.
 **New CI status is unverified:** this is committed test code awaiting
 runner execution, not yet a demonstrated E2E pass. If CI fails, obtain
 the exact failed job log before changing assertions or production code.
+
+## Security review — official workspace detachment gate (2026-10-13)
+
+The initialized official-host SDK HTTP test now also checks a live
+`WorkspaceEntity.detachSession(lead.id)` while its Bearer credential and exact
+principal/workspace/Lead grant remain valid. It requires the *same MCP session*
+to deny the detached Lead without disclosing Team content, then checks
+`attachSession` restores workspace membership and explicit grant still governs
+the separately tested revoke path. This is test-only fixture mutation via the
+official WorkspaceRegistry API. **CI is pending** for this additional test.
+
+Review boundary: no production/real-user host identity integration has been
+verified and the DSH Web UI's own authentication is not established by the
+service-Bearer bridge tests. External deployment, approval/origin controls,
+and per-user identity mapping need separate review before any real ChatGPT
+connection. No permission to deploy, merge or expose a public MCP endpoint.
