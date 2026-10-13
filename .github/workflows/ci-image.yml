@@ -79,8 +79,14 @@ jobs:
             response="$(docker exec "$name" curl -sS --max-time 2 --output /dev/null --write-out '%{http_code}' \
               --header 'Host: 127.0.0.1:3080' "http://127.0.0.1:3080/index.html" 2>/dev/null || true)"
             if [[ "$response" == 401 ]]; then
+              trusted_api="$(docker exec "$name" curl -sS --max-time 2 --output /dev/null --write-out '%{http_code}' \
+                --header 'Host: 127.0.0.1:3080' "http://127.0.0.1:3080/api/" 2>/dev/null || true)"
+              if [[ "$trusted_api" != 401 ]]; then
+                echo "::error::Trusted Host API unauthenticated response must be 401 (HTTP $trusted_api)"
+                exit 1
+              fi
               rejected="$(docker exec "$name" curl -sS --max-time 2 --output /dev/null --write-out '%{http_code}' \
-                --header 'Host: untrusted.example.invalid' "http://127.0.0.1:3080/index.html" 2>/dev/null || true)"
+                --header 'Host: untrusted.example.invalid' "http://127.0.0.1:3080/api/" 2>/dev/null || true)"
               if [[ "$rejected" != 403 ]]; then
                 echo "::error::Untrusted Host check failed (HTTP $rejected)"
                 exit 1
@@ -96,7 +102,7 @@ jobs:
           fi
           sleep 3
           test "$(docker inspect --format '{{.State.Status}}' "$name")" = running
-          echo "Isolated alpha startup OK: HTTP 401, untrusted Host 403, no network, alive"
+          echo "Isolated alpha startup OK: index 401, trusted API 401, untrusted API 403, no network, alive"
       - name: Log in to GHCR
         if: steps.state.outputs.ready == 'true' && github.event_name == 'push'
         uses: docker/login-action@v3
