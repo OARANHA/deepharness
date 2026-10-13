@@ -73,7 +73,14 @@ test('initialized official TeamService WorkspaceRegistry JSONL host through SDK 
   const direct = await directReader({ workspaceId: workspace.id, leadSessionId: lead.id });
   assert.equal(direct.leadSessionId, lead.id,
     'stage: official workspace+projection reader must work before Bearer transport');
-  const host = ctx;
+  // Cordis Context service getters may return different facade references
+  // on subsequent accesses. Capture the initialized service instances once
+  // while keeping the binding's replacement-detection guard intact.
+  const host = Object.freeze({
+    workspaceRegistry: ctx.workspaceRegistry,
+    sessions: ctx.sessions,
+    sessionProjections: ctx.sessionProjections,
+  });
   const binding = createDshHostReadBinding(host, {
     currentCredential: () => ({ authMode: 'token', authToken: token, principalId: 'bridge' }),
     grants: [{ principalId: 'bridge', workspaceId: workspace.id, leadSessionId: lead.id }],
