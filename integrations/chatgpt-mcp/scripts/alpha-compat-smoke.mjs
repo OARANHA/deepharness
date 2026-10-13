@@ -130,6 +130,18 @@ try {
   console.log('ALPHA_TEST_ONLY_PEER_METADATA_ADAPTATION: five exact RC2 peers → 0.2.1-alpha.2 (disposable copy, not upstream, not exemption)');
 
   cpSync(join(upstream, 'test', 'integration'), join(installed, 'test', 'integration'), { recursive: true });
+  // Instrument only the copied upstream test to identify which official
+  // alpha health capability is absent. Preserve all original assertions.
+  const cliTestPath = join(installed, 'test', 'integration', 'dsh-cli.test.mjs');
+  let cliTest = readFileSync(cliTestPath, 'utf8');
+  for (const name of ['agentPresets', 'webSurface', 'userQuestions']) {
+    const original = `assert.equal(healthData.capabilities.${name}, true);`;
+    assert.ok(cliTest.includes(original), `Upstream health assertion changed: ${name}`);
+    cliTest = cliTest.replace(original,
+      `assert.equal(healthData.capabilities.${name}, true, 'Missing alpha capability: ${name}; available: ' + JSON.stringify(healthData.capabilities));`);
+  }
+  writeFileSync(cliTestPath, cliTest);
+
   // The original tests assert 23 MCP tools, bearer auth, session operations,
   // Web origin fence and clean shutdown; no real model or production runtime.
   run(process.execPath, [
