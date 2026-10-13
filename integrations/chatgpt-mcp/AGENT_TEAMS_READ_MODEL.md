@@ -155,3 +155,30 @@ while an asynchronous projection is pending.
 Transport wiring, trusted runtime policy provisioning, origin protection and
 HTTP/MCP end-to-end verification remain pending. This is not a production ACL
 deployment, and no endpoint has been exposed.
+
+## HTTP request context binding
+
+`createMcpReadRequestContext` composes implemented Bearer authentication,
+server-owned exact grants, and an AsyncLocalStorage context per dispatch.
+It admits only explicit allowed Origin values; missing Origin is denied unless
+the server explicitly sets allowMissingOrigin=true for non-browser clients.
+CORS headers alone are not authorization. Invalid credentials/origin never
+invoke dispatch. A snapshot of server headers is bound to the configured service.
+Callbacks outside dispatch or inherited after dispatch completes fail closed.
+Concurrent request contexts are isolated. Administrative grant methods remain
+server-only and are not MCP tools.
+
+Integration contract for a reviewed bridge overlay:
+- Construct one binding from trusted runtime credentials, origins and grants.
+- Register binding.readTeam as the read-only Team callback.
+- Wrap BOTH fresh and existing session transport.handleRequest calls with
+  binding.runHttpRequest(req, () => transport.handleRequest(req, res, parsedBody)).
+- Do not rely on initialization/session ID as persistent authentication.
+- Preserve other approval, lifecycle and host restrictions. Do not expose
+  upstream mutation tools through this read-only slice.
+
+57 local tests pass, including actual loopback HTTP requests through this
+boundary. **These are not MCP SDK end-to-end tests:** the upstream submodule
+is unchanged, and no production tool is registered. The SDK's async dispatch
+lifetime and context propagation must be verified in a separate isolated
+integration before claiming the HTTP/MCP bridge is wired.
