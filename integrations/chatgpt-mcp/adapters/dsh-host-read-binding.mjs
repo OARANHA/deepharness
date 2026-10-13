@@ -28,7 +28,13 @@ export function createDshHostReadBinding(ctx, policy) {
     snapshot(session, keys) {
       checkHost();
       if (!session || sessions.get(session.id) !== session) deny();
-      return sessionProjections.snapshot(session, keys);
+      // The snapshot may resolve later. A Team read must not return data from
+      // a session handle which was replaced while the projection was pending.
+      return Promise.resolve(sessionProjections.snapshot(session, keys)).then(value => {
+        checkHost();
+        if (sessions.get(session.id) !== session) deny();
+        return value;
+      });
     },
   };
   const binding = createMcpReadRequestContext({
