@@ -1,0 +1,26 @@
+name: ChatGPT MCP — Agent Teams read model
+
+on:
+  pull_request:
+    paths:
+      - 'integrations/chatgpt-mcp/adapters/agent-teams-read-model.mjs'
+      - 'integrations/chatgpt-mcp/test/agent-teams-read-model.test.mjs'
+      - '.github/workflows/mcp-agent-teams-read-model.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  read-model:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Read-only projection unit contract
+        run: node --test integrations/chatgpt-mcp/test/agent-teams-read-model.test.mjs
