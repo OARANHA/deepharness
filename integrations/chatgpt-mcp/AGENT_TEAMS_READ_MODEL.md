@@ -14,8 +14,10 @@ come from separate Session projections; this slice does not fabricate them.
 ## Delivered in this PR
 `adapters/agent-teams-read-model.mjs` maps an **already authorized**
 projection into detached members/tasks. It checks the exact Lead identity,
-rejects projection replay failure, rejects malformed/unknown fields that
-would change control meaning, and bounds the input arrays. It does not read
+rejects projection replay failure, duplicate member/task identities,
+incorrect Lead role/phase, dangling/duplicate/self-referential dependencies
+and cyclic task graphs, and bounds the input arrays. It selects only known
+output fields; unknown input fields are not passed through. It does not read
 session storage, use Web cookies, access a gateway, or start an MCP listener.
 The new isolated unit test and CI workflow exercise these checks.
 
