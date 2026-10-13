@@ -229,3 +229,27 @@ Source: https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.1-alpha.2/
 
 This verifies the documented alpha API contract, not a running real DSH host.
 The remaining runtime host/plugin binding gate is unchanged.
+
+## Official-host binding preparation — 2026-10-13
+
+`adapters/dsh-host-read-binding.mjs` now composes the already-tested scoped
+request reader against an existing host's `workspaceRegistry.get`,
+`sessions.get`, and `sessionProjections.snapshot` contracts. It rejects
+missing host services, stale/swapped session handles, and service replacement
+before projection. It starts no server, does not resume a session, and
+registers no write tools. A separate four-case contract test has been added
+to the existing read-model CI job.
+
+**Evidence boundary:** these added tests are synthetic host-shape fixtures.
+The previous session reported a passing uncommitted host probe using actual
+DSH 0.2.1-alpha.2 Cordis/SessionStore/SessionProjectionRegistry/TeamService
+instances, but its scratch files were not available on this session. No
+reproduced official-host probe or npm lockfile is committed here yet.
+Consequently this commit is *not* the finished official-host CI gate.
+The new workflow outcome must be reported by the repository owner; no CI
+polling or production runtime test is claimed.
+
+**Next step:** reconstruct the isolated pinned DSH host-probe with
+`npm ci --ignore-scripts`, an immutable lockfile, actual service composition
+and an HTTP/MCP SDK roundtrip. Require green CI and readback before treating
+the official-host gate as closed. No merge, deploy or plugin installation.
