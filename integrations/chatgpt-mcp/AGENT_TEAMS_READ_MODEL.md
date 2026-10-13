@@ -138,3 +138,20 @@ CORS is not proof of origin protection. A reviewed request context propagation
 and origin gate remain required before registering this reader as an MCP tool.
 The grant backend remains an explicit server-owned hasReadGrant dependency,
 not a DSH ACL. No endpoint, session transport or approval policy is changed.
+
+## Server-owned exact grant registry
+
+`createScopedReadGrants()` now implements the hasReadGrant dependency.
+It defaults to no permissions, copies validated principal/workspace/Lead tuples,
+rejects wildcard grants, bounds entries and uses collision-free tuple keys.
+Trusted replace/revoke operations take effect immediately; malformed replacement
+is rejected atomically while preserving the prior policy.
+The registry is in memory only; restart denies unless the server supplies an
+explicit reviewed configuration. These management methods must never be
+registered as MCP tools or fed by tool arguments. No credentials are stored.
+The composed Bearer reader is tested against the actual registry with revocation
+while an asynchronous projection is pending.
+
+Transport wiring, trusted runtime policy provisioning, origin protection and
+HTTP/MCP end-to-end verification remain pending. This is not a production ACL
+deployment, and no endpoint has been exposed.
