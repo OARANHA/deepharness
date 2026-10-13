@@ -117,7 +117,8 @@ test('initialized official TeamService WorkspaceRegistry JSONL host through SDK 
   const call = args => send('tools/call', { name: 'dsh_read_agent_team', arguments: args });
   const target = { workspaceId: workspace.id, leadSessionId: lead.id };
   const allowed = await (await call(target)).json();
-  assert.equal(allowed.result.isError, undefined);
+  assert.equal(allowed.result.isError, undefined,
+    `official host rejected authorized read: ${JSON.stringify(allowed.result.content)}`);
   assert.equal(JSON.parse(allowed.result.content[0].text).leadSessionId, 'lead');
   assert.deepEqual(ctx.sessionProjections.snapshot(lead, ['agentTeam']).values.agentTeam, realProjection);
   for (const args of [
