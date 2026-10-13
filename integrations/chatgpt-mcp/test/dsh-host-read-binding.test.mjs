@@ -51,3 +51,29 @@ test('replaced host services or stale session fail closed', async () => {
 test('missing host services fail closed', () => {
   assert.throws(() => createDshHostReadBinding({}, {}), /denied/);
 });
+
+test('host service replaced during pending projection denies returned data', async () => {
+  const h = host();
+  let signalEntered;
+  let finishProjection;
+  const entered = new Promise(resolve => { signalEntered = resolve; });
+  const pending = new Promise(resolve => { finishProjection = resolve; });
+  h.ctx.sessionProjections = projectionFixture({ read: () => {
+    signalEntered();
+    return pending;
+  } });
+  const binding = createDshHostReadBinding(h.ctx, h.policy);
+  const read = binding.runHttpRequest(request, () => binding.readTeam(target));
+  await entered;
+  h.ctx.workspaceRegistry = { get: () => ({ id: 'ws', sessionIds: ['lead'] }) };
+  finishProjection({ members: [{ id: 'lead', name: 'lead', role: 'lead', phase: 'active' }], tasks: [] });
+  await assert.rejects(read, /denied/);
+});
+
+test('service replacement during admission denies before session projection', async () => {
+  const h = host();
+  const binding = createDshHostReadBinding(h.ctx, h.policy);
+  h.ctx.sessionProjections = projectionFixture({ read: () => { throw new Error('must not project'); } });
+  await assert.rejects(binding.runHttpRequest(request, () => binding.readTeam(target)), /denied/);
+  assert.equal(h.reads(), 0);
+});
