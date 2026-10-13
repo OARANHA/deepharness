@@ -74,3 +74,27 @@ cannot infer a user's permission from workspace membership or knowledge of a
 session ID. Current tests use stubs of those callbacks and DSH service method
 shapes, **not** an authenticated DSH production host. No MCP endpoints are
 registered, no write-capable Team methods are called, no deployment permitted.
+
+## Revocation boundary hardening
+
+The host reader checks trusted access at admission, after loading the live
+Lead, **and after projection resolution**, denying a permission revoked
+during any asynchronous interval before materializing the read model.
+A negative test uses a deferred projection and revokes policy while it is
+pending. This is a safety boundary within the testable host adapter; it
+does not eliminate the need for a production-grade transactional authority
+check if DSH changes the session between the last check and response.
+
+## Explicit identity gate for a future MCP transport
+
+**Not implemented:** DSH's `WorkspaceRegistry` validates Session
+membership against persisted headers but has no principal ACL. Its
+`sessionProjections` service provides the Team projection, not an access
+decision. The upstream bridge's bearer authentication validates possession
+of a bridge token, not identity and authorization to an arbitrary workspace.
+Therefore a server-bound principal and an explicit scoped grant registry
+must be designed and reviewed before tools can be exposed. No principal,
+workspace, or `canRead` flag may be accepted in MCP tool arguments.
+An absent or revoked grant must return denied, not fall back to all-workspaces.
+
+Do not treat CI here as production identity integration or as a deploy gate.
