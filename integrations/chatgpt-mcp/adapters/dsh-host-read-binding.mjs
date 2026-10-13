@@ -14,18 +14,34 @@ export function createDshHostReadBinding(ctx, policy) {
       typeof ctx.sessionProjections?.snapshot !== 'function') deny();
 
   const { workspaceRegistry, sessions, sessionProjections } = ctx;
+  // Verify the exact official host references on every authority check and
+  // snapshot invocation, not only when the live session is first resolved.
+  const checkHost = () => {
+    if (ctx.workspaceRegistry !== workspaceRegistry ||
+        ctx.sessions !== sessions ||
+        ctx.sessionProjections !== sessionProjections) deny();
+  };
+  const guardedWorkspaceRegistry = {
+    get(id) { checkHost(); return workspaceRegistry.get(id); },
+  };
+  const guardedSessionProjections = {
+    snapshot(session, keys) {
+      checkHost();
+      if (!session || sessions.get(session.id) !== session) deny();
+      return sessionProjections.snapshot(session, keys);
+    },
+  };
   const binding = createMcpReadRequestContext({
     ...policy,
-    workspaceRegistry,
-    sessionProjections,
+    workspaceRegistry: guardedWorkspaceRegistry,
+    sessionProjections: guardedSessionProjections,
     resolveLiveLeadSession: async id => {
+      checkHost();
       const session = sessions.get(id);
       if (!session || session.id !== id) return undefined;
       // Reject a stale session handle or a swapped provider before projection.
-      if (ctx.sessions !== sessions ||
-          ctx.workspaceRegistry !== workspaceRegistry ||
-          ctx.sessionProjections !== sessionProjections ||
-          sessions.get(id) !== session) deny();
+      checkHost();
+      if (sessions.get(id) !== session) deny();
       return session;
     },
   });
