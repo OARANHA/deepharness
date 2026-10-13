@@ -27,3 +27,16 @@ least-privilege policy on a reviewed branch before any controlled installation.
 
 Await the owner's report on CI; **do not poll**. Keep PR stacked on the adoption
 PR until explicitly merged. No merge or deploy without owner approval.
+
+## Observed alpha gap (2026-10-13)
+
+Run 38351900209: isolated bridge starts; MCP initialize, tools/list and
+health calls return HTTP 200; standalone session/approval contract passes.
+However, `dsh_health.capabilities.webSurface` is `false` while the pinned
+upstream Web integration contract requires `true`. The pinned bridge source
+computes this as `apiProxy !== undefined || ctx.get('webRuntime') !== undefined`.
+This is a **real unresolved Web integration capability gap** on alpha, not an
+npm dependency or version-metadata failure. Do not invert/omit the assertion,
+forge the health response, or count the gate as green. Investigate the official
+alpha Web service contract and implement a reviewed compatibility adapter in a
+separate port slice before re-running the unchanged security assertions.
