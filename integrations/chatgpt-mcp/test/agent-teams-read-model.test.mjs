@@ -62,3 +62,10 @@ test('rejects ambiguous tasks and invalid dependency references', () => {
   valid.tasks.push({ ...valid.tasks[0], id: 'task-2', blockedBy: ['task-1'] });
   assert.equal(projectAgentTeam('lead-1', valid).tasks.length, 2);
 });
+
+test('rejects a cyclic Team task graph', () => {
+  const cycle = sample();
+  cycle.tasks[0].blockedBy = ['task-2'];
+  cycle.tasks.push({ ...cycle.tasks[0], id: 'task-2', blockedBy: ['task-1'] });
+  assert.throws(() => projectAgentTeam('lead-1', cycle), /cyclic Team task dependency/);
+});
