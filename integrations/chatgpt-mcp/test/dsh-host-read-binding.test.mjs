@@ -77,3 +77,23 @@ test('service replacement during admission denies before session projection', as
   await assert.rejects(binding.runHttpRequest(request, () => binding.readTeam(target)), /denied/);
   assert.equal(h.reads(), 0);
 });
+
+test('session handle swapped while snapshot is pending denies stale Team', async () => {
+  const h = host();
+  const original = h.ctx.sessions.get('lead');
+  let entered, complete;
+  const started = new Promise(resolve => { entered = resolve; });
+  const pending = new Promise(resolve => { complete = resolve; });
+  let live = original;
+  h.ctx.sessions.get = id => id === 'lead' ? live : undefined;
+  h.ctx.sessionProjections = projectionFixture({ read: () => {
+    entered();
+    return pending;
+  } });
+  const binding = createDshHostReadBinding(h.ctx, h.policy);
+  const read = binding.runHttpRequest(request, () => binding.readTeam(target));
+  await started;
+  live = { id: 'lead' };
+  complete({ members: [{ id: 'lead', name: 'lead', role: 'lead', phase: 'active' }], tasks: [] });
+  await assert.rejects(read, /denied/);
+});
