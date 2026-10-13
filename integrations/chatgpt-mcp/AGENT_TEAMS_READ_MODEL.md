@@ -253,3 +253,18 @@ polling or production runtime test is claimed.
 `npm ci --ignore-scripts`, an immutable lockfile, actual service composition
 and an HTTP/MCP SDK roundtrip. Require green CI and readback before treating
 the official-host gate as closed. No merge, deploy or plugin installation.
+
+## Host service replacement guards — 2026-10-13
+
+The host binding now checks that all three service instances still match the
+original Cordis context at each workspace membership query and snapshot
+invocation, not just when it first finds the live Lead. The existing
+authorization path rechecks membership after the asynchronous projection
+resolves. Additional fixture tests cover replacement during a pending
+projection and before admission. These tests are committed but their new
+CI outcome has not been confirmed by the owner.
+
+The official DSH host probe remains **not reconstructed**. npm registry
+resolution was unavailable in this execution environment, so no dependency
+lockfile or actual-host npm test result is claimed. Do not use an unpinned,
+dynamically generated dependency tree to bypass that missing verification.
