@@ -5,6 +5,8 @@ on:
     paths:
       - 'integrations/chatgpt-mcp/adapters/agent-teams-read-model.mjs'
       - 'integrations/chatgpt-mcp/test/agent-teams-read-model.test.mjs'
+      - 'integrations/chatgpt-mcp/adapters/agent-teams-read-authorization.mjs'
+      - 'integrations/chatgpt-mcp/test/agent-teams-read-authorization.test.mjs'
       - '.github/workflows/mcp-agent-teams-read-model.yml'
   workflow_dispatch:
 
@@ -23,4 +25,4 @@ jobs:
         with:
           node-version: 22
       - name: Read-only projection unit contract
-        run: node --test integrations/chatgpt-mcp/test/agent-teams-read-model.test.mjs
+        run: node --test integrations/chatgpt-mcp/test/agent-teams-read-model.test.mjs integrations/chatgpt-mcp/test/agent-teams-read-authorization.test.mjs
