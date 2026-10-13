@@ -3,6 +3,17 @@
 services:
   web:
     image: ${DEEPHARNESS_IMAGE:?Provide a tested GHCR image digest}
+    # The official alpha rejects wildcard binds; use only the concrete container IP.
+    # Compose $$ escaping preserves shell substitution until container startup.
+    command:
+      - sh
+      - -ec
+      - >-
+        set -- $$(hostname -i);
+        test -n "$$1";
+        exec dsh web --no-open --port 3080 --host "$$1"
+        --public-url https://deep.wandora.com.br/
+        --trusted-host deep.wandora.com.br
     restart: unless-stopped
     init: true
     read_only: true
