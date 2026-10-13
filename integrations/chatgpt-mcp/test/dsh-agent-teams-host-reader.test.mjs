@@ -30,7 +30,7 @@ test('uses real DSH service method shapes for authorized read', async () => {
   const h = setup();
   const value = await h.reader(request, { principal: 'owner' });
   assert.equal(value.leadSessionId, 'lead-1');
-  assert.deepEqual(h.events, ['transport', 'workspace', 'policy', 'session', 'workspace', 'policy', 'projection']);
+  assert.deepEqual(h.events, ['transport', 'workspace', 'policy', 'session', 'workspace', 'policy', 'projection', 'workspace', 'policy']);
 });
 
 test('wrong principal cannot trigger session access', async () => {
