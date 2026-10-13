@@ -38,3 +38,19 @@ The new isolated unit test and CI workflow exercise these checks.
 The parent PR #3 provides an isolated alpha compatibility probe only.
 This PR is stacked as Draft pending isolated CI and review. No real user
 session, secret, model request or server endpoint is involved.
+
+## Authorization contract boundary (2026-10-13)
+A separate `adapters/agent-teams-read-authorization.mjs` now requires the
+**trusted provider** to prove exact principal equality, workspace equality,
+explicit Lead identity, and `canReadTeamProjection === true` before it may
+fetch a projection. Rejected requests must perform zero projection reads.
+Tests exercise denial for missing/mismatched identities and wrong workspaces.
+
+**IMPORTANT: this is not actual DSH authorization integration.** The
+`resolveAuthority` / `readProjection` provider remains unimplemented;
+calling code must bind `resolveAuthority` to the transport-authenticated
+principal (never caller-controlled) and resolve workspace/session ownership
+through an officially supported host service. The current bridge bearer token
+alone is not proof of workspace access. Never accept an authority object from
+MCP tool arguments. Host-backed negative tests, revocation/concurrency
+semantics, and explicit review remain required before registering MCP tools.
