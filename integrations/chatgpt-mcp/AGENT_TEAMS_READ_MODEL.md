@@ -341,3 +341,21 @@ read-only and unchanged. Do not grant workflow write permissions merely
 to bypass this artifact handoff. Upon committing the exact lockfile,
 read back its bytes, verify SHA-256, and only then switch the job to
 `npm ci --ignore-scripts` without generation.
+
+## Immutable host-probe lockfile committed — 2026-10-13
+
+The owner uploaded the generated npm v3 lockfile to the repository root
+in commit `0a08aff`. The Git blob `7d5dd2dbe6921f740b6e9b96fb1a6e49e8f25f3c`
+matches the reviewed 64,552-byte GitHub Actions artifact byte-for-byte;
+its SHA-256 is
+`3c49bd38b4fa5e4a950a88003691f5df217e6004a85612021e5759363254268f`.
+It has now been committed at the correct path
+`integrations/chatgpt-mcp/host-probe/package-lock.json`; the accidental
+root copy was deleted. The workflow now uses only
+`npm ci --ignore-scripts`, with no dynamic lock generation.
+
+**Validation boundary:** the full initialized Cordis/TeamService + SDK
+HTTP host integration test still has not been implemented or executed.
+The current host-probe file is a published-class API preflight only.
+The new HEAD's CI has not been confirmed GREEN. Local npm continues
+to return EAI_AGAIN, so no local package execution is claimed.
