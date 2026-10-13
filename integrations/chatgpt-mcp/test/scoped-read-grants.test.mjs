@@ -1,3 +1,4 @@
+import { projectionFixture } from './projection-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createScopedReadGrants } from '../adapters/scoped-read-grants.mjs';
@@ -45,7 +46,7 @@ test('real grant revocation while Bearer reader awaits projection denies data', 
     hasReadGrant: policy.hasReadGrant,
     workspaceRegistry: { get: () => ({ id: 'ws', sessionIds: ['lead'] }) },
     resolveLiveLeadSession: async () => ({}),
-    sessionProjections: { stateOf: () => { entered(); return projection; } },
+    sessionProjections: projectionFixture({ read: () => { entered(); return projection; } }),
   });
   const pending = read(scope, { headers: { authorization: 'Bearer ' + token } });
   await started;
