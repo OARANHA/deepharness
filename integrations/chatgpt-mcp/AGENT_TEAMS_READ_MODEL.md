@@ -313,3 +313,16 @@ and cannot serve as proof of the initialized Cordis/TeamService HTTP gate.
 Review the generated lockfile before committing; replace the temporary
 generation step with pure `npm ci --ignore-scripts` after publication.
 The new CI outcome has not been verified yet.
+
+## Official package preflight GREEN — 2026-10-13
+
+GitHub Actions run 38450609936 job host-lock-preflight completed successfully.
+The job generated package-lock.json, completed npm ci with scripts disabled,
+and passed the pinned published DSH class-surface preflight. Artifact
+dsh-host-probe-lock-preflight (ID 11840516151) was downloaded and inspected:
+lockfileVersion 3, seven expected exact direct versions, 127 package entries;
+all 126 non-root package entries resolve to registry.npmjs.org with sha512
+integrity. The artifact is valid evidence, but the lockfile has NOT yet been
+committed to the PR. Do not replace the generation step with npm ci-only
+until that exact lockfile is published and read back. Real initialized
+Cordis/TeamService HTTP/MCP integration is still untested.
