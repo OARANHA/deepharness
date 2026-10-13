@@ -54,7 +54,11 @@ export function createDshAgentTeamHostReader({ workspaceRegistry, sessionProject
         await readAuthority();
         const projection = sessionProjections.stateOf(session, 'agentTeam');
         if (!projection) deny();
-        return projection;
+        // A projection may be async in future host adapters; do not assume a
+        // previously granted access survives the read boundary.
+        const resolved = await projection;
+        await readAuthority();
+        return resolved;
       },
     });
   };
