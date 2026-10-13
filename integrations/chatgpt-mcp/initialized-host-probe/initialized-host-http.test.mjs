@@ -44,8 +44,10 @@ test('initialized official TeamService WorkspaceRegistry JSONL host through SDK 
   ctx.provide('agents', { list: () => [] });
   ctx.provide('subagents', {});
   await ctx.plugin(TeamService);
-  const workspace = ctx.workspaceRegistry.list().find(item => item.sessionIds.includes(lead.id));
-  assert.ok(workspace, 'official workspace must index lead from cwd header');
+  const workspace = await ctx.workspaceRegistry.create(root);
+  await workspace.attachSession(lead.id);
+  assert.ok(ctx.workspaceRegistry.get(workspace.id)?.sessionIds.includes(lead.id),
+    'official workspace must durably attach the Lead after cwd validation');
   assert.equal(ctx.sessions.get(lead.id), lead);
   const realProjection = ctx.sessionProjections.snapshot(lead, ['agentTeam']).values.agentTeam;
   assert.deepEqual(realProjection.members, [{ id: lead.id, name: 'lead', role: 'lead', phase: 'active' }]);
