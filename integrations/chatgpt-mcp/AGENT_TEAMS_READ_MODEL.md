@@ -54,3 +54,23 @@ through an officially supported host service. The current bridge bearer token
 alone is not proof of workspace access. Never accept an authority object from
 MCP tool arguments. Host-backed negative tests, revocation/concurrency
 semantics, and explicit review remain required before registering MCP tools.
+
+## DSH host-service binding prototype
+
+`adapters/dsh-agent-teams-host-reader.mjs` now uses the **verified upstream
+service shapes** `workspaceRegistry.get(workspaceId).sessionIds` and
+`sessionProjections.stateOf(session, 'agentTeam')`. It rejects unregistered
+workspaces, sessions not attached to that workspace, missing projections or
+missing live session handles. It invokes the host-provided authorization policy
+**before** session access and **again** after asynchronous session resolution
+to deny a revoked/detached request. It does not cold-resume a session.
+
+This is still a **dependency-injected prototype, not a wired DSH identity
+provider**. The pinned DSH WorkspaceRegistry verifies session membership via
+persisted header/canonical cwd, but does **not** expose a per-principal access
+decision. Thus `authorizePrincipal` and `principalFromTransport` must be
+supplied by a separately audited authenticated integration; the connector
+cannot infer a user's permission from workspace membership or knowledge of a
+session ID. Current tests use stubs of those callbacks and DSH service method
+shapes, **not** an authenticated DSH production host. No MCP endpoints are
+registered, no write-capable Team methods are called, no deployment permitted.
