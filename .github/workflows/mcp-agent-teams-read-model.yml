@@ -19,6 +19,7 @@ on:
       - 'integrations/chatgpt-mcp/test/mcp-read-request-context.test.mjs'
       - 'integrations/chatgpt-mcp/adapters/register-scoped-team-read-tool.mjs'
       - 'integrations/chatgpt-mcp/sdk-probe/**'
+      - 'integrations/chatgpt-mcp/test/projection-fixture.mjs'
       - '.github/workflows/mcp-agent-teams-read-model.yml'
   workflow_dispatch:
 
