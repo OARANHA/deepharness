@@ -59,7 +59,7 @@ semantics, and explicit review remain required before registering MCP tools.
 
 `adapters/dsh-agent-teams-host-reader.mjs` now uses the **verified upstream
 service shapes** `workspaceRegistry.get(workspaceId).sessionIds` and
-`sessionProjections.stateOf(session, 'agentTeam')`. It rejects unregistered
+`sessionProjections.snapshot(session, ['agentTeam']).values.agentTeam`. It rejects unregistered
 workspaces, sessions not attached to that workspace, missing projections or
 missing live session handles. It invokes the host-provided authorization policy
 **before** session access and **again** after asynchronous session resolution
@@ -207,3 +207,25 @@ bridge overlay must connect the runtime services, provision trusted grants,
 wrap all HTTP dispatches and preserve origin/approval restrictions.
 The upstream submodule and deployment remain unchanged. Passing this gate
 does not authorize exposing the upstream bridge's other tools or deployment.
+
+## Alpha contract correction — 2026-10-13
+
+The earlier host prototype used stateOf as though it returned the client view.
+This was incorrect and the earlier fixtures masked the mismatch.
+Official alpha source packages/session/session-projection/src/index.ts shows
+stateOf returns SessionProjectionStateMap host state, while snapshot returns
+schema-validated SessionProjectionMap client values. Agent Teams projection.ts
+adds the implicit Lead, member roles and derived task fields only in wire.view.
+
+The host reader now requires snapshot and selects only values.agentTeam.
+It does not transform raw state or fall back to stateOf. Missing Team capability
+denies access. A regression test reproduces the former error by making stateOf
+throw and serving the official client envelope from snapshot.
+All fixtures now explicitly model this envelope using a test-only helper.
+58 local adapter tests and the real MCP SDK scenario pass after the correction.
+
+Source: https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.1-alpha.2/packages/session/session-projection/src/index.ts
+Source: https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.1-alpha.2/packages/experimental/agent-team/src/projection.ts
+
+This verifies the documented alpha API contract, not a running real DSH host.
+The remaining runtime host/plugin binding gate is unchanged.
