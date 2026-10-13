@@ -6,7 +6,7 @@
  */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -67,6 +67,42 @@ try {
     JSON.parse(readFileSync(join(temp, 'node_modules', '@deepseek-ai', 'dsh', 'package.json'), 'utf8')).version,
     DSH_VERSION,
   );
+
+
+  // npm --legacy-peer-deps bypasses peer resolution (required for the RC2
+  // bridge against alpha). The official host also uses runtime peer imports
+  // which may not be installed in a fresh environment. Resolve ONLY peers
+  // declared by installed @deepseek-ai packages; never guess latest tags.
+  const manifestPath = join(temp, 'package.json');
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  manifest.dependencies ??= {};
+  const scopeDir = join(temp, 'node_modules', '@deepseek-ai');
+  for (let pass = 0; pass < 6; pass++) {
+    const missing = new Map();
+    for (const entry of readdirSync(scopeDir)) {
+      const pkgPath = join(scopeDir, entry, 'package.json');
+      if (!existsSync(pkgPath)) continue;
+      const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+      for (const [name, range] of Object.entries(pkg.peerDependencies ?? {})) {
+        if (!name.startsWith('@deepseek-ai/')) continue;
+        if (pkg.peerDependenciesMeta?.[name]?.optional) continue;
+        if (existsSync(join(temp, 'node_modules', name, 'package.json'))) continue;
+        const prev = missing.get(name);
+        assert.ok(!prev || prev === range,
+          `Conflicting required peer ranges for ${name}: ${prev} vs ${range}`);
+        missing.set(name, range);
+      }
+    }
+    if (!missing.size) break;
+    console.log(`Official host missing required peers (pass ${pass + 1}): ${JSON.stringify(Object.fromEntries(missing))}`);
+    for (const [name, range] of missing) manifest.dependencies[name] = range;
+    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\\n');
+    run('npm', [
+      'install', '--prefix', temp, '--ignore-scripts', '--no-audit',
+      '--no-fund', '--package-lock=false', '--legacy-peer-deps',
+    ], temp);
+    if (pass === 5) throw new Error('Required official host peer closure did not converge');
+  }
 
   cpSync(join(upstream, 'test', 'integration'), join(installed, 'test', 'integration'), { recursive: true });
   // The original tests assert 23 MCP tools, bearer auth, session operations,
