@@ -182,3 +182,28 @@ boundary. **These are not MCP SDK end-to-end tests:** the upstream submodule
 is unchanged, and no production tool is registered. The SDK's async dispatch
 lifetime and context propagation must be verified in a separate isolated
 integration before claiming the HTTP/MCP bridge is wired.
+
+## MCP SDK stateful HTTP gate — verified locally
+
+The isolated sdk-probe pins the bridge's exact SDK 1.30.0 and zod 4.4.3
+with a dependency lockfile and disabled install scripts. It runs a loopback
+HTTP server, initializes a real StreamableHTTPServerTransport session, lists
+the sole registered dsh_read_agent_team tool and calls it through JSON-RPC.
+registerScopedTeamReadTool provides the read-only callback, generic denial
+without raw host errors, and read-only tool annotations.
+
+Verified with the real SDK: per-request AsyncLocalStorage context survives
+fresh and existing session dispatch. Invalid Bearer/origin rejects dispatch;
+wrong workspace/Lead and forged principal arguments return denied without
+projection access. Grant revocation during a pending read denies output.
+Token rotation rejects the old token even on an existing MCP session.
+Only this read tool is registered: no agent execution or mutation tools.
+
+Local evidence: 57 adapter tests plus 1 SDK integration scenario passed
+on Node 24.19.0. CI additionally runs this scenario on Node 22.
+The HTTP test harness is disposable test code, not a production listener.
+**Remaining:** host services are fixtures, not a live DSH Team. A reviewed
+bridge overlay must connect the runtime services, provision trusted grants,
+wrap all HTTP dispatches and preserve origin/approval restrictions.
+The upstream submodule and deployment remain unchanged. Passing this gate
+does not authorize exposing the upstream bridge's other tools or deployment.
