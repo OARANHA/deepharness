@@ -20,7 +20,7 @@ exact `@deepseek-ai/dsh@0.2.1-alpha.2` used in Wandora.
   establish publishable peer compatibility, approval-policy safety, Agent Teams
   membership/task exposure, or connection to ChatGPT.
 
-If red, inspect the failing import / DSH capability in the isolated action.
+The official alpha loader rejects the RC2 peer version metadata before bridge startup.\nFor contract probing only, the smoke checks all five upstream RC2 peer pins and\nthe installed official alpha peers, then replaces those five version strings in\nthe **installed, disposable** bridge package manifest. It does not modify the\npinned upstream or packaged tarball and does not grant a DSH version exemption.\nEven if this adapted test passes, the original tarball remains rejected by the\nalpha loader; publishing requires a separate reviewed compatibility release.\n\nIf red, inspect the failing import / DSH capability in the isolated action.
 Do not install the plugin on the 28server as a troubleshooting shortcut.
 If green, the next slice is adding read-only Agent Teams projections and
 least-privilege policy on a reviewed branch before any controlled installation.
