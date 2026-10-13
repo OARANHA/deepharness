@@ -397,3 +397,24 @@ persistence and storage domain. The pinned package set also lacks
 the independently initialized persistence/storage service dependencies.
 Do not claim this gate passed before a new CI GREEN on this HEAD.
 Local npm registry remained unreachable, so no local npm test was run.
+
+## Initialized-host dependency preparation — 2026-10-13
+
+A separate `initialized-host-probe` package now pins official
+`0.2.1-alpha.2` JSONL persistence, Storage, StorageJson, StorageDomain,
+WorkspaceRegistry, Agent, Subagent and TeamService plus Cordis/MCP/Zod.
+The dedicated read-only CI prerequisite job generates a reviewable lock
+artifact, uses `npm ci --ignore-scripts`, and verifies actual Cordis
+SessionStore/SessionProjectionRegistry instantiation and official service
+DI declarations. The source-independent npm registry is unreachable in
+the local executor (`EAI_AGAIN`); this new job has **not been verified
+GREEN**. Its generated lockfile is not yet committed.
+
+**This is not completion of the user-requested full gate.** The probe
+does not yet initialize WorkspaceRegistry, TeamService, StorageJson,
+StorageDomain or JSONL together, does not bind a TeamService-produced
+projection to an HTTP call, and executes no agents/models. Before
+advancing, retrieve/validate/commit the generated lockfile, then build
+an actual disposable runtime and negative tests using the official
+service graph. Never describe a green dependency preflight as full
+DSH host integration.
