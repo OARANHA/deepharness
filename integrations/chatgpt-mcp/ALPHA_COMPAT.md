@@ -52,3 +52,15 @@ actual service object can be retrieved from the injected context; the existing
 apiProxy check is preserved. Existing bearer-token, origin, session and MCP
 assertions remain unchanged. The pin, packed source, and production remain
 untouched. A green result is still a compatibility probe, not a release.
+
+## Web contract correction — real `webServer`
+
+The prior scoped `webRuntime` observer was **disproved** by run 38352532334:
+`webSurface` remained false. Source review shows the pinned bridge's *own*
+management API registers via `ctx.inject(['webServer'])` in `src/index.ts`,
+not via `webRuntime`. The new disposable adapter therefore observes the same
+real `webServer` dependency and revokes its observation when the injected
+service disposes. It does not alter the management route, session controls,
+MCP authentication, origin fence, or the upstream tarball. The original
+security assertions still run. Whether this proves the required Web parity is
+subject to the next isolated CI; no deployment authorization follows.
