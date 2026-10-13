@@ -1,3 +1,4 @@
+import { projectionFixture } from './projection-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
@@ -14,7 +15,7 @@ function setup() {
     hasReadGrant: ({ principalId, workspaceId, leadSessionId }) => grants.has([principalId, workspaceId, leadSessionId].join('/')),
     workspaceRegistry: { get: id => ({ id, sessionIds: ['lead', 'other'] }) },
     resolveLiveLeadSession: async () => ({}),
-    sessionProjections: { stateOf: () => { reads++; return projection; } },
+    sessionProjections: projectionFixture({ read: () => { reads++; return projection; } }),
   });
   return { read, request, grants, reads: () => reads,
     credential: value => { credential = value; }, defer: value => { projection = value; } };
