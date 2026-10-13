@@ -1,3 +1,4 @@
+import { projectionFixture } from './projection-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
@@ -13,10 +14,10 @@ function setup() {
     allowMissingOrigin: false,
     workspaceRegistry: { get: () => ({ id: 'ws', sessionIds: ['lead'] }) },
     resolveLiveLeadSession: async () => ({}),
-    sessionProjections: { stateOf: () => {
+    sessionProjections: projectionFixture({ read: () => {
       reads++;
       return { members: [{ id: 'lead', name: 'Lead', role: 'lead', phase: 'active' }], tasks: [] };
-    } },
+    } }),
   });
   const request = { headers: { authorization: 'Bearer ' + token, origin: 'https://client.example' } };
   return { binding, request, reads: () => reads };
