@@ -441,3 +441,24 @@ next run. The read-only MCP HTTP lifecycle test is separately GREEN but
 still has its own synthetic Team projection and workspace fixture.
 A complete HTTP read driven by this official composed host remains
 **not yet proven**.
+
+## Official initialized host → scoped MCP HTTP E2E — 2026-10-13
+
+The isolated `initialized-host-probe/initialized-host-http.test.mjs`
+now composes the published Cordis Context, JSON storage backend,
+StorageDomain facility, temporary JSONL persistence, SessionStore,
+SessionProjectionRegistry, WorkspaceRegistry and TeamService. It creates
+one real Lead Session with a temporary cwd, resolves its actual workspace
+identity from WorkspaceRegistry, and passes the **actual** Cordis host
+to `createDshHostReadBinding` behind the real stateful MCP SDK HTTP
+transport. It asserts that TeamService registered the official Lead
+projection, then checks the scoped read, forged request fields, wrong
+workspace/Lead, wrong bearer/origin, grant revocation and token rotation.
+
+The TeamService dependencies `agents` and `subagents` remain inert
+test-only DI services; no model, subprocess, agent or Team mutation runs.
+No production transport or remote ChatGPT client is involved.
+
+**New CI status is unverified:** this is committed test code awaiting
+runner execution, not yet a demonstrated E2E pass. If CI fails, obtain
+the exact failed job log before changing assertions or production code.
