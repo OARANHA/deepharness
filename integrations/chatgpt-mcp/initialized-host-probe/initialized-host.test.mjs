@@ -55,6 +55,8 @@ test('official WorkspaceRegistry and JSONL persistence initialize on disposable 
   assert.equal(ctx.sessions.get(lead.id), lead);
   const snapshot = ctx.sessionProjections.snapshot(lead, ['agentTeam']);
   assert.ok(snapshot.values.agentTeam, 'TeamService must register the official agentTeam projection');
-  assert.deepEqual(snapshot.values.agentTeam.members, []);
+  assert.deepEqual(snapshot.values.agentTeam.members, [
+    { id: lead.id, name: 'lead', role: 'lead', phase: 'active' },
+  ]);
   assert.deepEqual(snapshot.values.agentTeam.tasks, []);
 });
