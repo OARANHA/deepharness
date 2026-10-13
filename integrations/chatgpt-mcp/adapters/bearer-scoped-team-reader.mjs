@@ -9,11 +9,9 @@ import { timingSafeEqual } from 'node:crypto';
 import { createScopedMcpReadIdentity } from './scoped-mcp-read-identity.mjs';
 
 const deny = () => { throw new Error('Agent Teams read denied'); };
-export function createBearerScopedTeamReader({ currentCredential, ...host }) {
+export function createBearerServiceAuthenticator(currentCredential) {
   if (typeof currentCredential !== 'function') deny();
-  return createScopedMcpReadIdentity({
-    ...host,
-    authenticateRequest: async request => {
+  return async request => {
       const configured = await currentCredential();
       if (configured?.authMode !== 'token' ||
           typeof configured.authToken !== 'string' || configured.authToken.length === 0 ||
@@ -28,6 +26,12 @@ export function createBearerScopedTeamReader({ currentCredential, ...host }) {
       const expected = Buffer.from(configured.authToken);
       if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) deny();
       return { principalId: configured.principalId, kind: 'service' };
-    },
+  };
+}
+
+export function createBearerScopedTeamReader({ currentCredential, ...host }) {
+  return createScopedMcpReadIdentity({
+    ...host,
+    authenticateRequest: createBearerServiceAuthenticator(currentCredential),
   });
 }
