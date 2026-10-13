@@ -1,3 +1,4 @@
+import { projectionFixture } from './projection-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createScopedMcpReadIdentity } from '../adapters/scoped-mcp-read-identity.mjs';
@@ -15,7 +16,7 @@ function setup() {
       scope.workspaceId === 'ws' && scope.leadSessionId === 'lead',
     workspaceRegistry: { get: id => ({ id, sessionIds: ['lead', 'other'] }) },
     resolveLiveLeadSession: async id => ({ id }),
-    sessionProjections: { stateOf: () => { reads++; return projection; } },
+    sessionProjections: projectionFixture({ read: () => { reads++; return projection; } }),
   });
   return { read, request, authenticated, reads: () => reads,
     revoke: () => { granted = false; }, defer: value => { projection = value; } };
