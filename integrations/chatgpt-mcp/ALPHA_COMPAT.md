@@ -64,3 +64,15 @@ service disposes. It does not alter the management route, session controls,
 MCP authentication, origin fence, or the upstream tarball. The original
 security assertions still run. Whether this proves the required Web parity is
 subject to the next isolated CI; no deployment authorization follows.
+
+## Versioned adapter boundary
+
+The previously successful disposable `webServer` detector is now extracted to
+`adapters/dsh-alpha-web-surface.mjs`, imported by the isolated smoke script.
+This is source-controlled reviewable compatibility logic, **not** an installable
+or publishable alpha bridge package. The adapter only modifies the ephemeral
+installed JS after upstream SHA checks and verifies exact expected source
+anchors; a mismatch fails closed. The original upstream submodule and tarball
+are unchanged. Original bearer/auth, origin fence and MCP integration tests
+remain mandatory. Approval and authorization semantics beyond those tests
+remain unproven. No live Agent Teams access, production deployment, or merge.
