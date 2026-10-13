@@ -379,3 +379,21 @@ has not been observed. No production plugin, agent execution, shell or deploy.
 The remaining gate is constructing a disposable Cordis runtime with official
 storage/domain/persistence, live session and TeamService registration,
 then repeating this HTTP path without synthetic host service fixtures.
+
+## Official live Session services HTTP step — 2026-10-13
+
+The `host-probe/dsh-host-http.test.mjs` integration now initializes an
+official Cordis `Context`, mounts the published `SessionStore` and
+`SessionProjectionRegistry` services and creates a real live Session. It
+registers an **explicitly test-owned synthetic agentTeam projection**
+against the official registry and runs the real HTTP/MCP SDK flow through
+`createDshHostReadBinding`. The workspace lookup remains a fixture;
+a real TeamService is **not** installed. The test executes no model or agent.
+
+This is a stricter partial integration than the former all-fixture host
+probe, but is **not** the requested complete DSH host verification with
+official TeamService projection, WorkspaceRegistry, temporary JSONL
+persistence and storage domain. The pinned package set also lacks
+the independently initialized persistence/storage service dependencies.
+Do not claim this gate passed before a new CI GREEN on this HEAD.
+Local npm registry remained unreachable, so no local npm test was run.
