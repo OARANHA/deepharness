@@ -268,3 +268,17 @@ The official DSH host probe remains **not reconstructed**. npm registry
 resolution was unavailable in this execution environment, so no dependency
 lockfile or actual-host npm test result is claimed. Do not use an unpinned,
 dynamically generated dependency tree to bypass that missing verification.
+
+## Asynchronous Lead replacement hardening — 2026-10-13
+
+The official-service-shape binding now rechecks the exact live Session object
+after `sessionProjections.snapshot` resolves. If `sessions.get(id)` changes
+while the snapshot is pending, it denies the read rather than returning a
+stale Team. A regression test using a deferred synthetic projection is in
+the PR. This does **not** constitute a real initialized DSH host probe.
+
+The isolated official DSH 0.2.1-alpha.2 host-probe with pinned npm lockfile
+and a dedicated `npm ci --ignore-scripts` CI job is still pending: the
+local execution environment could not resolve `registry.npmjs.org`
+(`EAI_AGAIN`). The CI on this new HEAD must be explicitly verified before
+claiming its regression test passed. No production integration or deploy.
