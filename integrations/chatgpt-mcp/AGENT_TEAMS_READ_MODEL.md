@@ -121,3 +121,20 @@ origin and approval gates, and verify end-to-end negative cases before exposure.
 No DSH per-workspace ACL is inferred. No deployment or write operation is added.
 Revocation is checked before returning; transport delivery after that boundary
 requires server lifecycle handling and is not an atomic grant transaction.
+
+## Bearer credential verification adapter
+
+`bearer-scoped-team-reader.mjs` now supplies an implemented authenticator:
+it compares the actual Authorization header with the current server credential
+using Node timingSafeEqual, rejects absent/invalid credentials and authMode none,
+and binds successful possession only to the configured service principal.
+The currentCredential callback is reread at each check, permitting rotation.
+No credential is persisted or exposed by this adapter. Tests generate ephemeral
+random credentials and cover invalid headers, scopes and mid-read rotation.
+
+**Still not HTTP/MCP wiring:** the pinned upstream src/http.ts authenticates
+requests but does not pass IncomingMessage into tool callbacks. Its wildcard
+CORS is not proof of origin protection. A reviewed request context propagation
+and origin gate remain required before registering this reader as an MCP tool.
+The grant backend remains an explicit server-owned hasReadGrant dependency,
+not a DSH ACL. No endpoint, session transport or approval policy is changed.
