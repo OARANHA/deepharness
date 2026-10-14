@@ -139,7 +139,28 @@ await probeKeycloakOfficialHost({
   revoke: async () => { revokedTokens.add(claims.jti); },
 });
 const { probePersistentGrantPolicy } = await import('../initialized-host-probe/persistent-grant-policy-probe.mjs');
-await probePersistentGrantPolicy({ issuer, resource, keys, request, principal });
+// Dedicated independent PKCE issuance keeps this wire-token revocation separate
+// from the original token used by the existing persistent-host revocation gate.
+const wireTransaction=await authorizeHuman();
+const wireExchange=await exchange(wireTransaction.code,wireTransaction.verifier);
+assert.equal(wireExchange.status,200,'dedicated wire S256 exchange required');
+const wireAccess=(await wireExchange.json()).access_token;
+assert.equal(typeof wireAccess,'string');
+const wireRequest={headers:{...request.headers,authorization:'Bearer '+wireAccess}};
+assert.equal((await authenticated(wireRequest)).principalId,principal,'wire JWT must authenticate same individual');
+const wireClaims=JSON.parse(Buffer.from(wireAccess.split('.')[1],'base64url').toString('utf8'));
+assert.notEqual(wireClaims.jti,claims.jti,'wire revocation must use a distinct real token');
+const controlTransaction=await authorizeHuman();
+const controlExchange=await exchange(controlTransaction.code,controlTransaction.verifier);
+assert.equal(controlExchange.status,200,'independent control S256 exchange required');
+const controlAccess=(await controlExchange.json()).access_token;
+assert.equal(typeof controlAccess,'string');
+const controlRequest={headers:{...request.headers,authorization:'Bearer '+controlAccess}};
+assert.equal((await authenticated(controlRequest)).principalId,principal);
+const controlClaims=JSON.parse(Buffer.from(controlAccess.split('.')[1],'base64url').toString('utf8'));
+assert.ok(![claims.jti,wireClaims.jti].includes(controlClaims.jti),'control token must be distinct');
+await probePersistentGrantPolicy({issuer,resource,keys,request:wireRequest,principal,
+  withPrivateTransport:true,claims:wireClaims,controlRequest,controlClaims});
 const { probePersistentKeycloakHost } = await import('../initialized-host-probe/keycloak-postgres-host-probe.mjs');
 await probePersistentKeycloakHost({ issuer, resource, keys, claims, request, principal });
 revokedTokens.add(claims.jti);
