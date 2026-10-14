@@ -23,3 +23,5 @@
 !integrations/chatgpt-mcp/sql/
 !integrations/chatgpt-mcp/sql/001_token_revocations.sql
 !integrations/chatgpt-mcp/sql/002_read_grants.sql
+
+!deploy/disabled-mcp-profile-contract.mjs
