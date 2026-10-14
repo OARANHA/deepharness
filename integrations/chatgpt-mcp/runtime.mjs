@@ -4,15 +4,17 @@
  */
 import { createDshHostReadBinding } from './adapters/dsh-host-read-binding.mjs';
 import { createRotatingJwksTransportAuthenticator } from './adapters/rotating-jwks-transport-authenticator.mjs';
+import {createPostgresReadGrantStore} from './adapters/postgres-read-grants.mjs';
 import { createPostgresRevocationBackend } from './adapters/postgres-token-revocation.mjs';
 import { createMcpOAuthHttpGate } from './adapters/mcp-oauth-http-gate.mjs';
 const deny = () => { throw Error('Agent Teams read denied'); };
 export function createOfficialDshMcpReadRuntime(host, {
-  discovery, issuer, resource, query, grants, allowedOrigins,
+  discovery, issuer, resource, query, grants, allowedOrigins, grantMode = 'static',
   allowMissingNotBefore = false, revocationTimeoutMs = 1000,
 } = {}) {
   if (typeof discovery?.get !== 'function' || typeof query !== 'function' ||
-      typeof issuer !== 'string' || !Array.isArray(grants) ||
+      typeof issuer !== 'string' || !['static','postgres'].includes(grantMode) ||
+      (grantMode==='static'?!Array.isArray(grants):grants!==undefined) ||
       !Array.isArray(allowedOrigins)) deny();
   const backend = createPostgresRevocationBackend({ query, timeoutMs: revocationTimeoutMs });
   // Pin the independently selected issuer even if a discovery implementation
@@ -27,7 +29,8 @@ export function createOfficialDshMcpReadRuntime(host, {
     requiredScope: 'agent-teams:read', allowMissingNotBefore,
   });
   const binding = createDshHostReadBinding(host, {
-    authenticateTransport, grants, allowedOrigins,
+    authenticateTransport, grants:grantMode==='static'?grants:[], allowedOrigins,
+    ...(grantMode==='postgres'?{hasReadGrant:createPostgresReadGrantStore({query,timeoutMs:revocationTimeoutMs}).hasReadGrant}:{}),
   });
   const gate = createMcpOAuthHttpGate({ resource, issuer, authenticateTransport });
   return Object.freeze({
