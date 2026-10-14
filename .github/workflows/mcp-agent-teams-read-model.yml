@@ -5,6 +5,9 @@ on:
     paths:
       - 'integrations/chatgpt-mcp/package.json'
       - 'integrations/chatgpt-mcp/runtime.mjs'
+      - 'integrations/chatgpt-mcp/plugin.mjs'
+      - 'integrations/chatgpt-mcp/cordis.patch.yml'
+      - 'integrations/chatgpt-mcp/test/plugin-entry.test.mjs'
       - 'integrations/chatgpt-mcp/PACKAGE_README.md'
       - 'integrations/chatgpt-mcp/LICENSE'
       - 'integrations/chatgpt-mcp/adapters/**'
