@@ -5,7 +5,11 @@ import { Pool } from 'pg';
 import { createPostgresRevocationBackend } from '../adapters/postgres-token-revocation.mjs';
 
 const url = process.env.TEST_POSTGRES_URL;
-if (!url || !/^postgres(?:ql)?:\/\/127\.0\.0\.1:5432\//.test(url)) {
+let target;
+try { target = new URL(url); } catch { throw new Error('Isolated loopback TEST_POSTGRES_URL is required'); }
+if (!['postgres:', 'postgresql:'].includes(target.protocol) ||
+    target.hostname !== '127.0.0.1' || target.port !== '5432' ||
+    target.pathname !== '/token_revocation_test' || target.search || target.hash) {
   throw new Error('Isolated loopback TEST_POSTGRES_URL is required');
 }
 const schema = new URL('../sql/001_token_revocations.sql', import.meta.url);
