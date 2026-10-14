@@ -99,3 +99,26 @@ must not be applied indiscriminately to ID tokens or unrelated clients.
 Next: inspect actual Keycloak profile diagnostics and identify an audited
 issuer-side way to satisfy `nbf` or document a separate, security-reviewed
 JWT claim-policy change. Until then the Keycloak access JWT is **NO-GO**.
+
+## RFC 7519-compatible `nbf` interoperability (2026-10-14)
+
+Verified RFC 7519 §4.1.5: the `nbf` (not-before) claim is OPTIONAL.
+Keycloak 26.8.0 lab access JWT has no `nbf` by default. We do NOT
+fabricate `nbf` or use static timestamps. The verifier now supports
+`allowMissingNotBefore: true` **only if explicitly set by the trusted
+embedding server**. Default remains false. If `nbf` is included,
+its value must be a safe integer, not precede `iat`, and not be
+later than verifier time. Regardless of this option, signed JWT,
+pinned issuer, exact audience, access token purpose, required scope,
+`iat <= now`, `exp > now`, bounded lifetime, and authoritative
+revocation remain mandatory. The rotating JWKS adapter forwards
+the option. A regression test covers absent and malicious present
+`nbf`, expired and future-issued tokens.
+
+The disposable Keycloak profile probe now accepts missing `nbf` only
+under this temporal policy, and continues to fail the workflow on
+any other contract mismatch. This isolated service-account lab does not
+prove authorization-code PKCE for a real ChatGPT human user; no OAuth
+provider connection or production deployment has been approved.
+New CI **pending**. Production **NO-GO**.
+Reference: https://www.rfc-editor.org/rfc/rfc7519.html#section-4.1.5
