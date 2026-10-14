@@ -72,3 +72,20 @@ login, OAuth code exchange, client registration or production resource
 metadata endpoint has been configured. RFC 9728 publication under a
 real MCP resource URL, resource-identifier policy and proxy/TLS mapping
 require separate review. **New CI unverified. NO-GO for production.**
+
+## Isolated mock OAuth authorization-code / PKCE / JWT / MCP test (2026-10-14)
+
+`initialized-host-probe/mock-oauth-pkce-e2e.test.mjs` runs two ephemeral
+loopback HTTP servers: a deliberately simulated authorization server
+and an MCP resource endpoint using the real HTTP discovery gate,
+pinned JWT transport verifier and request-scoped Agent Teams grants.
+It asserts 401 discovery, the S256 challenge and one-time code exchange,
+denial on wrong verifier, signed resource-audience JWT acceptance,
+denial of a different workspace, and rejection after token revocation.
+All keys and codes are ephemeral; nothing is deployed or exposed.
+
+**Not proved by this test:** ChatGPT's actual OAuth client behavior,
+a real provider's registration/PKCE/token profile, callback URI validation
+by a third-party client, production HTTPS, durable token revocation,
+real DSH-host plus OAuth in the same process, or ingress/network policy.
+The AS is intentionally simulated. New CI pending; release remains NO-GO.
