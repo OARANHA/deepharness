@@ -505,3 +505,30 @@ malformed assertions, origin and credential rejection and grant
 revocation. **New CI is not yet verified.** No real ChatGPT login,
 OAuth authorization, external endpoint, merge or deployment is part of
 this slice.
+
+## Offline pinned-key JWT verification gate (2026-10-13)
+
+The `pinned-jwt-transport-authenticator.mjs` adapter accepts an **explicitly
+provisioned RSA public JWK set** and validates an RS256-signed access JWT
+using Node.js crypto. It enforces exact issuer and audience, a known key
+ID, JWT type, signature, `sub`, `jti`, `iat`, `nbf`, `exp`, a maximum
+one-hour token lifetime and `token_use: 'access'`. A mandatory server-side
+`isRevoked` callback must return **exactly false** for each validation;
+unavailable revocation checking denies. Successful tokens map to the
+individual principal `issuer#subject`, which is independently checked
+against an explicit workspace/Lead grant on every read.
+
+The isolated test generates ephemeral RSA keys locally (no private key is
+committed) and exercises forged signatures, issuer/audience mismatches,
+expired/future tokens, wrong token purpose/algorithm/kid, malformed JWTs,
+cross-principal grant attempts and fail-closed revocation.
+
+**Limitations:** this is an offline pinned-key verification primitive,
+**not** a complete OAuth 2.0 / OIDC provider integration or ChatGPT login.
+There is no OAuth authorization flow, token exchange, network JWKS refresh,
+OIDC discovery, key-rotation lifecycle, token revocation backend, or
+production ingress. Public-key pinning and `isRevoked` inputs are trusted
+server configuration. Integrate only after a separately reviewed issuer,
+audience, principal mapping, key provisioning, revocation, resource
+authorization and HTTPS design. No secrets, real tokens, merge or deploy.
+**New CI execution is pending.**
