@@ -48,3 +48,30 @@ Decision (2026-10-14): **conditional candidate, NOT approved for deploy**.
 persistent revocation, admin-provisioned user grant, and real ChatGPT login.
 Do not install Keycloak, change VPS, enable anonymous DCR/CIMD experimental
 features, create DNS, expose ports, merge PR, or deploy automatically.
+
+## Disposable real-Keycloak token-profile laboratory (2026-10-14)
+
+Added `keycloak-lab/realm.json`, `keycloak-lab/probe.mjs` and
+`.github/workflows/chatgpt-mcp-keycloak-lab.yml`. The workflow is
+**manual only** (`workflow_dispatch`); it is not a production rollout.
+It launches a pinned `quay.io/keycloak/keycloak:26.8.0` container
+with experimental `resource-indicators` on runner loopback only,
+imports an ephemeral realm with a service-account probe client,
+and inspects the shape of a **real Keycloak-issued access JWT** without
+printing the token or credentials. CI creates fresh random lab admin
+and client secrets and discards the container. A service-account token
+is intentionally not proof of ChatGPT browser login or human grants.
+
+The probe reports explicit `KEYCLOAK_CONTRACT_NO_GO` if fields or
+audience fail the exact current JWT profile. **The probe intentionally
+does not fail CI solely for incompatibility**: success means evidence
+was collected, NOT that OAuth is production compatible.
+Review the log's profile result separately before proceeding.
+In particular, default Keycloak claims may omit `token_use`, `nbf`
+or an `agent-teams:read` scope; do not relax authorization to green
+the experiment. A full browser flow and human subject authorization
+still requires a separate explicit gate. This lab has **not been run**.
+GitHub may require workflow_dispatch workflow registration on the
+default branch before the manual run is selectable: do not merge a
+draft PR merely to enable the button; use an approved isolated test
+branch/workflow mechanism instead.
