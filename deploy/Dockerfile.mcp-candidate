@@ -1,7 +1,8 @@
 # CI-only installation candidate; not the production image or an automatic deploy.
 FROM local/deepharness:ci
 USER root
-RUN npm install --global --ignore-scripts --no-audit --no-fund --cache /tmp/mcp-build-cache pnpm@11.28.5 \
+RUN npm install --global --prefix /usr/local --ignore-scripts --no-audit --no-fund --cache /tmp/mcp-build-cache pnpm@11.28.5 \
+ && test "$(/usr/local/bin/pnpm --version)" = 11.28.5 \
  && npm install --prefix /opt/wandora-mcp-verifier --ignore-scripts --no-audit --no-fund \
       --cache /tmp/mcp-build-cache js-yaml@4.3.2
 COPY integrations/chatgpt-mcp/ /opt/wandora-mcp-source/
