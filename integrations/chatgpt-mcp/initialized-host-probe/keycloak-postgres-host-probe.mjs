@@ -2,6 +2,7 @@
  * Never serializes bearer/credentials; fixed loopback DB and container name.
  */
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -35,6 +36,13 @@ export async function probePersistentKeycloakHost({ issuer, resource, keys, clai
     allowMissingNotBefore: true, isRevoked: store.isRevoked,
   });
   const identity = { issuer, subject: claims.sub, tokenId: claims.jti };
+  const assertPersisted = async () => {
+    const tokenHash = createHash('sha256').update(JSON.stringify([issuer, claims.sub, claims.jti])).digest('hex');
+    const result = await pool.query(
+      'SELECT revoked FROM chatgpt_mcp_token_revocations WHERE token_hash = $1', [tokenHash]);
+    assert.equal(result.rowCount, 1, 'exact revocation record must survive restart');
+    assert.deepEqual(result.rows, [{ revoked: true }], 'healthy primary lookup must prove stored revocation');
+  };
   let phase = 'schema';
   try {
     await pool.query(await readFile(new URL('../sql/001_token_revocations.sql', import.meta.url), 'utf8'));
@@ -49,6 +57,7 @@ export async function probePersistentKeycloakHost({ issuer, resource, keys, clai
     phase = 'client restart';
     await pool.end();
     pool = open();
+    await assertPersisted();
     await assert.rejects(verifier(backend())(request), /denied/);
     phase = 'server restart';
     await pool.end();
@@ -64,6 +73,7 @@ export async function probePersistentKeycloakHost({ issuer, resource, keys, clai
     }
     assert.ok(ready, 'disposable PostgreSQL must recover after actual container restart');
     pool = open();
+    await assertPersisted();
     const restored = backend();
     await assert.rejects(verifier(restored)(request), /denied/);
     assert.equal(await restored.isRevoked({ ...identity, tokenId: 'never-revoked-after-restart' }), false);
