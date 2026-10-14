@@ -52,3 +52,23 @@ issuance, refresh service, IDP selection or grant provisioning. MCP
 endpoint metadata/401 HTTP routing and real issuer-specific access-token
 validation still require integration and approval. No OAuth login is
 functional yet. Avoid claims of OAuth completion. CI pending.
+
+## Opt-in protected-resource HTTP discovery/401 gate (2026-10-14)
+
+`adapters/mcp-oauth-http-gate.mjs` is a **non-listening**, server-owned
+HTTP adapter for a pinned MCP resource URL. It serves GET protected-resource
+JSON metadata at a fixed `/.well-known/oauth-protected-resource/mcp` route,
+rejects other methods, and responds to missing/invalid transport identity at
+`/mcp` with HTTP 401, a Bearer `WWW-Authenticate` resource_metadata hint
+and `Cache-Control: no-store`. A validated identity is passed to the
+embedding host's existing MCP dispatch, which **must** reauthenticate and
+recheck exact principal/workspace/Lead grants; this adapter is not a
+standalone permission gate.
+
+`mcp-oauth-http-gate.test.mjs` probes a temporary loopback HTTP server
+for metadata, 401, valid dispatch, 404 and 405 behavior. Nothing is
+mounted on a production listener. No real authorization server, account
+login, OAuth code exchange, client registration or production resource
+metadata endpoint has been configured. RFC 9728 publication under a
+real MCP resource URL, resource-identifier policy and proxy/TLS mapping
+require separate review. **New CI unverified. NO-GO for production.**
