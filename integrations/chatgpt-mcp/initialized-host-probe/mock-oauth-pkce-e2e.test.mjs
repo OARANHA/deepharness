@@ -11,9 +11,9 @@ const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 20
 const now = 2000000000;
 const encode = x => Buffer.from(JSON.stringify(x)).toString('base64url');
 const hash = s => createHash('sha256').update(s).digest('base64url');
-const signAccess = sub => {
+const signAccess = (sub, { scope = 'agent-teams:read', aud = resource } = {}) => {
   const head = encode({ alg: 'RS256', typ: 'JWT', kid: 'mock-key' });
-  const body = encode({ iss: issuer, aud: resource, sub, jti: randomBytes(12).toString('hex'),
+  const body = encode({ iss: issuer, aud, sub, scope, jti: randomBytes(12).toString('hex'),
     iat: now - 5, nbf: now - 5, exp: now + 120, token_use: 'access' });
   const input = head + '.' + body;
   return input + '.' + sign('RSA-SHA256', Buffer.from(input), privateKey).toString('base64url');
@@ -53,7 +53,7 @@ test('mock OAuth authorization code + PKCE S256 -> JWT -> exact MCP Agent Team g
   t.after(() => new Promise(ok => provider.close(ok)));
   const providerUrl = 'http://127.0.0.1:' + provider.address().port;
   const authenticateTransport = createPinnedJwtTransportAuthenticator({
-    issuer, audience: resource,
+    issuer, audience: resource, requiredScope: 'agent-teams:read',
     publicKeys: { 'mock-key': { ...publicKey.export({ format: 'jwk' }), alg: 'RS256' } },
     isRevoked: async ({ tokenId }) => revoked.has(tokenId), now: () => now,
   });
@@ -105,6 +105,15 @@ test('mock OAuth authorization code + PKCE S256 -> JWT -> exact MCP Agent Team g
     body: new URLSearchParams({ code: grant.code, code_verifier: verifier,
       grant_type: 'authorization_code', resource }) })).status, 400, 'authorization code is one-use');
   const headers = { authorization: 'Bearer ' + access_token };
+  for (const invalidToken of [signAccess('alice', { scope: 'other:read' }),
+    signAccess('alice', { scope: '' }), signAccess('alice', { aud: 'https://wrong.example/mcp' })]) {
+    assert.equal((await fetch(mcpUrl + '/mcp', {
+      headers: { authorization: 'Bearer ' + invalidToken },
+    })).status, 401, 'wrong scope or resource audience must deny');
+  }
+  assert.equal((await fetch(mcpUrl + '/mcp', {
+    headers: { authorization: 'Bearer ' + signAccess('bob') },
+  })).status, 403, 'signed but ungranted subject cannot read');
   assert.equal((await fetch(mcpUrl + '/mcp', { headers })).status, 200);
   await assert.rejects(binding.runHttpRequest({ headers }, () =>
     binding.readTeam({ workspaceId: 'ws-other', leadSessionId: 'lead-1' })), /denied/);
