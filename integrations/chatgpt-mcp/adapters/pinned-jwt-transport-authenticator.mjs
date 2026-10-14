@@ -15,11 +15,13 @@ const decode = raw => {
   return out;
 };
 export function createPinnedJwtTransportAuthenticator({
-  issuer, audience, publicKeys, isRevoked, now = () => Math.floor(Date.now() / 1000),
+  issuer, audience, publicKeys, isRevoked, requiredScope, now = () => Math.floor(Date.now() / 1000),
 }) {
   if (!valid(issuer) || !valid(audience) || !publicKeys ||
       typeof publicKeys !== 'object' || Array.isArray(publicKeys) ||
-      typeof isRevoked !== 'function' || typeof now !== 'function') deny();
+      typeof isRevoked !== 'function' || typeof now !== 'function' ||
+      (requiredScope !== undefined && (typeof requiredScope !== 'string' ||
+        !/^[a-z][a-z0-9:-]{0,63}$/.test(requiredScope)))) deny();
   const keys = new Map();
   for (const [kid, jwk] of Object.entries(publicKeys)) {
     if (!valid(kid) || keys.size >= 16 || jwk?.kty !== 'RSA' || jwk?.alg !== 'RS256' ||
@@ -51,7 +53,9 @@ export function createPinnedJwtTransportAuthenticator({
         !Number.isSafeInteger(claims.exp) ||
         claims.iat > time || claims.nbf > time || claims.exp <= time ||
         claims.exp <= claims.iat || claims.exp - claims.iat > 3600 ||
-        claims.nbf < claims.iat || claims.token_use !== 'access') deny();
+        claims.nbf < claims.iat || claims.token_use !== 'access' ||
+        (requiredScope !== undefined && (typeof claims.scope !== 'string' ||
+          !claims.scope.split(' ').includes(requiredScope)))) deny();
     let revoked;
     try { revoked = await isRevoked({ issuer: claims.iss, subject: claims.sub, tokenId: claims.jti }); }
     catch { deny(); }
