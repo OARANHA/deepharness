@@ -1,6 +1,6 @@
 # Candidato operacional OAuth + proxy — primeiro canário
 
-Estado: gerador e testes preparados; CI do novo proxy ainda pendente. Não é instalação, registro OAuth, autorização de produção ou prova de conexão ChatGPT. Base de laboratório GREEN: 510faad (pacote lab.4 + JWT humano Keycloak + MCP/mTLS + DSH oficial + PostgreSQL real).
+Estado verificado em 2026-10-14: configuração candidata e teste combinado GREEN no commit f68ac5b7a37b3bb915909bf2f710c8c950dfabcc. Não é instalação, registro OAuth, autorização de produção ou prova de conexão ChatGPT. O laboratório usa pacote lab.4 instalado, JWT humano Keycloak, Envoy/mTLS, DSH oficial e PostgreSQL real.
 
 ## Produzir a configuração revisável
 
@@ -46,7 +46,7 @@ O backend precisa rodar no mesmo host Cordis/DSH que possui as sessões existent
 
 Cinco testes locais do gerador/CLI passaram. A CI nova valida o JSON com Envoy fixado e exercita TLS real em loopback contra backend double: cadeia, SAN/EKU incorretos, certificado ausente/não confiável, Host/Origin/path/method, mTLS backend, headers falsos e OAuth ainda exigido. Usa somente CAs e certificados descartáveis; não possui a chave OpenAI. Marca sucesso somente com `OPERATIONAL_PROXY_MTLS_SAN_ORIGIN_MATCH` e leitura positiva após cada negação TLS.
 
-Esse teste não substitui o fluxo humano Keycloak/DSH/PostgreSQL já comprovado, nem comprova o cliente ChatGPT real ou todos os componentes pelo novo proxy. O próximo teste deve usar o proxy na combinação já existente antes de qualquer implantação. Não afirmar compatibilidade só por `--mode validate`.
+Esse teste não substitui o fluxo humano Keycloak/DSH/PostgreSQL já comprovado, nem comprova o cliente ChatGPT real ou todos os componentes pelo novo proxy. O teste combinado descrito abaixo já passou. A próxima etapa é preencher e revisar a composição operacional real, seguida do canário pelo ChatGPT após autorização de ativação. Não afirmar compatibilidade só por `--mode validate`.
 
 ## Ativação e rollback posteriores
 
@@ -64,7 +64,7 @@ Fontes verificadas em 2026-10-14:
 - https://github.com/envoyproxy/envoy/releases/tag/v1.40.0
 
 
-## Fluxo completo pelo proxy (novo incremento; CI pendente)
+## Fluxo completo pelo proxy (CI verificada)
 
 O job independente do proxy passou em df9a5ff, incluindo o marcador
 OPERATIONAL_PROXY_MTLS_SAN_ORIGIN_MATCH. A correção do harness executa o
@@ -87,5 +87,60 @@ mesmo se a remoção do container proxy falhar.
 
 Novo marcador obrigatório:
 KEYCLOAK_PACKED_PROXY_OFFICIAL_DSH_PERSISTENT_GRANTS_MATCH.
-Sintaxe e 104 testes locais passaram, incluindo falha simulada de remoção do proxy com encerramento real do backend e limpeza de fixtures; o fluxo novo depende da CI.
+Sintaxe e 104 testes locais passaram, incluindo falha simulada de remoção do proxy com encerramento real do backend e limpeza de fixtures; o fluxo novo passou na CI Keycloak #38592622957 em f68ac5b7a37b3bb915909bf2f710c8c950dfabcc.
 Isso não preenche issuer/resource/callback de produção nem autoriza ingress.
+
+
+## Preparação operacional pelo Git — 2026-10-14
+
+A stack deepharness foi informada pelo proprietário como Git-backed, com
+repositório OARANHA/deepharness e caminho deploy/portainer-stack.yml.
+O arquivo da main foi lido: serviço web, imagem por DEEPHARNESS_IMAGE,
+BasicAuth por DSH_BASIC_AUTH_USERS, volumes dsh_data/dsh_workspace,
+rede externa traefik-public e Web UI deep.wandora.com.br. Isso verifica
+o conteúdo do Git, não a revisão aplicada pelo Portainer nem seus valores.
+
+O proprietário distinguiu o Portainer da stack do Portainer configurado
+no conector MCP de infraestrutura. Uma listagem vazia pelo conector não
+é evidência de ausência da stack deepharness. A navegação ao Portainer
+da stack terminou em erro de transporte TLS neste navegador; não foi
+possível ler sua configuração ativa. Não alterar URLs/configuração
+do conector nem tentar contornar a allowlist de containers.
+
+### Valores necessários e fonte de comprovação
+
+| Valor | Fonte | Situação |
+| --- | --- | --- |
+| Branch/ref e revisão aplicada da stack | Configuração Git e histórico de redeploy no Portainer | Não verificados; o runbook recomenda main, não comprova uso atual |
+| DEEPHARNESS_IMAGE e digest anterior para rollback | Variável da stack e imagem efetivamente executada | Não verificados; digest histórico ou de CI não substitui readback |
+| DSH_BASIC_AUTH_USERS | Provisionamento privado no Portainer | Referência existente; não copiar valor para Git/chat |
+| issuer | Discovery HTTPS do realm Keycloak operacional | Não definido; não reutilizar localhost do laboratório |
+| resource | Hostname HTTPS MCP dedicado e caminho /mcp | Não definido; não reutilizar hostname da Web UI |
+| clientId / resourceClientId | Clientes dedicados revisados no Keycloak | Não definidos; gerar candidato disabled antes de provisionar |
+| redirectUri / redirectUriEvidence | Interface real de gestão da conexão ChatGPT | Não definidos; copiar callback exato, sem inferência |
+| authorizationResponseIssuerSupported | Metadata e contrato do issuer operacional | Não verificado |
+| tokenEndpointAuthMethod | Interface ChatGPT e cliente Keycloak correspondente | Não definido |
+| backendHost / backendPort | Composição privada no mesmo host DSH existente | Não definidos; requer instalação do pacote e policy confiável |
+| allowedOrigins | Origens efetivamente utilizadas pelo cliente | Não definidas; ausência tratada apenas pelo canal mTLS verificado |
+| Owner, workspace e Lead | Identidade JWT e serviços DSH existentes | Não definidos para o canário; grants exatos provisionados no primary |
+| Certificados e acesso PostgreSQL | Secret manager e rede operacional privada | Não provisionados por este incremento |
+
+### Sequência restante
+
+1. Confirmar revisão/digest ativos e rollback da stack existente; preservar
+   volumes e usar exatamente o mesmo host DSH/sessões. Não executar redeploy
+   só porque a branch do conector recebeu documentação.
+2. Obter os valores reais acima. Preencher entrada privada do gerador e
+   produzir os quatro arquivos desativados. Nenhum segredo entra no Git.
+3. Preparar uma única revisão final com imagem que realmente contenha lab.4,
+   montagem do host/policy/SDK, PostgreSQL primary, backend mTLS e ingresso
+   dedicado. O YAML atual não fornece esses componentes; um overlay de
+   produção completo permanece pendente dos valores e da composição real.
+4. Apresentar o diff concreto para autorização de implantação/provisionamento
+   e ativação. A preparação no Git não autoriza importação de clientes,
+   grants, DNS, certificados, bind ou alterações na stack.
+5. Após ativação autorizada e readbacks, executar canário humano ChatGPT
+   limitado à leitura aprovada e verificar a revogação/rollback.
+
+Não há novo gate sintético planejado. Correções exigirão verificação apenas
+se a revisão operacional ou o cliente real revelar uma falha.
