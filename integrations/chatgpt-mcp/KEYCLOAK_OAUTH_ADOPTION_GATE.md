@@ -200,3 +200,12 @@ verify a real existing Lead/session without creating or waking it,
 and repeat cross-workspace/Lead revocation denial with actual
 projection data. Do not deploy or expose any listener automatically.
 CI pending.
+
+
+## Combined real human JWT → official DSH read gate (2026-10-14, CI pending)
+
+The existing human PKCE probe now calls `initialized-host-probe/keycloak-official-host-probe.mjs` in the same Node process, passing the in-memory Keycloak access-token request and existing JWKS-backed authenticator. No JWT/code/password is written to an artifact or printed. The Keycloak workflow installs only the already committed initialized-host dependency lock using `npm ci --ignore-scripts` on Node 22.
+
+The helper initializes disposable official Cordis 4.0.5-alpha.1 and DSH 0.2.1-alpha.2 Storage/JSON domain/JSONL persistence/SessionStore/WorkspaceRegistry/TeamService. Two existing lab Lead sessions are attached to one workspace before the read. Inert agent/subagent prerequisites do not run models or agents. The server grant permits only the authenticated issuer-sub principal and exact first Lead. Tests require official projection output, deny the second live Lead even with a forged principal argument, deny another workspace and invalid bearer, and deny revocation during awaited Lead resolution before any further projection access. Cleanup disposes host and removes temporary storage.
+
+Expected success marker: `KEYCLOAK_HUMAN_OFFICIAL_DSH_READ_MATCH`. This is **not verified until CI passes**. Syntax checks and persisted source review alone are not runtime proof. Revocation in this combined test is in-memory; persistent PostgreSQL revocation remains separately tested. Team data are official but disposable, Lead-only/empty board; no production team, ChatGPT OAuth login, endpoint exposure, deployment or merge. Prior separate gates are GREEN at `b70923c`. JEV recommends deep review and permits the bounded isolated test.
