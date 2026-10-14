@@ -1,11 +1,12 @@
 /** Pinned OIDC HTTPS metadata fetcher. Trusted deployment must enforce network
- * egress/DNS anti-rebinding separately: URL validation alone cannot prevent SSRF.
+ * a restricted egress firewall and TLS interception/proxy controls separately.
  * Never derive issuer or JWKS endpoints from a token or user input.
  */
 import { validatePinnedOidcMetadata } from './pinned-oidc-metadata.mjs';
+import { createDnsPinnedOidcFetcher } from './dns-pinned-oidc-fetcher.mjs';
 const deny = () => { throw new Error('OIDC discovery denied'); };
 export function createPinnedOidcDiscovery({
-  issuer, discoveryUri, jwksUri, fetcher = globalThis.fetch,
+  issuer, discoveryUri, jwksUri, fetcher = createDnsPinnedOidcFetcher(),
   now = () => Date.now(), timeoutMs = 3000, ttlMs = 60000,
   maxBytes = 65536,
 }) {
