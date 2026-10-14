@@ -24,7 +24,7 @@ test('changed host services abort and dispose the booted context',async()=>{
 });
 test('policy failure disposes and suppresses credential-bearing errors',async()=>{
   const x=setup();x.opts.createPolicy=async()=>{throw Error('private password');};
-  await assert.rejects(bootExistingProfileReadHost(x.opts),/^Error: Existing DSH read host composition denied$/);
+  await assert.rejects(bootExistingProfileReadHost(x.opts),/^Error: Existing DSH read host composition denied \(policy\)$/);
   assert.equal(x.events.at(-1),'disposed');
 });
 test('existing connector policy is never overwritten',async()=>{
