@@ -108,11 +108,16 @@ export async function probePersistentGrantPolicy({issuer,resource,keys,request,p
     await assert.rejects(read(),/denied/);
     await assertRow(false);
     phase='database unavailable';
+    await pool.query('UPDATE chatgpt_mcp_read_grants SET allowed = TRUE WHERE grant_hash = $1',[grantHash]);
+    await assertRow(true);assert.equal((await read()).leadSessionId,lead.id);
     await pool.end();await exec('docker',['stop',container],{timeout:30000});pool=open();
     await assert.rejects(store.hasReadGrant(scope),/denied/);
     await assert.rejects(read(),/denied/);
     await pool.end();await exec('docker',['start',container],{timeout:30000});await ready();
-    pool=open();await mount();await assertRow(false);await assert.rejects(read(),/denied/);
+    pool=open();await mount();await assertRow(true);
+    assert.equal((await read()).leadSessionId,lead.id,'healthy restored primary must authorize its preserved exact grant');
+    await pool.query('UPDATE chatgpt_mcp_read_grants SET allowed = FALSE WHERE grant_hash = $1',[grantHash]);
+    await assertRow(false);await assert.rejects(read(),/denied/);
     assert.equal(ctx.sessions.get(lead.id),lead);assert.equal(ctx.sessions.get(other.id),other);
     assert.deepEqual(ctx.sessionProjections.snapshot(lead,['agentTeam']).values.agentTeam,baseline);
     console.log('KEYCLOAK_CORDIS_PERSISTENT_GRANTS_MATCH: real human JWT + official plugin + exact primary grants + allowed/revoked restart + in-flight revocation + outage denied');
