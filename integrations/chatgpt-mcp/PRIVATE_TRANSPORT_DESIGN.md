@@ -68,3 +68,33 @@ sem depender de proxy real — custo: integração proxy/túnel é trabalho sepa
 Ruling: manter stateless no primeiro transporte para eliminar mapas de sessão
 com identidade reutilizada — custo: clientes que exigirem sessão/SSE persistentes
 precisam de contrato e testes posteriores; não presumir compatibilidade ChatGPT.
+
+## JWT humano + PostgreSQL real no transporte (incremento; CI pendente)
+
+O probe persistent-grant-policy-probe aceita withPrivateTransport:true apenas
+no laboratório. Todas as leituras de aceitação/negação percorrem HTTPS/mTLS,
+SDK stateless, plugin oficial e PostgreSQL primary real do laboratório existente.
+Não há nova infraestrutura: listener somente 127.0.0.1/porta efêmera e certificados
+descartáveis. O resource https://mcp.example/mcp permanece identificador do lab;
+a conexão física é loopback, com SNI/Host e SAN correspondentes. Não é DNS real.
+
+human-pkce-probe obtém JWT de uma transação PKCE independente para a rede e
+outro JWT independente de controle, ambos autenticados como o mesmo principal.
+Isso preserva o token original usado pelos testes existentes e impede reutilizar
+um código para cenários incompatíveis. Nenhum token/código/cookie é registrado.
+
+Reutiliza as provas existentes de grant ausente/exato, outro Lead, revogação
+durante await, persistência permitida/revogada em pool/plugin/DB e outage.
+Adiciona revogação real do token de rede; exige linha SQL saudável revoked:true,
+grant allowed:true e leitura permitida do controle não revogado antes de aceitar
+a negação do token alvo, inclusive após reinício de pool/plugin e banco.
+Confirma ambos os tokens ainda não expirados. Cleanup restaura banco parado
+pelo teste antes de encerrar pool, host, listener e arquivos temporários.
+
+Revisão independente encontrou ausência desse controle positivo pós-reinício
+e restauração do banco no caminho de erro; ambos foram corrigidos.
+96 testes locais de fronteira/regressão passaram; sintaxe dos probes aprovada.
+A combinação real exige a CI e o marcador
+KEYCLOAK_MTLS_OFFICIAL_DSH_PERSISTENT_GRANTS_MATCH. Ainda não comprovada
+neste incremento. Não altera adapters de produção, whitelist/exports lab.3,
+Keycloak de produção, credenciais persistentes ou conexão ChatGPT.
