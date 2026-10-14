@@ -46,7 +46,7 @@ try{
   phase='installed module';
   const resolve=createRequire(join(profile,'package.json'));
   const installed=JSON.parse(await readFile(resolve.resolve(name+'/package.json'),'utf8'));
-  assert.equal(installed.version,'0.1.0-lab.3');
+  assert.equal(installed.version,'0.1.0-lab.4');
   assert.equal(installed.dsh.bundle.patch,'./cordis.patch.yml');
   const plugin=await import(pathToFileURL(resolve.resolve(name+'/plugin')).href);
   assert.equal(typeof plugin.apply,'function');
