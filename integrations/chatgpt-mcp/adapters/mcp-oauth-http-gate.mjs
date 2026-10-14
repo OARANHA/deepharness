@@ -11,7 +11,7 @@ export function createMcpOAuthHttpGate({
   if (typeof authenticateTransport !== 'function' ||
       typeof metadataPath !== 'string' || typeof mcpPath !== 'string' ||
       !metadataPath.startsWith('/.well-known/oauth-protected-resource/') ||
-      !/^\/[a-z0-9/_-]+$/i.test(metadataPath) ||
+      !/^\/\.well-known\/oauth-protected-resource\/[a-z0-9/_-]+$/i.test(metadataPath) ||
       !/^\/[a-z0-9/_-]+$/i.test(mcpPath) || metadataPath === mcpPath) deny();
   const resourceUrl = new URL(resource);
   if (resourceUrl.pathname !== mcpPath || resourceUrl.search || resourceUrl.hash) deny();
