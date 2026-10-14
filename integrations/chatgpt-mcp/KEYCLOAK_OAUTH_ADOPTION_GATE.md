@@ -172,3 +172,31 @@ The test never stores JWTs/secrets outside the disposable job, does
 not expose a public MCP endpoint and does not assert that ChatGPT
 can authenticate. CI result **pending**; PR remains Draft, production
 **NO-GO** pending actual host integration and reviewed ingress.
+
+## Independent wrong-PKCE gate and official host seam (2026-10-14)
+
+The isolated human Keycloak probe now starts **a second, independent**
+authorization-code flow using its own verifier and state, then attempts
+to redeem its code with a wrong PKCE verifier. Expected HTTP 400 and
+`KEYCLOAK_INDEPENDENT_WRONG_PKCE_DENIED`. The original positive
+flow still redeems its *own* valid code and denies replay. No tokens,
+cookies, credentials, codes or identities are printed.
+
+Added `adapters/prepare-official-dsh-team-read.mjs`: a small fail-closed,
+non-listening composition seam for the **existing** official DSH host
+interfaces `workspaceRegistry.get`, `sessionProjections.snapshot`,
+and `resolveLiveLeadSession`, plus trusted transport authenticator,
+exact initial grants, and origin policy. This reuses the existing
+scoped read-request context and deliberately exports ONLY
+`runHttpRequest` and `readTeam` (not grant writes). Its negative
+interface contract is tested in the pinned initialized-host suite.
+
+**NOT YET PROVED:** the actual production DSH service injection,
+non-resuming Lead resolver binding, a real Agent Team projection,
+TLS/public OAuth, or real ChatGPT connection. This is a safe integration
+seam, not a deployed DSH host plugin. The next owner-reviewed
+preproduction canary must resolve official initialized host services,
+verify a real existing Lead/session without creating or waking it,
+and repeat cross-workspace/Lead revocation denial with actual
+projection data. Do not deploy or expose any listener automatically.
+CI pending.
