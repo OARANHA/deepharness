@@ -13,10 +13,12 @@ import { WorkspaceRegistry } from '@deepseek-ai/dsh-workspace';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { generateKeyPairSync, sign, randomBytes, randomUUID } from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
+import { prepareOfficialDshTeamRead } from '../adapters/prepare-official-dsh-team-read.mjs';
+import { createPinnedJwtTransportAuthenticator } from '../adapters/pinned-jwt-transport-authenticator.mjs';
 import { createDshHostReadBinding } from '../adapters/dsh-host-read-binding.mjs';
 import { createDshAgentTeamHostReader } from '../adapters/dsh-agent-teams-host-reader.mjs';
 import { projectAgentTeam } from '../adapters/agent-teams-read-model.mjs';
@@ -97,6 +99,49 @@ test('initialized official TeamService WorkspaceRegistry JSONL host through SDK 
     assert.equal(scoped.leadSessionId, lead.id,
       'stage: authenticated host binding must read Team before SDK transport');
   });
+  // Exercise the internal, non-listening seam against official initialized
+  // services with a signed individual identity. Keys/tokens exist only in this
+  // disposable test; this is not a Keycloak-issued token or production read.
+  const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const issuer = 'https://id.example';
+  const audience = 'https://mcp.example/mcp';
+  const now = Math.floor(Date.now() / 1000);
+  const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url');
+  const jwt = subject => {
+    const body = encode({ alg: 'RS256', kid: 'lab', typ: 'JWT' }) + '.' +
+      encode({ iss: issuer, aud: audience, sub: subject, jti: 'official-host-jti',
+        iat: now, nbf: now, exp: now + 300, token_use: 'access', scope: 'agent-teams:read' });
+    return body + '.' + sign('RSA-SHA256', Buffer.from(body), privateKey).toString('base64url');
+  };
+  let individualRevoked = false;
+  const individual = prepareOfficialDshTeamRead({
+    workspaceRegistry: host.workspaceRegistry,
+    sessionProjections: host.sessionProjections,
+    resolveLiveLeadSession: async id => host.sessions.get(id),
+    authenticateTransport: createPinnedJwtTransportAuthenticator({
+      issuer, audience, now: () => now,
+      publicKeys: { lab: { ...publicKey.export({ format: 'jwk' }), alg: 'RS256' } },
+      isRevoked: async () => individualRevoked,
+    }),
+    grants: [{ principalId: issuer + '#alice', workspaceId: workspace.id, leadSessionId: lead.id }],
+    allowedOrigins: ['https://client.example'],
+  });
+  const individualTarget = { workspaceId: workspace.id, leadSessionId: lead.id };
+  const alice = jwt('alice');
+  const individualRead = (bearer, args = individualTarget) => individual.runHttpRequest({
+    headers: { authorization: 'Bearer ' + bearer, origin: 'https://client.example' },
+  }, () => individual.readTeam(args));
+  const individualResult = await individualRead(alice);
+  assert.equal(individualResult.leadSessionId, lead.id);
+  assert.deepEqual(individualResult.members, realProjection.members);
+  await assert.rejects(individualRead(jwt('bob')), /denied/);
+  await assert.rejects(individualRead(alice, { ...individualTarget, leadSessionId: 'other' }), /denied/);
+  await assert.rejects(individualRead(alice, { ...individualTarget, principalId: issuer + '#alice' }), /denied/);
+  individualRevoked = true;
+  await assert.rejects(individualRead(alice), /denied/);
+  assert.deepEqual(ctx.sessionProjections.snapshot(lead, ['agentTeam']).values.agentTeam, realProjection);
+  console.log('OFFICIAL_HOST_INDIVIDUAL_READ_SEAM_MATCH: signed test JWT + exact grants + official projection + denied other principal/Lead + revocation');
+
   const sessions = new Map();
   const http = createServer(async (req, res) => {
     try {
