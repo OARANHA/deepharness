@@ -19,7 +19,7 @@
       "protocol": "openid-connect",
       "publicClient": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "CI-ONLY-ISOLATED-THROWAWAY",
+      "secret": "__CI_GENERATED_CLIENT_SECRET__",
       "serviceAccountsEnabled": true,
       "standardFlowEnabled": false,
       "directAccessGrantsEnabled": false,
