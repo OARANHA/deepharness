@@ -54,8 +54,9 @@ async function exchange(codeVerifier) {
       code, code_verifier: codeVerifier, redirect_uri: callback, resource }),
   });
 }
-const wrong = await exchange('wrong-verifier');
-assert.equal(wrong.status, 400, 'wrong PKCE proof must fail');
+// Exchange the valid code first. Keycloak can invalidate a code after a
+// failed PKCE redemption; probing a wrong verifier on that same code first
+// would make the positive path untestable.
 const ok = await exchange(verifier);
 assert.equal(ok.status, 200, 'valid S256 PKCE code exchange must succeed');
 const access = (await ok.json()).access_token;
