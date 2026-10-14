@@ -59,7 +59,6 @@
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": true,
-      "clientAuthenticatorType": "client-secret",
       "serviceAccountsEnabled": false,
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
@@ -93,7 +92,6 @@
       "defaultClientScopes": [
         "agent-teams:read"
       ],
-      "pkceCodeChallengeMethod": "S256",
       "redirectUris": [
         "http://127.0.0.1:18081/callback"
       ],
