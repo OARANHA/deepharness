@@ -191,6 +191,24 @@ jobs:
           print("Portainer Stack syntax OK: shared Traefik network, no published ports")
           '
 
+      - name: Build private connector installation candidate (CI only)
+        if: steps.state.outputs.ready == 'true' && github.event_name == 'pull_request'
+        run: docker build -f deploy/Dockerfile.mcp-candidate -t local/deepharness-mcp:candidate .
+      - name: Official offline DSH install and disabled profile composition
+        if: steps.state.outputs.ready == 'true' && github.event_name == 'pull_request'
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --init --read-only --network none \
+            --security-opt no-new-privileges --cap-drop ALL \
+            --pids-limit 256 --memory 2g --cpus 1.5 \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=128m,mode=1777 \
+            --tmpfs /data/dsh:rw,nosuid,nodev,size=256m,mode=0700,uid=1000,gid=1000 \
+            --tmpfs /workspace:rw,nosuid,nodev,size=128m,mode=0700,uid=1000,gid=1000 \
+            -e DSH_MCP_INSTALL_PROOF=true local/deepharness-mcp:candidate \
+            node /opt/wandora-mcp-verifier/verify-disabled-mcp-profile.mjs
+
       - name: Log in to GHCR
         if: steps.state.outputs.ready == 'true' && github.event_name == 'push'
         uses: docker/login-action@v3
