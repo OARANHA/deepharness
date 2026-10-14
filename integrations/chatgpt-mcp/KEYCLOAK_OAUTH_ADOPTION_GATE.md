@@ -78,3 +78,24 @@ branch/workflow mechanism instead.
 
 ## CI trigger update (2026-10-14)
 The disposable Keycloak laboratory now also uses a narrowly scoped `pull_request` trigger for changes to its workflow or `keycloak-lab/**` files. This avoids reliance on the GitHub Actions manual dispatch UI (which may require a workflow registered on the default branch). It does not deploy, merge, install on the VPS, or prove ChatGPT login. Read the **KEYCLOAK_LAB_PROFILE** / **KEYCLOAK_CONTRACT_NO_GO** diagnostics even if the workflow itself turns green: a technically successful lab with incompatible JWT fields is still NO-GO. Lab CI outcome pending.
+
+## Keycloak token mapper / strict CI experiment (2026-10-14)
+
+Lab realm updated with an explicit `agent-teams:read` client scope (assigned to
+the disposable service-account client) and an OIDC hardcoded-claim protocol
+mapper on access tokens only for `token_use=access`. The previous lab had
+correct RS256 and exact resource audience but lacked `nbf`, `token_use`
+and `agent-teams:read` in the issued access token.
+
+The lab probe now returns a non-zero exit code whenever real token claims
+do not match the strict existing verifier. **A RED Keycloak lab may be the
+correct safe outcome.** Do not insert a constant `nbf` using a hardcoded
+claim mapper: it must be generated as a meaningful token not-before time,
+not a shared static timestamp. No claim is manufactured inside the
+resource server. The lab's client-credentials path tests only token shape,
+not PKCE browser grants for human users, and a hardcoded purpose claim
+must not be applied indiscriminately to ID tokens or unrelated clients.
+
+Next: inspect actual Keycloak profile diagnostics and identify an audited
+issuer-side way to satisfy `nbf` or document a separate, security-reviewed
+JWT claim-policy change. Until then the Keycloak access JWT is **NO-GO**.
