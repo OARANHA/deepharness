@@ -3,6 +3,7 @@ name: ChatGPT MCP — Agent Teams read model
 on:
   pull_request:
     paths:
+      - 'deploy/mcp/**'
       - 'integrations/chatgpt-mcp/package.json'
       - 'integrations/chatgpt-mcp/runtime.mjs'
       - 'integrations/chatgpt-mcp/policy.mjs'
@@ -144,3 +145,21 @@ jobs:
           path: ${{ runner.temp }}/runtime-package-artifact
           retention-days: 7
           if-no-files-found: error
+
+
+  operational-oauth-proxy-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test inactive OAuth and proxy rendering contract
+        run: node --test deploy/mcp/render-operational-candidate.test.mjs
+      - name: Validate and exercise disposable Envoy mTLS proxy on loopback
+        run: node deploy/mcp/operational-proxy-lab.mjs
