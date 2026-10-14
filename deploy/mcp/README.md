@@ -111,8 +111,8 @@ do conector nem tentar contornar a allowlist de containers.
 
 | Valor | Fonte | Situação |
 | --- | --- | --- |
-| Branch/ref e revisão aplicada da stack | Configuração Git e histórico de redeploy no Portainer | Não verificados; o runbook recomenda main, não comprova uso atual |
-| DEEPHARNESS_IMAGE e digest anterior para rollback | Variável da stack e imagem efetivamente executada | Não verificados; digest histórico ou de CI não substitui readback |
+| Branch/ref e revisão aplicada da stack | Configuração Git e histórico de redeploy no Portainer | Proprietário informou refs/heads/main em 2026-10-14; revisão aplicada ainda não verificada |
+| DEEPHARNESS_IMAGE e digest anterior para rollback | Variável da stack e imagem efetivamente executada | Proprietário informou sha256:27c6073e2dc4e8f4f34555aa89915285d8a7e25031dc4964cb7e80abbfb11075; inspeção do container pendente |
 | DSH_BASIC_AUTH_USERS | Provisionamento privado no Portainer | Referência existente; não copiar valor para Git/chat |
 | issuer | Discovery HTTPS do realm Keycloak operacional | Não definido; não reutilizar localhost do laboratório |
 | resource | Hostname HTTPS MCP dedicado e caminho /mcp | Não definido; não reutilizar hostname da Web UI |
