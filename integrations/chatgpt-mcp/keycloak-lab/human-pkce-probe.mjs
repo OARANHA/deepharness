@@ -16,6 +16,7 @@ if (!password || password.length < 24) throw Error('Missing ephemeral human lab 
 const json = await (await fetch(issuer + '/.well-known/openid-configuration')).json();
 assert.equal(json.issuer, issuer);
 assert.ok(json.code_challenge_methods_supported.includes('S256'));
+async function authorizeHuman() {
 const verifier = randomBytes(48).toString('base64url');
 const challenge = createHash('sha256').update(verifier).digest('base64url');
 const state = randomBytes(16).toString('base64url');
@@ -49,17 +50,22 @@ assert.equal(redirect.searchParams.get('state'), state, 'OAuth state mismatch');
 assert.equal(redirect.searchParams.get('error'), null, 'OAuth authz failed');
 const code = redirect.searchParams.get('code');
 assert.ok(code, 'authorization code missing');
-async function exchange(codeVerifier) {
+return {code,verifier};
+
+}
+async function exchange(code, codeVerifier) {
   return fetch(json.token_endpoint, { method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ grant_type: 'authorization_code', client_id: 'mcp-pkce-human-probe',
       code, code_verifier: codeVerifier, redirect_uri: callback, resource }),
   });
 }
+
+const {code,verifier} = await authorizeHuman();
 // Exchange the valid code first. Keycloak can invalidate a code after a
 // failed PKCE redemption; probing a wrong verifier on that same code first
 // would make the positive path untestable.
-const ok = await exchange(verifier);
+const ok = await exchange(code,verifier);
 assert.equal(ok.status, 200, 'valid S256 PKCE code exchange must succeed');
 const access = (await ok.json()).access_token;
 assert.equal(typeof access, 'string');
@@ -73,8 +79,14 @@ assert.ok(claims.scope.split(' ').includes('agent-teams:read'));
 assert.ok(typeof claims.sub === 'string' && claims.sub.length > 0, 'human access token must carry issuer-managed subject');
 assert.ok(Number.isSafeInteger(claims.iat) && Number.isSafeInteger(claims.exp));
 assert.ok(claims.exp > claims.iat && claims.exp - claims.iat <= 3600);
-const reused = await exchange(verifier);
+const reused = await exchange(code,verifier);
 assert.equal(reused.status, 400, 'authorization code replay must be denied');
+const second = await authorizeHuman();
+assert.notEqual(second.code, code);
+const wrong = await exchange(second.code, 'wrong-pkce-verifier');
+assert.equal(wrong.status, 400, 'independent code must reject wrong PKCE verifier');
+console.log('KEYCLOAK_INDEPENDENT_WRONG_PKCE_DENIED');
+
 // Full local path: Keycloak-issued JWT -> validated signature/claims ->
 // transport-bound individual subject -> exact workspace+Lead grant -> read.
 // The DSH projection below is deliberately fixture-only; no live DSH read.
