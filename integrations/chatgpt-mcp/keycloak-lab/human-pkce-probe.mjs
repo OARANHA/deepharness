@@ -4,6 +4,8 @@
  */
 import assert from 'node:assert/strict';
 import { createHash, randomBytes } from 'node:crypto';
+import { createPinnedJwtTransportAuthenticator } from '../adapters/pinned-jwt-transport-authenticator.mjs';
+import { createMcpReadRequestContext } from '../adapters/mcp-read-request-context.mjs';
 const base = process.env.KEYCLOAK_LAB_URL ?? 'http://127.0.0.1:18080';
 const issuer = base + '/realms/deepharness-mcp-lab';
 const resource = 'https://mcp.example/mcp';
@@ -73,4 +75,52 @@ assert.ok(Number.isSafeInteger(claims.iat) && Number.isSafeInteger(claims.exp));
 assert.ok(claims.exp > claims.iat && claims.exp - claims.iat <= 3600);
 const reused = await exchange(verifier);
 assert.equal(reused.status, 400, 'authorization code replay must be denied');
+// Full local path: Keycloak-issued JWT -> validated signature/claims ->
+// transport-bound individual subject -> exact workspace+Lead grant -> read.
+// The DSH projection below is deliberately fixture-only; no live DSH read.
+const discoveryJwks = await fetch(json.jwks_uri);
+assert.equal(discoveryJwks.status, 200, 'issuer JWKS endpoint required');
+const jwks = await discoveryJwks.json();
+const head = JSON.parse(Buffer.from(segments[0], 'base64url').toString('utf8'));
+assert.equal(head.alg, 'RS256');
+assert.equal(head.typ, 'JWT');
+assert.ok(typeof head.kid === 'string' && head.kid.length);
+const signingKey = jwks.keys?.find(k => k.kid === head.kid && k.kty === 'RSA');
+assert.ok(signingKey, 'matching issuer RSA signing key required');
+const keys = { [head.kid]: { ...signingKey, alg: 'RS256' } };
+const clock = () => Math.floor(Date.now() / 1000);
+const revokedTokens = new Set();
+const authenticated = createPinnedJwtTransportAuthenticator({
+  issuer, audience: resource, publicKeys: keys, requiredScope: 'agent-teams:read',
+  allowMissingNotBefore: true, now: clock,
+  isRevoked: async ({tokenId}) => revokedTokens.has(tokenId),
+});
+const request = {headers: { authorization: 'Bearer ' + access, origin: 'http://127.0.0.1:18081' }};
+const principal = issuer + '#' + claims.sub;
+const scope = {principalId:principal,workspaceId:'lab-workspace',leadSessionId:'lab-lead-allowed'};
+let projections = 0;
+const binding = createMcpReadRequestContext({
+  authenticateTransport: authenticated,
+  allowedOrigins: ['http://127.0.0.1:18081'],
+  grants: [scope],
+  workspaceRegistry: {get(id) { return id === 'lab-workspace'
+    ? {id,sessionIds:['lab-lead-allowed','lab-lead-denied']} : undefined; }},
+  resolveLiveLeadSession: async id => ({id}),
+  sessionProjections: {snapshot() { projections++;
+    return {values:{agentTeam:{members:[{id:'lab-lead-allowed',name:'fixture-lead',role:'lead',phase:'active'}],tasks:[]}}};
+  }},
+});
+const read = (target, req=request) => binding.runHttpRequest(req, () => binding.readTeam(target));
+const allowed = {workspaceId:'lab-workspace',leadSessionId:'lab-lead-allowed'};
+const denied = {workspaceId:'lab-workspace',leadSessionId:'lab-lead-denied'};
+assert.equal((await authenticated(request)).principalId, principal, 'signed sub determines individual principal');
+assert.equal((await read(allowed)).leadSessionId, allowed.leadSessionId);
+const beforeDenied = projections;
+await assert.rejects(read(denied), /denied/, 'workspace membership must not authorize a different Lead');
+assert.equal(projections, beforeDenied, 'unauthorized team projection must not be read');
+await assert.rejects(read({...allowed,principalId:principal,workspaceId:'other-workspace'}), /denied/);
+await assert.rejects(read(allowed,{headers:{authorization:'Bearer invalid',origin:'http://127.0.0.1:18081'}}), /denied/);
+revokedTokens.add(claims.jti);
+await assert.rejects(read(allowed), /denied/, 'revoked real token must not read an authorized Lead');
+console.log('KEYCLOAK_HUMAN_GRANTS_E2E_MATCH: real signed JWT + issuer sub + exact grants + denied other Lead + revocation; DSH data fixture only');
 console.log('KEYCLOAK_HUMAN_PKCE_PROFILE_MATCH: code + S256 + state + resource audience + read scope + one-time exchange');
