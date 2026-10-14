@@ -7,7 +7,6 @@ import {createServer,request as httpsRequest} from 'node:https';
 import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {StreamableHTTPServerTransport} from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import {z} from 'zod';
-import {createPrivateMcpHttpHandler} from '../adapters/private-mcp-http-handler.mjs';
 export async function createLoopbackPrivateMcpProbe({resource,getService,bearer,origin}){
  if(process.env.GITHUB_ACTIONS!=='true'||resource!=='https://mcp.example/mcp'||
  typeof getService!=='function'||typeof bearer!=='string'||!bearer.startsWith('Bearer ')||
@@ -34,12 +33,9 @@ export async function createLoopbackPrivateMcpProbe({resource,getService,bearer,
     requestCert:true,rejectUnauthorized:true},(req,res)=>{
     httpRequests++;handler.handle(req,res).catch(()=>res.destroy());
   });
-  const service=Object.fromEntries(['handleOAuthRequest','runHttpRequest','readTeam'].map(name=>[
-    name,(...args)=>getService()[name](...args),
-  ]));
-  handler=createPrivateMcpHttpHandler({enabled:true,resource,service,allowedOrigins:[origin],
-    McpServer,StreamableHTTPServerTransport,
-    inputSchema:z.object({workspaceId:z.string().min(1).max(256),leadSessionId:z.string().min(1).max(256)}).strict()});
+  const options={enabled:true,McpServer,StreamableHTTPServerTransport,
+    inputSchema:z.object({workspaceId:z.string().min(1).max(256),leadSessionId:z.string().min(1).max(256)}).strict()};
+  handler=getService().createPrivateTransport(options);
   await new Promise(resolve=>http.listen(0,'127.0.0.1',resolve));
   const ca=await file('ca.crt'),cert=await file('client.crt'),key=await file('client.key');
   let id=0;
@@ -60,6 +56,12 @@ export async function createLoopbackPrivateMcpProbe({resource,getService,bearer,
     await rm(root,{recursive:true,force:true});
   };
   return {
+    async rebind(){
+      // The plugin was unloaded by mount(): do not mask a live old handler
+      // by explicitly disposing it here. Prove its HTTP invalidation first.
+      assert.equal((await send('tools/list')).status,503,'old plugin-owned handler must deny after unload');
+      handler=getService().createPrivateTransport(options);
+    },
     async assertLifecycle(){
       const before=httpRequests;let timer;
       const tlsError=new Promise((resolve,reject)=>{
@@ -102,3 +104,4 @@ export async function createLoopbackPrivateMcpProbe({resource,getService,bearer,
   throw Error('Private CI wire initialization denied');
  }
 }
+
