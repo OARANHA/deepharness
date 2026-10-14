@@ -63,29 +63,65 @@ jobs:
           echo "KEYCLOAK_LAB_HUMAN_PASSWORD=$LAB_HUMAN_PASSWORD" >> "$GITHUB_ENV"
           export LAB_CLIENT_SECRET LAB_HUMAN_PASSWORD
           node -e 'const fs=require("node:fs"); const t=fs.readFileSync(process.argv[1],"utf8"); fs.writeFileSync(process.argv[2],t.replace("__CI_GENERATED_CLIENT_SECRET__",process.env.LAB_CLIENT_SECRET).replace("__CI_GENERATED_HUMAN_PASSWORD__",process.env.LAB_HUMAN_PASSWORD))' "$PWD/integrations/chatgpt-mcp/keycloak-lab/realm.json" "$RUNNER_TEMP/keycloak-realm.json"
+          # Ephemeral CA and server certificate. Private material stays in runner temp.
+          umask 077
+          mkdir -p "$RUNNER_TEMP/keycloak-lab-tls"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -keyout "$RUNNER_TEMP/keycloak-lab-tls/ca.key" \
+            -out "$RUNNER_TEMP/keycloak-lab-tls/ca.crt" \
+            -subj "/CN=DSH isolated CI CA" \
+            -addext "basicConstraints=critical,CA:TRUE" \
+            -addext "keyUsage=critical,keyCertSign,cRLSign" >/dev/null 2>&1
+          openssl req -new -newkey rsa:2048 -nodes \
+            -keyout "$RUNNER_TEMP/keycloak-lab-tls/server.key" \
+            -out "$RUNNER_TEMP/keycloak-lab-tls/server.csr" \
+            -subj "/CN=127.0.0.1" >/dev/null 2>&1
+          printf '%s\n' "subjectAltName=IP:127.0.0.1" "basicConstraints=critical,CA:FALSE" \
+            "keyUsage=critical,digitalSignature,keyEncipherment" "extendedKeyUsage=serverAuth" \
+            > "$RUNNER_TEMP/keycloak-lab-tls/server.ext"
+          openssl x509 -req -days 1 -in "$RUNNER_TEMP/keycloak-lab-tls/server.csr" \
+            -CA "$RUNNER_TEMP/keycloak-lab-tls/ca.crt" -CAkey "$RUNNER_TEMP/keycloak-lab-tls/ca.key" \
+            -CAcreateserial -extfile "$RUNNER_TEMP/keycloak-lab-tls/server.ext" \
+            -out "$RUNNER_TEMP/keycloak-lab-tls/server.crt" >/dev/null 2>&1
+          chmod 644 "$RUNNER_TEMP/keycloak-lab-tls/ca.crt" "$RUNNER_TEMP/keycloak-lab-tls/server.crt"
+          sudo chown 1000:1000 "$RUNNER_TEMP/keycloak-lab-tls/server.key"
           docker run -d --name keycloak-mcp-lab \
-            --network bridge -p 127.0.0.1:18080:8080 \
+            --network bridge -p 127.0.0.1:18080:8443 \
             -e KC_BOOTSTRAP_ADMIN_USERNAME=lab-admin \
             -e KC_BOOTSTRAP_ADMIN_PASSWORD="$LAB_ADMIN_PASSWORD" \
             -v "$RUNNER_TEMP/keycloak-realm.json:/opt/keycloak/data/import/realm.json:ro" \
+            -v "$RUNNER_TEMP/keycloak-lab-tls/server.crt:/opt/keycloak/conf/lab-server.crt:ro" \
+            -v "$RUNNER_TEMP/keycloak-lab-tls/server.key:/opt/keycloak/conf/lab-server.key:ro" \
             quay.io/keycloak/keycloak:26.8.0 \
-            start-dev --features=resource-indicators --import-realm --http-port=8080
+            start-dev --features=resource-indicators --import-realm --http-enabled=false \
+            --https-port=8443 --https-certificate-file=/opt/keycloak/conf/lab-server.crt \
+            --https-certificate-key-file=/opt/keycloak/conf/lab-server.key \
+            --hostname=https://127.0.0.1:18080
           for i in {1..100}; do
-            if curl -fsS --max-time 2 http://127.0.0.1:18080/realms/deepharness-mcp-lab/.well-known/openid-configuration >/dev/null; then exit 0; fi
+            if curl -fsS --cacert "$RUNNER_TEMP/keycloak-lab-tls/ca.crt" --max-time 2 https://127.0.0.1:18080/realms/deepharness-mcp-lab/.well-known/openid-configuration >/dev/null; then exit 0; fi
             sleep 3
           done
           echo "Keycloak lab did not become ready; sanitized startup diagnostics:" >&2
           docker inspect --format "state={{.State.Status}} exit={{.State.ExitCode}}" keycloak-mcp-lab || true
           docker logs --tail 65 keycloak-mcp-lab 2>&1 | sed -E "s/(password|secret|token)([=: ]+)[^[:space:]]+/\\1\\2[REDACTED]/Ig" || true
           exit 1
+      - name: Verify trusted TLS and rejection without lab CA
+        env:
+          KEYCLOAK_LAB_URL: https://127.0.0.1:18080
+          NODE_EXTRA_CA_CERTS: ${{ runner.temp }}/keycloak-lab-tls/ca.crt
+        run: |
+          node integrations/chatgpt-mcp/keycloak-lab/tls-probe.mjs
+          env -u NODE_EXTRA_CA_CERTS KEYCLOAK_TLS_NEGATIVE=true node integrations/chatgpt-mcp/keycloak-lab/tls-probe.mjs
       - name: Probe actual JWT profile without printing tokens
         env:
-          KEYCLOAK_LAB_URL: http://127.0.0.1:18080
+          KEYCLOAK_LAB_URL: https://127.0.0.1:18080
+          NODE_EXTRA_CA_CERTS: ${{ runner.temp }}/keycloak-lab-tls/ca.crt
           KEYCLOAK_LAB_CLIENT_SECRET: ${{ env.KEYCLOAK_LAB_CLIENT_SECRET }}
         run: node integrations/chatgpt-mcp/keycloak-lab/probe.mjs
       - name: Test human authorization code PKCE on loopback
         env:
-          KEYCLOAK_LAB_URL: http://127.0.0.1:18080
+          KEYCLOAK_LAB_URL: https://127.0.0.1:18080
+          NODE_EXTRA_CA_CERTS: ${{ runner.temp }}/keycloak-lab-tls/ca.crt
           KEYCLOAK_LAB_HUMAN_PASSWORD: ${{ env.KEYCLOAK_LAB_HUMAN_PASSWORD }}
         run: node integrations/chatgpt-mcp/keycloak-lab/human-pkce-probe.mjs
       - name: Tear down ephemeral service
@@ -93,3 +129,5 @@ jobs:
         run: |
           docker rm -f keycloak-mcp-lab || true
           docker rm -fv keycloak-mcp-postgres || true
+          rm -rf "$RUNNER_TEMP/keycloak-lab-tls"
+          rm -f "$RUNNER_TEMP/keycloak-realm.json"
