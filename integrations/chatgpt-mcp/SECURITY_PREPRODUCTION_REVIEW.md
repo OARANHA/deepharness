@@ -89,3 +89,25 @@ a real provider's registration/PKCE/token profile, callback URI validation
 by a third-party client, production HTTPS, durable token revocation,
 real DSH-host plus OAuth in the same process, or ingress/network policy.
 The AS is intentionally simulated. New CI pending; release remains NO-GO.
+
+## Real-provider interoperability gate — signed scopes and audience (2026-10-14)
+
+The pinned JWT authenticator now supports an **opt-in requiredScope**
+setting, checked on verified access-token claims alongside its existing
+issuer, exact resource audience, expiry, signature and authoritative
+revocation checks. Deployments choosing OAuth bearer tokens MUST set
+`requiredScope: 'agent-teams:read'` and `audience` to the exact
+canonical public MCP resource URI. Neither valid scope nor signature
+grants any Agent Team by itself: explicit per-principal/workspace/Lead
+grants are always required.
+
+The isolated OAuth mock tests now cover signed access tokens with wrong
+scope, missing scope, wrong audience and ungranted user subjects. This is
+a CI security interop gate, **not** a real provider connection. Real
+provider onboarding also requires choosing supported client registration
+(CIMD, DCR or pre-registered client), verified HTTPS authorization-server
+metadata, accepted token profile (JWT claims and RS256), resource
+indicator propagation, refresh-token policy, primary-backed revocation
+and safe public ingress. The strict verifier does not accept opaque
+access tokens or multi-audience lists; incompatible providers must not
+be connected by weakening the guard. CI pending; NO-GO.
