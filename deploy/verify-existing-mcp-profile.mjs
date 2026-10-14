@@ -40,8 +40,9 @@ try {
   await assert.rejects(service.readTeam({workspaceId:'ungranted',leadSessionId:'ungranted'}));
   assert.throws(()=>service.createPrivateTransport({enabled:true}));
   console.log('DSH_EXISTING_WEB_PROFILE_READ_SERVICE_MATCH: actual official launcher + installed package + existing services + Web 401 + denied ungranted read + disposal; no MCP listener');
-} catch {
-  throw Error('Existing official Web composition proof failed at '+phase);
+} catch(error) {
+  const safe=/^Existing DSH read host composition denied \([a-z-]+\)$/.test(error?.message??'')?error.message:'internal';
+  throw Error('Existing official Web composition proof failed at '+phase+' ('+safe+')');
 } finally {
   await host?.ctx.fiber.dispose();
 }
