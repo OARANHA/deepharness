@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "enabled": false,
+  "issuer": "https://id.wandora.com.br/realms/deepharness",
+  "resource": "https://dsh-mcp.wandora.com.br/mcp",
+  "backendPort": 3443,
+  "allowedOrigins": ["https://chatgpt.com", "https://chatgpt-mtls-proxy.invalid"]
+}
