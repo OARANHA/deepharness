@@ -1,6 +1,6 @@
 # DeepHarness ChatGPT MCP — internal read runtime
 
-Private package @wandora/deepharness-chatgpt-mcp-read@0.1.0-lab.2.
+Private package @wandora/deepharness-chatgpt-mcp-read@0.1.0-lab.3.
 This is an ESM runtime and DSH/Cordis bundle for an existing initialized official host. It is not a CLI, public endpoint or deployed service. The bundle inserts one disabled row; plugin registration uses the /plugin export.
 
 Export: createOfficialDshMcpReadRuntime(host, policy).
@@ -29,3 +29,12 @@ package.json declares dsh.bundle.patch=./cordis.patch.yml and exact alpha peer r
 The patch contains only wandora-chatgpt-mcp-read, disabled:true, endpointEnabled:false. No core services are inserted. Even direct plugin activation rejects endpointEnabled:true. Trusted operator code must provide chatgptMcpReadPolicy; do not put functions, grants or credentials in YAML. The plugin provides chatgptMcpRead internally with the three read-runtime methods; fiber disposal removes the service and invalidates retained/in-flight handles. It does not close host sessions or caller-owned DB/discovery resources.
 
 After reviewed installation, the bundle row remains disabled until a separate host policy/loading decision. There is no listener in this version, including after the row is enabled. CI mounts the installed module through the official Cordis ctx.plugin contract; a full PluginManager profile-install transaction is not tested by that mount.
+
+
+## Persistent operational policy
+
+The /policy export provides createPersistentDshMcpReadPolicy({discovery,issuer,resource,query,allowedOrigins,allowMissingNotBefore,revocationTimeoutMs}). Trusted embedding code supplies the resulting frozen policy as chatgptMcpReadPolicy. This factory fixes grantMode:postgres and accepts no grants/grantMode override. Legacy static mode remains for separate experiments; it cannot be combined with the persistent callback or used as fallback.
+
+Every exact principal/workspace/Lead check queries chatgpt_mcp_read_grants on the authoritative primary. Missing row and allowed:false deny; malformed results/errors/deadlines deny; no grant cache or startup seed. The tuple hash uses the same exact ID validator as static grants, excluding wildcards. Grant administration is not part of the runtime/plugin exports.
+
+sql/001_token_revocations.sql and sql/002_read_grants.sql are packaged for reviewed operator provisioning only; no install script applies them. Real migrations, roles and credentials remain unconfigured. The caller must implement query against the primary and honor bounded lifetime/cancellation. Disposal does not own/close the injected DB pool.
