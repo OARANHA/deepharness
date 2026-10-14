@@ -53,6 +53,54 @@
       "defaultClientScopes": [
         "agent-teams:read"
       ]
+    },
+    {
+      "clientId": "mcp-pkce-human-probe",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "clientAuthenticatorType": "client-secret",
+      "serviceAccountsEnabled": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "protocolMappers": [
+        {
+          "name": "resource-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "dsh-mcp-resource",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "access-token-purpose",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "token_use",
+            "claim.value": "access",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ],
+      "defaultClientScopes": [
+        "agent-teams:read"
+      ],
+      "pkceCodeChallengeMethod": "S256",
+      "redirectUris": [
+        "http://127.0.0.1:18081/callback"
+      ],
+      "webOrigins": [],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
     }
   ],
   "clientScopes": [
@@ -63,6 +111,20 @@
         "include.in.token.scope": "true",
         "display.on.consent.screen": "false"
       }
+    }
+  ],
+  "users": [
+    {
+      "username": "lab-human",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "__CI_GENERATED_HUMAN_PASSWORD__",
+          "temporary": false
+        }
+      ]
     }
   ]
 }
