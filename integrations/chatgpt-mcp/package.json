@@ -13,6 +13,7 @@
   "files": [
     "runtime.mjs",
     "PACKAGE_README.md",
+    "README.md",
     "LICENSE",
     "adapters/agent-teams-read-authorization.mjs",
     "adapters/agent-teams-read-model.mjs",
