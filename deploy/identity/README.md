@@ -66,8 +66,8 @@ Antes de aplicar:
    registrar digest efetivamente testado. Não utilizar latest.
 4. Provisionar valores privados no Portainer:
    WANDORA_KEYCLOAK_IMAGE, WANDORA_ID_POSTGRES_IMAGE,
-   WANDORA_ID_DB_PASSWORD, WANDORA_ID_TRUSTED_PROXY,
-   WANDORA_ID_BOOTSTRAP_USER, WANDORA_ID_BOOTSTRAP_PASSWORD.
+   WANDORA_ID_TRUSTED_PROXY e WANDORA_ID_BOOTSTRAP_USER.
+   Senhas DB/bootstrap são arquivos privados, não variáveis do Portainer.
    No primeiro start de banco vazio, fornecer ambos os campos bootstrap.
    Depois eles são opcionais no Compose e devem ser removidos da configuração
    privada. Não iniciar banco vazio sem planejar o bootstrap administrativo.
@@ -100,3 +100,32 @@ https://www.keycloak.org/server/containers
 https://www.keycloak.org/server/reverseproxy
 https://www.keycloak.org/server/configuration-production
 https://github.com/docker-library/official-images/blob/master/library/postgres
+
+## Segredos por arquivo — preparação atualizada
+
+O Compose lê /opt/wandora/data/identity/secrets/db-password e
+bootstrap-password como secrets locais read-only. PostgreSQL usa
+POSTGRES_PASSWORD_FILE; Keycloak carrega os arquivos no ambiente do processo
+filho e faz exec do start optimized, sem imprimir valores. O arquivo bootstrap
+pode ser esvaziado em etapa autorizada após remover a conta temporária; manter
+o arquivo presente para futuras montagens, não apagar a origem do bind.
+
+provision-secrets.py cria somente uma pasta nova e dois arquivos aleatórios
+privados, com dono1000:0/mode0400 e diretórios root0700. Recusa host diferente,
+não-root, destino existente ou symlink no destino. Não sobrescreve segredo,
+não cria container/volume/rota e não exibe os valores.
+
+Cópia de preparação no host:
+ /opt/wandora/ops-workspace/provision-identity-secrets-v1.py
+SHA256 esperado da cópia1157bytes:
+ 53b4b4011fca0494ec1072720a6a74fd86c44474a0de48f4f328e031ac3a57cc
+
+A preparação root pelo MCP foi negada por programa python3 hard-denied.
+Nenhum segredo foi provisionado. Não executar o mesmo Python através de
+outro intérprete/tool para contornar a negativa. O proprietário pode executar
+a ação revisada diretamente no próprio terminal root da wandora-vps-01,
+conferindo hash e hostname. Nunca enviar os valores criados ao chat.
+
+CI foi ampliada para testar startup com arquivos mode0400 UID1000 e
+PostgreSQL PASSWORD_FILE; esse novo incremento aguarda resultado.
+Imagem já publicada permanece a mesma; alteração é composição de credenciais.
