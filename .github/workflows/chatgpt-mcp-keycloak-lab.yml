@@ -20,6 +20,31 @@ jobs:
           node-version: 22
       - name: Install pinned official DSH host probe dependencies
         run: npm ci --prefix integrations/chatgpt-mcp/initialized-host-probe --ignore-scripts --no-audit --no-fund
+      - name: Install exact integration-only PostgreSQL driver
+        working-directory: integrations/chatgpt-mcp/initialized-host-probe
+        run: npm install --no-save --package-lock=false --ignore-scripts --no-audit --no-fund pg@8.16.3
+      - name: Start disposable primary revocation database
+        shell: bash
+        run: |
+          set -euo pipefail
+          LAB_PG_PASSWORD="$(openssl rand -hex 32)"
+          echo "::add-mask::$LAB_PG_PASSWORD"
+          echo "PGHOST=127.0.0.1" >> "$GITHUB_ENV"
+          echo "PGPORT=15432" >> "$GITHUB_ENV"
+          echo "PGUSER=integration" >> "$GITHUB_ENV"
+          echo "PGDATABASE=token_revocation_test" >> "$GITHUB_ENV"
+          echo "PGPASSWORD=$LAB_PG_PASSWORD" >> "$GITHUB_ENV"
+          docker run -d --name keycloak-mcp-postgres \
+            -p 127.0.0.1:15432:5432 \
+            -e POSTGRES_USER=integration \
+            -e POSTGRES_DB=token_revocation_test \
+            -e POSTGRES_PASSWORD="$LAB_PG_PASSWORD" postgres:16
+          for i in {1..40}; do
+            if docker exec keycloak-mcp-postgres pg_isready -U integration -d token_revocation_test >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          echo "Disposable revocation database readiness failed" >&2
+          exit 1
       - name: Start throwaway Keycloak on loopback only
         shell: bash
         run: |
@@ -61,4 +86,6 @@ jobs:
         run: node integrations/chatgpt-mcp/keycloak-lab/human-pkce-probe.mjs
       - name: Tear down ephemeral service
         if: always()
-        run: docker rm -f keycloak-mcp-lab || true
+        run: |
+          docker rm -f keycloak-mcp-lab || true
+          docker rm -fv keycloak-mcp-postgres || true
