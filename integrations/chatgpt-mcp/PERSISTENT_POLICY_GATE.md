@@ -21,3 +21,11 @@ Marcador esperado: KEYCLOAK_CORDIS_PERSISTENT_GRANTS_MATCH. CI atual ainda pende
 Não equivale a política de logout do emissor, failover/backup operacional, instalação PluginManager de perfil, conexão real ChatGPT, transporte protegido ou deploy. O endpoint permanece inexistente/desativado e a PR Draft.
 
 Ruling: manter modo estático explícito apenas para compatibilidade dos testes anteriores; a factory operacional força PostgreSQL e rejeita mistura. Custo: dois modos internos precisam continuar com testes independentes, sem fallback entre eles.
+
+
+## Revisão independente
+Um achado material no teste foi corrigido: a fase de indisponibilidade agora exige grant allowed:true e leitura bem-sucedida imediatamente antes de parar o DB, negação durante a parada e SQL saudável/leitura permitida após recuperação; depois revoga e nega novamente. Um grant previamente falso não pode mascarar a prova de fail-closed. Não houve outro bypass material reportado.
+
+Limite temporal: a decisão observa o primary em cada revalidação, incluindo após fronteiras assíncronas e antes de retornar. Não promete revogação atômica que se estenda além da última consulta ou até a entrega pela rede; uma revogação posterior à decisão final exige nova requisição/validação.
+
+Regressão local ampliada: 75/75 testes passaram; quatro testes também passaram contra o tarball lab.3 instalado offline. Esses resultados não substituem a CI de grants reais/restart.
