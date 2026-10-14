@@ -34,8 +34,35 @@
             "id.token.claim": "false",
             "access.token.claim": "true"
           }
+        },
+        {
+          "name": "access-token-purpose",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "token_use",
+            "claim.value": "access",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
         }
+      ],
+      "defaultClientScopes": [
+        "agent-teams:read"
       ]
+    }
+  ],
+  "clientScopes": [
+    {
+      "name": "agent-teams:read",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      }
     }
   ]
 }
