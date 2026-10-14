@@ -122,3 +122,22 @@ prove authorization-code PKCE for a real ChatGPT human user; no OAuth
 provider connection or production deployment has been approved.
 New CI **pending**. Production **NO-GO**.
 Reference: https://www.rfc-editor.org/rfc/rfc7519.html#section-4.1.5
+
+## Human-user authorization code + PKCE lab gate (2026-10-14)
+
+The disposable realm now includes a one-off `lab-human` user with a
+fresh random password generated only in GitHub Actions, and a public
+`mcp-pkce-human-probe` OAuth client pinned to a loopback callback with
+PKCE S256. The `human-pkce-probe.mjs` script exercises the actual
+Keycloak login HTML form and authorization-code/token endpoints with
+temporary state and verifier, and fails on absent login challenge,
+cross-origin form action, wrong callback/state, wrong PKCE rejection,
+missing signed-access-token scope/resource claims or successful code
+replay. It does not log passwords, codes, bearer tokens or identities.
+
+**Scope limitation:** scripted form submission is not a full browser
+or ChatGPT client. It is a disposable HTTP-based lab; Keycloak themes,
+required user actions or login CSRF-cookie flows may require adapting
+the test. A lab GREEN would establish only this issuer's human code +
+PKCE behavior, not real ChatGPT registration, real TLS, hosted OAuth,
+or persistent revocation. New CI is pending; no production activation.
