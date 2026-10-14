@@ -9,7 +9,7 @@ import { createScopedMcpReadIdentity } from './scoped-mcp-read-identity.mjs';
 import { createScopedReadGrants } from './scoped-read-grants.mjs';
 const deny = () => { throw new Error('Agent Teams read denied'); };
 export function createMcpReadRequestContext({
-  currentCredential, authenticateTransport, grants = [], allowedOrigins = [], allowMissingOrigin = false, ...host
+  currentCredential, authenticateTransport, hasReadGrant, grants = [], allowedOrigins = [], allowMissingOrigin = false, ...host
 }) {
   if (!Array.isArray(allowedOrigins) || typeof allowMissingOrigin !== 'boolean') deny();
   const origins = new Set();
@@ -21,7 +21,10 @@ export function createMcpReadRequestContext({
         (parsed.protocol === 'http:' && !['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname))) deny();
     origins.add(origin);
   }
+  if(hasReadGrant!==undefined&&(typeof hasReadGrant!=='function'||
+      !Array.isArray(grants)||grants.length!==0))deny();
   const policy = createScopedReadGrants(grants);
+  const checkGrant = hasReadGrant ?? policy.hasReadGrant;
   // Only the embedding server may supply this already-verified identity resolver.
   // Never treat user headers or MCP arguments as verified principal claims.
   if (authenticateTransport !== undefined && typeof authenticateTransport !== 'function') deny();
@@ -44,7 +47,7 @@ export function createMcpReadRequestContext({
           identity.kind !== context.kind) deny();
       return identity;
     },
-    hasReadGrant: policy.hasReadGrant,
+    hasReadGrant: checkGrant,
   });
   return Object.freeze({
     runHttpRequest: async (serverRequest, dispatch) => {
@@ -70,7 +73,7 @@ export function createMcpReadRequestContext({
       return result;
     },
     // Trusted server administration only; never register as MCP tools.
-    replaceGrants: policy.replace,
-    revokeGrant: policy.revoke,
+    replaceGrants: entries => {if(hasReadGrant!==undefined)deny();return policy.replace(entries);},
+    revokeGrant: scope => {if(hasReadGrant!==undefined)deny();return policy.revoke(scope);},
   });
 }
