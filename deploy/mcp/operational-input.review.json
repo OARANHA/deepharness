@@ -1,11 +1,11 @@
 {
-  "issuer": null,
+  "issuer": "https://id.wandora.com.br/realms/deepharness",
   "resource": null,
   "clientId": null,
   "resourceClientId": null,
   "redirectUri": null,
   "redirectUriEvidence": null,
-  "authorizationResponseIssuerSupported": null,
+  "authorizationResponseIssuerSupported": true,
   "tokenEndpointAuthMethod": null,
   "backendHost": null,
   "backendPort": null,
