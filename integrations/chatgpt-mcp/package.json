@@ -1,0 +1,35 @@
+{
+  "name": "@wandora/deepharness-chatgpt-mcp-read",
+  "version": "0.1.0-lab.1",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "exports": {
+    ".": "./runtime.mjs"
+  },
+  "files": [
+    "runtime.mjs",
+    "PACKAGE_README.md",
+    "LICENSE",
+    "adapters/agent-teams-read-authorization.mjs",
+    "adapters/agent-teams-read-model.mjs",
+    "adapters/authoritative-revocation-check.mjs",
+    "adapters/bearer-scoped-team-reader.mjs",
+    "adapters/dsh-agent-teams-host-reader.mjs",
+    "adapters/dsh-host-read-binding.mjs",
+    "adapters/mcp-oauth-http-gate.mjs",
+    "adapters/mcp-oauth-resource-metadata.mjs",
+    "adapters/mcp-read-request-context.mjs",
+    "adapters/pinned-jwt-transport-authenticator.mjs",
+    "adapters/postgres-token-revocation.mjs",
+    "adapters/rotating-jwks-transport-authenticator.mjs",
+    "adapters/scoped-mcp-read-identity.mjs",
+    "adapters/scoped-read-grants.mjs"
+  ],
+  "scripts": {
+    "test": "node --test test/runtime-package.test.mjs"
+  }
+}
