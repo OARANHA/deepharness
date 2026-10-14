@@ -649,3 +649,29 @@ chain validation in the deployment environment, additional IPv6
 address-space review, and durable revocation backend wiring. No network
 calls to a real provider, OAuth login, merge, deployment or VPS changes.
 **CI not yet verified** for this gate.
+
+## Persistent PostgreSQL revocation repository gate (2026-10-13)
+
+`adapters/postgres-token-revocation.mjs` now provides an **opt-in**
+durable repository implementing the existing `isRevoked` callback
+contract accepted by the rotating JWKS/JWT verifier. A trusted host
+must inject a PostgreSQL primary-query function; the adapter never
+accepts a client-provided database connection. An exact issuer +
+subject + token ID tuple is SHA-256 hashed before storage, and the
+revocation row is written idempotently. Each authorization uses the
+authoritative primary, with no negative-answer cache; missing rows
+are treated as not revoked **only after a successful, unambiguous
+primary query**. Database errors, invalid results and deadline
+failures deny authorization.
+
+`sql/001_token_revocations.sql` documents the proposed persistent
+schema. The migration is **NOT applied**; database access roles,
+credentials, backup/retention, availability and replica policy
+remain subject to operator approval. The tests use a shared-state
+query double across adapter instances; they are not a real
+PostgreSQL or multi-process integration test. A running MCP server
+must explicitly inject `backend.isRevoked` into the JWT verifier;
+there is no live production DB connection.
+
+**CI for this gate unverified.** PR remains Draft; no merge, VPS
+mutation or deployment.
