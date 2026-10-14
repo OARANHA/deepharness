@@ -21,3 +21,8 @@ The prepared Envoy external-mTLS design requires the OpenAI certificate to reach
 Identity remains https://id.wandora.com.br/realms/deepharness; its Cloudflare orange proxy is independent.
 
 Still pending: verify built launcher behavior; reviewed operational wrapper and image; primary grants database; backend/public certificates and OpenAI CA; exact callback from real ChatGPT UI; disabled OAuth clients and separate realm user; exact workspace/Lead canary grant; backup/restore; approved cutover and real ChatGPT canary. This inventory is not evidence of a connected ChatGPT client.
+
+## DNS and existing-profile preparation — 2026-10-14
+Owner created A dsh-mcp.wandora.com.br -> 158.220.97.145, DNS-only. An unprivileged Node DNS query through medicspro-agent on28server independently returned exactly that IPv4.
+
+Added existing-profile-host.mjs: calls trusted official runProfile once for Web, passes existing arguments/patch layers, checks original workspace/session/projection identities, provides policy and mounts the installed read plugin on that returned context. It creates no Context, sessions or MCP listener. Five local lifecycle tests passed. Candidate Dockerfile/CI now run verify-existing-mcp-profile.mjs after the existing offline official installer; it is intended to verify real packaged launcher, Web401, installed service, denied ungranted read and root disposal. New real-container result is PENDING; do not infer success from local tests. No production image release/redeploy, private listener, client/grant or certificate was applied.
