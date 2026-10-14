@@ -10,6 +10,16 @@ const {loadLayeredEnv}=await import(pathToFileURL(official.resolve('@deepseek-ai
 const installed=createRequire('/data/dsh/profiles/web/package.json');
 const plugin=await import(pathToFileURL(installed.resolve('@wandora/deepharness-chatgpt-mcp-read/plugin')).href);
 const {createPersistentDshMcpReadPolicy}=await import(pathToFileURL(installed.resolve('@wandora/deepharness-chatgpt-mcp-read/policy')).href);
+const dependencies=createRequire('/opt/wandora-mcp-host/package.json');
+for(const [specifier,entry] of [['pg','Pool'],['@modelcontextprotocol/sdk/server/mcp.js','McpServer'],
+  ['@modelcontextprotocol/sdk/server/streamableHttp.js','StreamableHTTPServerTransport']]){
+  const loaded=await import(pathToFileURL(dependencies.resolve(specifier)).href);
+  assert.equal(typeof loaded[entry],'function','operational dependency must be packaged');
+}
+const {z}=await import(pathToFileURL(dependencies.resolve('zod')).href);
+assert.equal(typeof z.object,'function');
+const operational=await import('./mcp/operational-host.mjs');
+assert.equal(typeof operational.startOperationalReadHost,'function');
 let host,phase='official Web profile boot';
 try {
   host=await bootExistingProfileReadHost({
