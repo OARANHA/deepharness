@@ -1,6 +1,6 @@
 {
   "name": "@wandora/deepharness-chatgpt-mcp-read",
-  "version": "0.1.0-lab.1",
+  "version": "0.1.0-lab.2",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -8,7 +8,9 @@
     "node": ">=22.19.0"
   },
   "exports": {
-    ".": "./runtime.mjs"
+    ".": "./runtime.mjs",
+    "./plugin": "./plugin.mjs",
+    "./package.json": "./package.json"
   },
   "files": [
     "runtime.mjs",
@@ -28,9 +30,37 @@
     "adapters/postgres-token-revocation.mjs",
     "adapters/rotating-jwks-transport-authenticator.mjs",
     "adapters/scoped-mcp-read-identity.mjs",
-    "adapters/scoped-read-grants.mjs"
+    "adapters/scoped-read-grants.mjs",
+    "plugin.mjs",
+    "cordis.patch.yml"
   ],
   "scripts": {
-    "test": "node --test test/runtime-package.test.mjs"
+    "test": "node --test test/runtime-package.test.mjs test/plugin-entry.test.mjs"
+  },
+  "main": "./plugin.mjs",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.5-alpha.1",
+    "@deepseek-ai/dsh-session": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-session-projection": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-workspace": "0.2.1-alpha.2"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-session": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-session-projection": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-workspace": {
+      "optional": true
+    }
   }
 }
