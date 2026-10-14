@@ -62,3 +62,30 @@ Fontes verificadas em 2026-10-14:
 - https://www.envoyproxy.io/docs/envoy/latest/start/quick-start/securing.html
 - https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/transport_sockets/tls/v3/common.proto.html
 - https://github.com/envoyproxy/envoy/releases/tag/v1.40.0
+
+
+## Fluxo completo pelo proxy (novo incremento; CI pendente)
+
+O job independente do proxy passou em df9a5ff, incluindo o marcador
+OPERATIONAL_PROXY_MTLS_SAN_ORIGIN_MATCH. A correção do harness executa o
+binário Envoy com UID/GID do dono dos arquivos, preservando permissões privadas.
+
+O probe humano agora insere a mesma configuração Envoy entre o cliente de
+laboratório e o handler do pacote lab.4 instalado. Chave/certificado de cliente
+externo pertencem a uma CA descartável com SAN gerenciado simulado; não é
+certificado OpenAI real nem cliente ChatGPT. O backend continua com mTLS
+privado distinto. JWT humano Keycloak e PostgreSQL primary continuam reais
+no laboratório; nenhuma alteração nos validadores de autenticação ou grants.
+
+Exige leitura permitida com Origin ausente através do canal normalizado e
+negação sem bearer, com Origin presente maliciosa, grant revogado e token
+revogado, incluindo o canal sem Origin. Mantém controle positivo não revogado,
+reinícios de pool/plugin/banco, indisponibilidade e old-handler503 antes de
+cada rebind. A imagem Envoy é pré-carregada antes de emitir os JWTs, para que
+download não consuma sua validade. Cleanup encerra backend e remove chaves
+mesmo se a remoção do container proxy falhar.
+
+Novo marcador obrigatório:
+KEYCLOAK_PACKED_PROXY_OFFICIAL_DSH_PERSISTENT_GRANTS_MATCH.
+Sintaxe e 104 testes locais passaram, incluindo falha simulada de remoção do proxy com encerramento real do backend e limpeza de fixtures; o fluxo novo depende da CI.
+Isso não preenche issuer/resource/callback de produção nem autoriza ingress.
