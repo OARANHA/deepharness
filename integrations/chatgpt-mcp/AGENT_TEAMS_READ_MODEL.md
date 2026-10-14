@@ -532,3 +532,24 @@ server configuration. Integrate only after a separately reviewed issuer,
 audience, principal mapping, key provisioning, revocation, resource
 authorization and HTTPS design. No secrets, real tokens, merge or deploy.
 **New CI execution is pending.**
+
+## Pinned OIDC metadata validation (2026-10-13)
+
+`adapters/pinned-oidc-metadata.mjs` validates **already fetched**
+provider metadata against a server-pinned HTTPS issuer and exact,
+same-origin JWKS URI; it accepts only RS256 public RSA JWKs with unique
+key IDs and refuses private key material, key substitution, unexpected
+origins, mismatched issuers and insecure or malformed URLs. The
+validated public keys can be fed into the previously tested pinned JWT
+authenticator. The isolated negative tests run under the existing
+initialized-host CI.
+
+**Do not mistake this for live OIDC discovery or production trust:**
+there are no network fetches, redirects, response-size ceilings,
+cache/rotation handling, outbound network policy, OAuth authorization
+code/PKCE flow, token issuer provisioning or live ChatGPT identity
+claims. An OIDC provider's ID-token signing algorithm metadata alone
+does not establish an access-token validation profile: issuer-specific
+access-token format, key usage, resource audience and revocation must be
+documented and independently reviewed before deployment. No new
+endpoint, secrets, merge or deployment. **New CI pending.**
