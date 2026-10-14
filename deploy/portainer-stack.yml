@@ -29,12 +29,14 @@ services:
     environment:
       NARB_DISABLE_NATIVE_CACHE: "1"
       NPM_CONFIG_CACHE: /data/dsh/.npm-cache
+      NPM_CONFIG_PREFIX: /data/dsh/.npm-global
       XDG_CACHE_HOME: /data/dsh/.cache
     volumes:
       - dsh_data:/data/dsh
       - dsh_workspace:/workspace
       # Fresh volumes copy image-owned directories; legacy contents remain in dsh_data.
       - dsh_npm_cache_v1:/data/dsh/.npm-cache
+      - dsh_npm_global_v1:/data/dsh/.npm-global
       - dsh_tool_cache_v1:/data/dsh/.cache
       - dsh_hyperframes_state_v1:/data/dsh/.hyperframes
     networks:
@@ -54,6 +56,7 @@ volumes:
   dsh_data:
   dsh_workspace:
   dsh_npm_cache_v1:
+  dsh_npm_global_v1:
   dsh_tool_cache_v1:
   dsh_hyperframes_state_v1:
 
