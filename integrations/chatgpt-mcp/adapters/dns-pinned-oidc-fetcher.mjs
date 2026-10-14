@@ -9,9 +9,9 @@ import { resolvePublicOidcAddresses } from './oidc-egress-address-policy.mjs';
 
 const deny = () => { throw new Error('OIDC pinned HTTPS denied'); };
 export function createDnsPinnedOidcFetcher({
-  lookup = systemLookup, maxBytes = 65536, timeoutMs = 3000,
+  lookup = systemLookup, requestImpl = https.request, maxBytes = 65536, timeoutMs = 3000,
 } = {}) {
-  if (typeof lookup !== 'function' || !Number.isInteger(maxBytes) ||
+  if (typeof lookup !== 'function' || typeof requestImpl !== 'function' || !Number.isInteger(maxBytes) ||
       maxBytes < 1024 || maxBytes > 131072 || !Number.isInteger(timeoutMs) ||
       timeoutMs < 100 || timeoutMs > 10000) deny();
   return async (uri, options = {}) => {
@@ -33,7 +33,7 @@ export function createDnsPinnedOidcFetcher({
           ended = true;
           if (error) reject(error); else resolve(response);
         };
-        const req = https.request(url, {
+        const req = requestImpl(url, {
           method: 'GET', agent: false, servername: url.hostname,
           rejectUnauthorized: true, timeout: timeoutMs, signal,
           headers: { accept: 'application/json', connection: 'close' },
