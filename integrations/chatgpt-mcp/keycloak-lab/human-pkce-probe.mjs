@@ -132,6 +132,12 @@ await assert.rejects(read(denied), /denied/, 'workspace membership must not auth
 assert.equal(projections, beforeDenied, 'unauthorized team projection must not be read');
 await assert.rejects(read({...allowed,principalId:principal,workspaceId:'other-workspace'}), /denied/);
 await assert.rejects(read(allowed,{headers:{authorization:'Bearer invalid',origin:'http://127.0.0.1:18081'}}), /denied/);
+// Same in-memory Keycloak-issued access token now reads official DSH services.
+const { probeKeycloakOfficialHost } = await import('../initialized-host-probe/keycloak-official-host-probe.mjs');
+await probeKeycloakOfficialHost({
+  authenticateTransport: authenticated, request, principal,
+  revoke: async () => { revokedTokens.add(claims.jti); },
+});
 revokedTokens.add(claims.jti);
 await assert.rejects(read(allowed), /denied/, 'revoked real token must not read an authorized Lead');
 console.log('KEYCLOAK_HUMAN_GRANTS_E2E_MATCH: real signed JWT + issuer sub + exact grants + denied other Lead + revocation; DSH data fixture only');
