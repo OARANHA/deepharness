@@ -1,0 +1,36 @@
+name: ChatGPT MCP — isolated Keycloak profile probe
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  keycloak-lab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start throwaway Keycloak on loopback only
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --name keycloak-mcp-lab \
+            --network bridge -p 127.0.0.1:18080:8080 \
+            -e KC_BOOTSTRAP_ADMIN_USERNAME=lab-admin \
+            -e KC_BOOTSTRAP_ADMIN_PASSWORD=CI-ONLY-EPHEMERAL-ADMIN \
+            -v "$PWD/integrations/chatgpt-mcp/keycloak-lab/realm.json:/opt/keycloak/data/import/realm.json:ro" \
+            quay.io/keycloak/keycloak:26.8.0 \
+            start-dev --features=resource-indicators --import-realm --http-port=8080
+          for i in {1..100}; do
+            if curl -fsS --max-time 2 http://127.0.0.1:18080/realms/deepharness-mcp-lab/.well-known/openid-configuration >/dev/null; then exit 0; fi
+            sleep 3
+          done
+          echo "Keycloak lab did not become ready" >&2
+          exit 1
+      - name: Probe actual JWT profile without printing tokens
+        env:
+          KEYCLOAK_LAB_URL: http://127.0.0.1:18080
+          KEYCLOAK_LAB_CLIENT_SECRET: CI-ONLY-ISOLATED-THROWAWAY
+        run: node integrations/chatgpt-mcp/keycloak-lab/probe.mjs
+      - name: Tear down ephemeral service
+        if: always()
+        run: docker rm -f keycloak-mcp-lab || true
