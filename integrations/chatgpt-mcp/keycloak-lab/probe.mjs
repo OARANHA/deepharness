@@ -20,7 +20,7 @@ const tokenRes = await fetch(metadata.token_endpoint, {
 });
 if (!tokenRes.ok) {
   console.log('KEYCLOAK_CONTRACT_NO_GO: token endpoint rejected resource-bound lab request; HTTP ' + tokenRes.status);
-  process.exitCode = 0; // This is an evidence probe, not a production release gate.
+  process.exitCode = 1; // Incompatible issuer is a failing contract, not GREEN.
 } else {
   const result = await tokenRes.json();
   const token = result.access_token;
@@ -39,4 +39,5 @@ if (!tokenRes.ok) {
   }));
   console.log(profileMatches ? 'KEYCLOAK_LAB_PROFILE_MATCH — still NOT real ChatGPT login' :
     'KEYCLOAK_CONTRACT_NO_GO — real provider requires reviewed token-profile adaptation');
+  if (!profileMatches) process.exitCode = 1;
 }
