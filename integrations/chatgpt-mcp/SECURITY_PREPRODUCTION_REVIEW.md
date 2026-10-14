@@ -26,3 +26,29 @@ This is a **source and isolated CI review**, not authorization to expose a produ
 Draft PR may continue to run tests and security-gate changes. Require independent operator review,
 explicit owner approval, a production-grade egress policy and actual authenticated end-to-end
 read-only canary before reconsidering go-live.
+
+## OAuth 2.1/MCP discovery preparation (2026-10-13; CI unverified)
+
+`adapters/mcp-oauth-resource-metadata.mjs` adds inert, server-owned
+RFC 9728 protected-resource metadata, a 401 `WWW-Authenticate`
+challenge formatter and strict validation for an allowlisted HTTPS
+OAuth authorization-server metadata document (issuer, exact same-origin
+authorization/token endpoints, authorization code grant and PKCE S256).
+Only the `agent-teams:read` scope can be advertised in this contract.
+The MCP resource server must validate access-token signature, `aud`
+for its resource, expiry/revocation and bind verified issuer+subject to
+existing explicit principal/workspace/Lead grants; token claims and
+resource scope are **not** substitutes for a grant.
+
+Roles: ChatGPT is the **OAuth client** and owns PKCE verifier/challenge,
+state, callback and code exchange. DeepHarness MCP is the **resource
+server**, NOT the OAuth authorization server. A trusted third-party IDP
+must issue tokens bound to the MCP resource (RFC 8707). Never handle
+ChatGPT login codes or client secrets inside MCP tool arguments.
+
+This gate adds **no public routes**, login UI, discovery fetch, OAuth
+client registration, resource indicator implementation, callback,
+issuance, refresh service, IDP selection or grant provisioning. MCP
+endpoint metadata/401 HTTP routing and real issuer-specific access-token
+validation still require integration and approval. No OAuth login is
+functional yet. Avoid claims of OAuth completion. CI pending.
