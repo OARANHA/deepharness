@@ -17,7 +17,8 @@ export function createMcpReadRequestContext({
     let parsed;
     try { parsed = new URL(origin); } catch { deny(); }
     if (typeof origin !== 'string' || parsed.origin !== origin ||
-        !['http:', 'https:'].includes(parsed.protocol)) deny();
+        !['http:', 'https:'].includes(parsed.protocol) ||
+        (parsed.protocol === 'http:' && !['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname))) deny();
     origins.add(origin);
   }
   const policy = createScopedReadGrants(grants);
