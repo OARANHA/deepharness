@@ -59,3 +59,22 @@ test('runtime keeps host replacement and independently selected issuer guards',a
   g.config.discovery.get=async()=>({issuer:'https://other.example',publicKeys:{}});
   await assert.rejects(g.read(),/denied/);
 });
+
+test('operational runtime reads durable grant every time and never accepts static fallback',async()=>{
+  const {createPersistentDshMcpReadPolicy}=await import('../policy.mjs');
+  const f=setup();let allowed=false,checks=0;
+  const {grants,...options}=f.config;
+  const policy=createPersistentDshMcpReadPolicy({...options,query:async sql=>{
+    if(sql.includes('chatgpt_mcp_read_grants')){checks++;return {rows:[{allowed}]};}
+    return {rows:[]};
+  }});
+  assert.throws(()=>createOfficialDshMcpReadRuntime(f.host,{...policy,grants:[]}),/denied/);
+  const runtime=createOfficialDshMcpReadRuntime(f.host,policy);
+  const read=()=>runtime.runHttpRequest({
+    headers:{authorization:'Bearer '+signed(),origin:'https://client.example'},
+  },()=>runtime.readTeam({workspaceId:'ws',leadSessionId:'lead'}));
+  await assert.rejects(read(),/denied/);
+  allowed=true;assert.equal((await read()).leadSessionId,'lead');
+  const previous=checks;allowed=false;await assert.rejects(read(),/denied/);
+  assert.ok(checks>previous,'revoked grant must be re-read instead of cached');
+});
