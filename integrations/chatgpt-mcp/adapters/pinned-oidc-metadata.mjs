@@ -10,7 +10,7 @@ const exactHttps = value => {
   let url;
   try { url = new URL(value); } catch { deny(); }
   if (url.protocol !== 'https:' || !url.hostname || url.username || url.password ||
-      url.search || url.hash || url.href !== value) deny();
+      url.search || url.hash || (url.href !== value && !(url.pathname === '/' && url.origin === value))) deny();
   return url;
 };
 export function validatePinnedOidcMetadata({ issuer, discovery, jwks, allowedJwksUri }) {
