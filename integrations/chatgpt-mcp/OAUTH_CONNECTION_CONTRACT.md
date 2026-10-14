@@ -62,3 +62,7 @@ Ruling: implementar primeiro o gate de PostgreSQL combinado — utiliza infraest
 Revisão independente do incremento teste/CI solicitada conforme skill de execução.
 Fonte oficial do contrato OAuth: https://developers.openai.com/plugins/build/auth
 Fonte do transporte remoto: https://developers.openai.com/plugins/build/mcp-server
+
+
+### Revisão independente deste incremento
+Dois achados corrigidos: (1) após reinício de pool e de container, o teste agora exige consulta SQL saudável do hash exato issuer/subject/jti com uma linha revoked=true, antes de verificar negação do JWT; falha de DB não pode contar como prova de persistência. (2) alterações em sql/** também disparam o workflow combinado. Syntax check aprovado; resultado runtime continua pendente da CI. Nenhuma alteração na validação JWT ou grants de aplicação.
