@@ -67,7 +67,7 @@ export async function probePersistentGrantPolicy({issuer,resource,keys,request,p
     phase='operational policy';
     const policy=createPersistentDshMcpReadPolicy({
       issuer,resource,discovery:{get:async()=>({issuer,publicKeys:keys})},query,
-      allowedOrigins:[origin],allowMissingNotBefore:true,revocationTimeoutMs:1500,
+      allowedOrigins:withPrivateTransport?[origin,'https://chatgpt-mtls-proxy.invalid']:[origin],allowMissingNotBefore:true,revocationTimeoutMs:1500,
     });
     phase='plugin mount';
     ctx.provide('chatgptMcpReadPolicy',policy);
@@ -80,8 +80,10 @@ export async function probePersistentGrantPolicy({issuer,resource,keys,request,p
     await mount();
     const target={workspaceId:workspace.id,leadSessionId:lead.id};
     if(withPrivateTransport){
+      phase='proxy wire initialization';
       const {createLoopbackPrivateMcpProbe}=await import('./loopback-private-mcp-probe.mjs');
-      wire=await createLoopbackPrivateMcpProbe({resource,getService:()=>runtime,bearer:request.headers.authorization,origin});
+      wire=await createLoopbackPrivateMcpProbe({resource,getService:()=>runtime,bearer:request.headers.authorization,origin,issuer,viaOperationalProxy:true});
+      phase='proxy wire lifecycle';
       await wire.assertLifecycle();
     }
     const read=(args=target)=>wire?wire.read(args):runtime.runHttpRequest(request,()=>runtime.readTeam(args));
@@ -96,6 +98,7 @@ export async function probePersistentGrantPolicy({issuer,resource,keys,request,p
     await pool.query('INSERT INTO chatgpt_mcp_read_grants (grant_hash,allowed) VALUES ($1,TRUE)',[grantHash]);
     await assertRow(true);
     assert.deepEqual((await read()).members,baseline.members);
+    if(wire)assert.deepEqual((await wire.read(target,request.headers.authorization,{withoutOrigin:true})).members,baseline.members);
     await assert.rejects(read({...target,leadSessionId:other.id}),/denied/);
     await assert.rejects(read({...target,leadSessionId:other.id,principalId:principal}),/denied/);
     phase='pool and plugin restart';
@@ -108,6 +111,7 @@ export async function probePersistentGrantPolicy({issuer,resource,keys,request,p
     phase='grant revocation';
     await pool.query('UPDATE chatgpt_mcp_read_grants SET allowed = FALSE WHERE grant_hash = $1',[grantHash]);
     await assertRow(false);await assert.rejects(read(),/denied/);
+    if(wire)await assert.rejects(wire.read(target,request.headers.authorization,{withoutOrigin:true}),/denied/);
     await pool.end();pool=open();await mount();await assertRow(false);await assert.rejects(read(),/denied/);
     phase='revoked database restart';
     await pool.end();await exec('docker',['restart',container],{timeout:30000});await ready();
@@ -147,6 +151,7 @@ export async function probePersistentGrantPolicy({issuer,resource,keys,request,p
         assert.equal(controlRow.rowCount,0);
         assert.equal((await wire.read(target,controlRequest.headers.authorization)).leadSessionId,lead.id);
         await assertTokenRow();await assert.rejects(read(),/denied/);
+        await assert.rejects(wire.read(target,request.headers.authorization,{withoutOrigin:true}),/denied/);
         assert.ok(claims.exp>Math.floor(Date.now()/1000),'revoked token must not have expired during denial');
       };
       await assertRevokedWithHealthyControl();
@@ -159,6 +164,7 @@ export async function probePersistentGrantPolicy({issuer,resource,keys,request,p
     }
     assert.equal(ctx.sessions.get(lead.id),lead);assert.equal(ctx.sessions.get(other.id),other);
     assert.deepEqual(ctx.sessionProjections.snapshot(lead,['agentTeam']).values.agentTeam,baseline);
+    if(wire)console.log('KEYCLOAK_PACKED_PROXY_OFFICIAL_DSH_PERSISTENT_GRANTS_MATCH: real human JWT + Envoy external fixture mTLS + private backend mTLS + installed plugin + real primary grants/revocation/restarts/outage + absent-Origin authorized');
     if(wire)console.log('KEYCLOAK_PACKED_MTLS_OFFICIAL_DSH_PERSISTENT_GRANTS_MATCH: installed lab.4 policy/plugin/transport + human PKCE JWT + real primary grants/revocation + plugin/DB restarts + outage denial');
     if(wire)console.log('KEYCLOAK_MTLS_OFFICIAL_DSH_PERSISTENT_GRANTS_MATCH: human PKCE JWT + direct mTLS SDK + official plugin + primary grants + token/grant persistent revocation + restart + outage denied');
     console.log('KEYCLOAK_CORDIS_PERSISTENT_GRANTS_MATCH: real human JWT + official plugin + exact primary grants + allowed/revoked restart + in-flight revocation + outage denied');
