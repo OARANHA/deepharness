@@ -3,6 +3,9 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
+      - 'integrations/chatgpt-mcp/runtime.mjs'
+      - 'integrations/chatgpt-mcp/policy.mjs'
+      - 'integrations/chatgpt-mcp/plugin.mjs'
       - '.github/workflows/chatgpt-mcp-keycloak-lab.yml'
       - 'integrations/chatgpt-mcp/keycloak-lab/**'
       - 'integrations/chatgpt-mcp/adapters/**'
