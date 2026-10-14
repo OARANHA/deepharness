@@ -598,3 +598,29 @@ not yet verified. Existing discovery timeout, cache and egress limitations
 still apply; in particular a compromised trusted JWKS source, an
 inadequately constrained network path, or an unavailable revocation store
 are not solved by this adapter. No OAuth login or production deploy.
+
+## OIDC egress preflight and authoritative revocation contract (2026-10-13)
+
+`oidc-egress-address-policy.mjs` supplies a conservative DNS/IP policy
+to reject private, loopback, link-local, multicast, reserved, documentation,
+mapped and mixed public/private DNS answers. This is a **preflight only**:
+it is **not integrated into the pinned discovery fetcher** and is NOT
+proof of SSRF/DNS-rebinding resistance. A deployable implementation must
+connect **only** to the selected vetted IP while retaining the originally
+pinned hostname for TLS SNI and certificate verification, forbid transparent
+proxies and redirects, enforce a separate egress firewall, and revalidate
+every fresh socket. No production network exposure is authorized by this
+change.
+
+`authoritative-revocation-check.mjs` defines the server-side revocation
+decision contract: externally supplied persistent authoritative lookup,
+per-check deadline, exact `false` for not revoked, and deny on timeout,
+unknown status or exception. This is **not** a deployed store or a complete
+OAuth revocation service. The server operator must provision a durable
+shared backend, token revocation policy and issuer-specific semantics; no
+memory-only allowlist can satisfy this operational requirement.
+
+The regression tests cover private/mixed DNS, invalid address families,
+revocation failure/unknown response and timeout. **New CI pending**.
+The modules add no agent actions, do not alter existing MCP grants, and
+do not perform merge, deployment or outbound network calls.
