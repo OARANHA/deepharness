@@ -3,6 +3,12 @@ name: ChatGPT MCP — Agent Teams read model
 on:
   pull_request:
     paths:
+      - 'integrations/chatgpt-mcp/package.json'
+      - 'integrations/chatgpt-mcp/runtime.mjs'
+      - 'integrations/chatgpt-mcp/PACKAGE_README.md'
+      - 'integrations/chatgpt-mcp/LICENSE'
+      - 'integrations/chatgpt-mcp/adapters/**'
+      - 'integrations/chatgpt-mcp/test/runtime-package.test.mjs'
       - 'integrations/chatgpt-mcp/adapters/dsh-host-read-binding.mjs'
       - 'integrations/chatgpt-mcp/test/dsh-host-read-binding.test.mjs'
       - 'integrations/chatgpt-mcp/adapters/agent-teams-read-model.mjs'
@@ -94,3 +100,34 @@ jobs:
         run: npm ci --prefix integrations/chatgpt-mcp/initialized-host-probe --ignore-scripts --no-audit --no-fund
       - name: Verify initialized-host prerequisite contracts
         run: npm test --prefix integrations/chatgpt-mcp/initialized-host-probe
+
+  packaged-runtime-host:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Runtime composition unit contract
+        run: npm test --prefix integrations/chatgpt-mcp
+      - name: Install pinned official host dependencies
+        run: npm ci --prefix integrations/chatgpt-mcp/initialized-host-probe --ignore-scripts --no-audit --no-fund
+      - name: Install and load actual packed runtime on official initialized DSH
+        run: node --test integrations/chatgpt-mcp/initialized-host-probe/packed-runtime-host.test.mjs
+      - name: Prepare reviewable private tarball and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/runtime-package-artifact"
+          npm pack ./integrations/chatgpt-mcp --ignore-scripts --pack-destination "$RUNNER_TEMP/runtime-package-artifact"
+          cd "$RUNNER_TEMP/runtime-package-artifact"
+          sha256sum ./*.tgz > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: private-dsh-read-runtime
+          path: ${{ runner.temp }}/runtime-package-artifact
+          retention-days: 7
+          if-no-files-found: error
