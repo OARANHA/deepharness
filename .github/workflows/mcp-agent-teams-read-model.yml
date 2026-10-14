@@ -5,6 +5,9 @@ on:
     paths:
       - 'integrations/chatgpt-mcp/package.json'
       - 'integrations/chatgpt-mcp/runtime.mjs'
+      - 'integrations/chatgpt-mcp/policy.mjs'
+      - 'integrations/chatgpt-mcp/sql/**'
+      - 'integrations/chatgpt-mcp/test/postgres-read-grants.test.mjs'
       - 'integrations/chatgpt-mcp/plugin.mjs'
       - 'integrations/chatgpt-mcp/cordis.patch.yml'
       - 'integrations/chatgpt-mcp/test/plugin-entry.test.mjs'
