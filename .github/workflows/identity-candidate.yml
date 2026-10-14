@@ -18,6 +18,15 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build optimized Keycloak candidate (no publication)
         run: docker build -f deploy/identity/Dockerfile -t local/wandora-keycloak:ci .
+      - name: Validate exact review stack syntax
+        env:
+          WANDORA_KEYCLOAK_IMAGE: local/wandora-keycloak:ci
+          WANDORA_ID_POSTGRES_IMAGE: postgres:16.15-bookworm
+          WANDORA_ID_DB_PASSWORD: ci-validation-placeholder
+          WANDORA_ID_TRUSTED_PROXY: 172.18.0.2
+          WANDORA_ID_BOOTSTRAP_USER: ci-bootstrap
+          WANDORA_ID_BOOTSTRAP_PASSWORD: ci-validation-placeholder
+        run: docker compose -f deploy/identity/portainer-stack.review.yml config --quiet
       - name: Production startup, hostname and PostgreSQL persistence (CI only)
         shell: bash
         run: |
