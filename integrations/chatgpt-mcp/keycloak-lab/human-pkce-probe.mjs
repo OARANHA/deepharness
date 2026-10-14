@@ -68,7 +68,7 @@ assert.equal(claims.iss, issuer);
 assert.equal(claims.aud, resource);
 assert.equal(claims.token_use, 'access');
 assert.ok(claims.scope.split(' ').includes('agent-teams:read'));
-assert.ok(claims.sub);
+assert.ok(typeof claims.sub === 'string' && claims.sub.length > 0, 'human access token must carry issuer-managed subject');
 assert.ok(Number.isSafeInteger(claims.iat) && Number.isSafeInteger(claims.exp));
 assert.ok(claims.exp > claims.iat && claims.exp - claims.iat <= 3600);
 const reused = await exchange(verifier);
