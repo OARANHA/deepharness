@@ -122,7 +122,11 @@
           "value": "__CI_GENERATED_HUMAN_PASSWORD__",
           "temporary": false
         }
-      ]
+      ],
+      "firstName": "Lab",
+      "lastName": "User",
+      "email": "lab-human@example.invalid",
+      "requiredActions": []
     }
   ]
 }
