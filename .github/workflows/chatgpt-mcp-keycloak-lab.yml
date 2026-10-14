@@ -6,6 +6,7 @@ on:
       - '.github/workflows/chatgpt-mcp-keycloak-lab.yml'
       - 'integrations/chatgpt-mcp/keycloak-lab/**'
       - 'integrations/chatgpt-mcp/adapters/**'
+      - 'integrations/chatgpt-mcp/sql/**'
       - 'integrations/chatgpt-mcp/initialized-host-probe/**'
 permissions:
   contents: read
