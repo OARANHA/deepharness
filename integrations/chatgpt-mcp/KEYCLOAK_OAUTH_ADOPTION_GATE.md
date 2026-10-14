@@ -150,3 +150,25 @@ The RED in Keycloak lab run 38516025537 showed that the human authorization-code
 
 ## Explicit issuer-managed human `sub` mapper (2026-10-14)
 Run 38516673419 remained RED after adding `basic` to the human-client default scopes: OAuth code exchange succeeded but human access JWT had no `sub`. The disposable client now explicitly attaches Keycloak's built-in `oidc-sub-mapper` to its access tokens; this derives the subject from the authenticated Keycloak user session. It does NOT invent a subject or substitute username/email. The profile test requires a nonempty string `sub` and retains exact audience, access purpose, scope, PKCE and replay checks. No proof of success until the new CI passes. See https://www.keycloak.org/admin-api/protocol-mappers.
+
+## Human JWT -> exact Team grants integration lab (2026-10-14)
+
+Extended the existing disposable Keycloak human PKCE probe to feed the
+**actual issuer-issued access JWT** into the existing pinned-RS256
+JWT authenticator and scoped MCP HTTP read binding. The probe obtains
+the public signing JWK from Keycloak discovery/JWKS and configures exact
+issuer, exact MCP resource audience, `agent-teams:read`, verified
+`iss#sub` individual identity, optional missing `nbf` and token-ID
+revocation callback. An explicit trusted fixture-only grant allows
+`lab-workspace/lab-lead-allowed`. Tests assert:
+- authorized fixture Team is readable through the scoped binding;
+- another existing Lead in the same workspace remains denied, with
+  no unauthorized projection snapshot;
+- another workspace and an invalid Bearer are denied;
+- revocation of the token `jti` denies the previously authorized Lead.
+
+The projection/workspace/Lead are test fixtures, **not real DSH data**.
+The test never stores JWTs/secrets outside the disposable job, does
+not expose a public MCP endpoint and does not assert that ChatGPT
+can authenticate. CI result **pending**; PR remains Draft, production
+**NO-GO** pending actual host integration and reviewed ingress.
