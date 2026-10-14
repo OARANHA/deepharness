@@ -1,0 +1,8 @@
+# Adds only the read connector. DSH owns its existing storage/session/team services.
+# Both bundle row and endpoint stay disabled until separately reviewed activation.
+- insert:
+    - id: wandora-chatgpt-mcp-read
+      name: '@wandora/deepharness-chatgpt-mcp-read/plugin'
+      disabled: true
+      config:
+        endpointEnabled: false
