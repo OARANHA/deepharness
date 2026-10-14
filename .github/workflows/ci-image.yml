@@ -30,6 +30,13 @@ jobs:
       - name: Build pinned image in CI (never on 28server)
         if: steps.state.outputs.ready == 'true'
         run: docker build --pull -f deploy/Dockerfile -t local/deepharness:ci .
+      - name: Non-root tool volumes and offline npm persistence regression
+        if: steps.state.outputs.ready == 'true'
+        env:
+          DEEPHARNESS_IMAGE: ghcr.io/oaranha/deepharness@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          DSH_BASIC_AUTH_USERS: ci-placeholder-no-secret
+        timeout-minutes: 5
+        run: node deploy/tool-state-volume-smoke.mjs local/deepharness:ci
       - name: Native addon probe under container runtime restrictions
         if: steps.state.outputs.ready == 'true'
         run: |
