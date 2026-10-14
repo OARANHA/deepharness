@@ -29,11 +29,15 @@ if (!tokenRes.ok) {
   const headers = JSON.parse(Buffer.from(token.split('.')[0], 'base64url').toString('utf8'));
   const presence = Object.fromEntries(required.map(k => [k, claims[k] !== undefined]));
   const exactAud = claims.aud === resource;
-  const profileMatches = Object.values(presence).every(Boolean) &&
+  const optionalNbfValid = claims.nbf === undefined ||
+    (Number.isSafeInteger(claims.nbf) && claims.nbf >= claims.iat && claims.nbf <= Math.floor(Date.now() / 1000));
+  const profileMatches = required.filter(k => k !== 'nbf').every(k => presence[k]) &&
+    optionalNbfValid && Number.isSafeInteger(claims.iat) && Number.isSafeInteger(claims.exp) &&
+    claims.iat <= Math.floor(Date.now() / 1000) && claims.exp > Math.floor(Date.now() / 1000) &&
     exactAud && claims.token_use === 'access' && headers.alg === 'RS256' &&
     typeof claims.scope === 'string' && claims.scope.split(' ').includes('agent-teams:read');
   console.log('KEYCLOAK_LAB_PROFILE: ' + JSON.stringify({
-    profileMatches, claimPresence: presence, exactResourceAudience: exactAud,
+    profileMatches, claimPresence: presence, optionalNbfValid, exactResourceAudience: exactAud,
     algorithmRS256: headers.alg === 'RS256', hasReadScope: typeof claims.scope === 'string' &&
       claims.scope.split(' ').includes('agent-teams:read'),
   }));
