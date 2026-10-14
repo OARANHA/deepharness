@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomBytes } from 'node:crypto';
 import { createPinnedJwtTransportAuthenticator } from '../adapters/pinned-jwt-transport-authenticator.mjs';
 import { createMcpReadRequestContext } from '../adapters/mcp-read-request-context.mjs';
-const base = process.env.KEYCLOAK_LAB_URL ?? 'http://127.0.0.1:18080';
+const base = process.env.KEYCLOAK_LAB_URL ?? 'https://127.0.0.1:18080';
 const issuer = base + '/realms/deepharness-mcp-lab';
 const resource = 'https://mcp.example/mcp';
 const callback = 'http://127.0.0.1:18081/callback';
