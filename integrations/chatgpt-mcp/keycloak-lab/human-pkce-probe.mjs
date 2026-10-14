@@ -138,6 +138,8 @@ await probeKeycloakOfficialHost({
   authenticateTransport: authenticated, request, principal,
   revoke: async () => { revokedTokens.add(claims.jti); },
 });
+const { probePersistentKeycloakHost } = await import('../initialized-host-probe/keycloak-postgres-host-probe.mjs');
+await probePersistentKeycloakHost({ issuer, resource, keys, claims, request, principal });
 revokedTokens.add(claims.jti);
 await assert.rejects(read(allowed), /denied/, 'revoked real token must not read an authorized Lead');
 console.log('KEYCLOAK_HUMAN_GRANTS_E2E_MATCH: real signed JWT + issuer sub + exact grants + denied other Lead + revocation; DSH data fixture only');
