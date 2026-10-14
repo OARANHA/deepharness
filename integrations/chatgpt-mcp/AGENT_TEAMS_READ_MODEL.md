@@ -553,3 +553,28 @@ does not establish an access-token validation profile: issuer-specific
 access-token format, key usage, resource audience and revocation must be
 documented and independently reviewed before deployment. No new
 endpoint, secrets, merge or deployment. **New CI pending.**
+
+## Bounded HTTPS OIDC discovery and rotation cache (2026-10-13)
+
+`adapters/pinned-oidc-discovery.mjs` is a testable **read-only discovery
+client**, not an OAuth login. A trusted embedding supplies a pinned issuer,
+the exact expected discovery URL and same-origin JWKS URL; metadata cannot
+redirect the JWKS request to a new URL. HTTPS fetches request JSON, reject
+redirects, cap Content-Length and streamed response bytes, use an abort timeout
+and `cache: no-store`. Validated public key sets replace the previous cache
+**atomically**, with bounded TTL and single-flight concurrent refresh.
+
+Expired cached keys are **not** returned after an unsuccessful refresh.
+Unknown `kid` must not trigger uncontrolled on-demand refreshes; call the
+explicit refresh operation only under a reviewed rate limit/rotation policy.
+The client does not itself manage OAuth authorization-code/PKCE flows,
+authenticate ChatGPT, or rotate live access tokens; it also does not yet
+wire refreshed keys into a live per-request JWT verifier.
+
+Security boundary: a trusted issuer URL and same-origin check **do not**
+prevent DNS rebinding or access to private IPs. Production deployment must
+supply a separately audited network egress policy, DNS/IP verification,
+TLS proxy rules, concurrency/rate limits and observability. Injected fetchers
+are trusted integration code; current negative tests use simulated responses,
+not public network access. No credentials, production endpoint, merge or
+deploy. **CI for this new gate remains unverified.**
