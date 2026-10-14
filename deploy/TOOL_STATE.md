@@ -21,12 +21,13 @@ Stack informada pelo proprietário:
 
 ## Correção preparada
 
-A imagem prepara três diretórios privados 0700 pertencentes ao usuário node.
+A imagem prepara quatro diretórios privados 0700 pertencentes ao usuário node.
 O Compose monta volumes novos e específicos nos mesmos caminhos:
 
 | Volume | Destino | Conteúdo |
 | --- | --- | --- |
 | dsh_npm_cache_v1 | /data/dsh/.npm-cache | Cache npm |
+| dsh_npm_global_v1 | /data/dsh/.npm-global | Ferramentas npm instaladas pelo usuário |
 | dsh_tool_cache_v1 | /data/dsh/.cache | Cache de ferramentas, incluindo browser HyperFrames |
 | dsh_hyperframes_state_v1 | /data/dsh/.hyperframes | Configuração/estado HyperFrames |
 
@@ -36,7 +37,7 @@ v1 previamente inicializados por root. Não há chown em startup, usuário root
 no serviço, chmod777 nem alteração recursiva do volume de sessões.
 Volumes dsh_data e dsh_workspace permanecem os mesmos.
 
-ATENÇÃO operacional: as novas montagens ocultam os três diretórios antigos
+ATENÇÃO operacional: as novas montagens ocultam os diretórios antigos
 durante execução, sem apagá-los. Em especial, .hyperframes é ESTADO, não apenas
 cache. Antes de implantação, inventariar e preservar sua configuração,
 identidade/consentimento de telemetria e eventual autenticação; migrar os
@@ -92,7 +93,36 @@ novo, com readback do usuário, modos, montagens e variáveis, depois testar uma
 sessão nova. Não efetuar redeploy usando digest antigo e montagens novas.
 
 Rollback exige restaurar TANTO digest quanto revisão anterior do Compose
-(retirando os três overlays), preservando todos os volumes. O digest informado
+(retirando os overlays), preservando todos os volumes. O digest informado
 acima é a referência anterior; a revisão antiga deve ser capturada antes do
 cutover. A configuração atual do MCP/OAuth/Keycloak/PostgreSQL não muda neste
 ajuste. Nenhuma ação na VPS ou no Portainer foi executada.
+
+
+## Instalações recorrentes de ferramentas e skills
+
+NPM_CONFIG_PREFIX=/data/dsh/.npm-global passa a valer na imagem e no Compose.
+Antes deste ajuste, não havia prefixo global declarativo gravável: npm global
+podia tentar escrever na árvore de sistema read-only. O ajuste elimina essa
+dependência de root para instalações npm no espaço do usuário.
+
+PATH mantém /opt/dsh/node_modules/.bin primeiro e inclui
+/data/dsh/.npm-global/bin depois. Assim ferramentas instaladas ficam
+disponíveis nas chamadas seguintes sem substituir o dsh empacotado.
+HOME e DSH_HOME continuam /data/dsh; workspace continua /workspace.
+
+O teste agora instala um tarball local com npm install --global --offline
+--ignore-scripts, executa sua CLI por PATH e volta a executá-la em outro
+container, sem reinstalar. Também grava e relê uma fixture de skill em
+HOME/.agents/skills entre containers. Não testa downloads nem scripts de
+instalação arbitrários; não afirma compatibilidade universal de plugins.
+A instalação oficial do plugin DSH permanece coberta pelo gate existente
+de pacote offline/perfil desativado.
+
+Antes do cutover, conferir como UID1000 os diretórios reais de skills/plugins
+no HOME e workspace. Se arquivos existentes pertencem a root, preparar
+migração/correção somente dos caminhos confirmados e autorizados, sem chown
+recursivo de todo /data/dsh. Volumes novos não reparam skills legadas fora
+de seus destinos. Não precisa pedir privilégio root para cada nova instalação
+em diretório corretamente preparado; ferramentas que exigem apt, bibliotecas
+de sistema ou escrita na imagem precisam empacotamento revisado próprio.
