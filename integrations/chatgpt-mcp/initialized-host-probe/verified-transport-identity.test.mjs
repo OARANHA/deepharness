@@ -57,3 +57,7 @@ test('untrusted or malformed transport resolvers deny rather than fall back', as
     await assert.rejects(binding.runHttpRequest({ headers: headers('a') }, async () => {}), /denied/);
   }
 });
+
+test('deny non-local cleartext HTTP origin configuration', async () => {
+  assert.throws(() => createMcpReadRequestContext({ allowedOrigins: ['http://remote.example'] }), /denied/);
+});
