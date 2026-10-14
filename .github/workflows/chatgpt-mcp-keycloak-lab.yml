@@ -3,6 +3,7 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
+      - 'deploy/mcp/render-operational-candidate.mjs'
       - 'integrations/chatgpt-mcp/package.json'
       - 'integrations/chatgpt-mcp/runtime.mjs'
       - 'integrations/chatgpt-mcp/policy.mjs'
@@ -29,7 +30,9 @@ jobs:
         working-directory: integrations/chatgpt-mcp/initialized-host-probe
         run: npm install --no-save --package-lock=false --ignore-scripts --no-audit --no-fund pg@8.16.3
       - name: Verify offline-installed policy and plugin reload contract
-        run: node --test integrations/chatgpt-mcp/initialized-host-probe/installed-read-package.test.mjs
+        run: node --test integrations/chatgpt-mcp/initialized-host-probe/installed-read-package.test.mjs integrations/chatgpt-mcp/initialized-host-probe/close-private-wire-resources.test.mjs
+      - name: Preload exact Envoy image before issuing human JWTs
+        run: docker pull envoyproxy/envoy:v1.40.0
       - name: Start disposable primary revocation database
         shell: bash
         run: |
