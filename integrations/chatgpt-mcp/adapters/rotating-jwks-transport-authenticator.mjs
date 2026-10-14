@@ -6,7 +6,7 @@ import { createPinnedJwtTransportAuthenticator } from './pinned-jwt-transport-au
 
 const deny = () => { throw new Error('Agent Teams read denied'); };
 export function createRotatingJwksTransportAuthenticator({
-  discovery, audience, isRevoked, requiredScope, now = () => Math.floor(Date.now() / 1000),
+  discovery, audience, isRevoked, requiredScope, allowMissingNotBefore = false, now = () => Math.floor(Date.now() / 1000),
 }) {
   if (typeof discovery?.get !== 'function' || typeof audience !== 'string' ||
       !audience || typeof isRevoked !== 'function' || typeof now !== 'function') deny();
@@ -19,7 +19,7 @@ export function createRotatingJwksTransportAuthenticator({
     let verify;
     try {
       verify = createPinnedJwtTransportAuthenticator({
-        issuer: snapshot.issuer, audience, publicKeys: snapshot.publicKeys, isRevoked, requiredScope, now,
+        issuer: snapshot.issuer, audience, publicKeys: snapshot.publicKeys, isRevoked, requiredScope, allowMissingNotBefore, now,
       });
     } catch { deny(); }
     try { return await verify(request); } catch { deny(); }
