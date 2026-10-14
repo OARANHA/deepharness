@@ -242,3 +242,23 @@ jobs:
           fi
           echo "Published image: ghcr.io/oaranha/deepharness@${digest}" >> "$GITHUB_STEP_SUMMARY"
           echo "Verified GHCR manifest digest: $digest"
+
+  mcp-grants-primary:
+    if: github.repository == 'OARANHA/deepharness' && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate inactive MCP proxy and authorization database composition
+        env:
+          DSH_MCP_PROXY_IMAGE: ghcr.io/oaranha/wandora-envoy@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          DSH_MCP_GRANTS_IMAGE: ghcr.io/oaranha/deepharness-grants@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          DSH_MCP_REVIEW_ROOT: /opt/wandora/ops-workspace/mcp-candidate
+          DSH_MCP_SECRET_ROOT: /opt/wandora/data/deepharness-mcp/secrets
+        run: docker compose -f deploy/mcp/portainer-ingress.review.yml -f deploy/mcp/portainer-grants.review.yml config --quiet
+      - name: Build authorization primary candidate without publishing
+        run: docker build -f deploy/mcp/Dockerfile.grants -t local/deepharness-grants:ci .
+      - name: Verify runtime SELECT privileges and persisted role boundaries on real PostgreSQL
+        run: node deploy/mcp/verify-grants-primary.mjs local/deepharness-grants:ci
