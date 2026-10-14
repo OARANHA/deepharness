@@ -624,3 +624,28 @@ The regression tests cover private/mixed DNS, invalid address families,
 revocation failure/unknown response and timeout. **New CI pending**.
 The modules add no agent actions, do not alter existing MCP grants, and
 do not perform merge, deployment or outbound network calls.
+
+## DNS-pinned HTTPS OIDC transport gate (2026-10-13)
+
+`adapters/dns-pinned-oidc-fetcher.mjs` now implements a Node
+`https.request` fetcher whose per-socket DNS callback verifies **all**
+resolver answers through `resolvePublicOidcAddresses` and returns the
+approved address directly to Node's socket connect. The HTTPS request
+retains the original hostname for TLS SNI and certificate verification,
+disallows IP-literal targets, rejects redirects/non-200 responses, bounds
+response bytes, and does not use connection pooling or an HTTP proxy.
+`pinned-oidc-discovery.mjs` uses this pinned fetcher by default. Existing
+test callers can still inject a trusted mock fetcher.
+
+Regression tests inspect the actual connection options in an isolated
+HTTPS request double, including approved IP, SNI hostname and
+`rejectUnauthorized: true`, and reject mixed/private DNS, redirects and
+simulated TLS errors. These tests **do not** constitute an end-to-end
+certificate/packet-level integration test.
+
+Production requirements remain: operating-system or provider egress
+firewall, proxy environment review, DNS resolver trust and certificate
+chain validation in the deployment environment, additional IPv6
+address-space review, and durable revocation backend wiring. No network
+calls to a real provider, OAuth login, merge, deployment or VPS changes.
+**CI not yet verified** for this gate.
