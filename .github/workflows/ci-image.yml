@@ -200,12 +200,12 @@ jobs:
 
       - name: Test disabled profile composition contract
         if: steps.state.outputs.ready == 'true' && github.event_name == 'pull_request'
-        run: node --test deploy/disabled-mcp-profile-contract.test.mjs
+        run: node --test deploy/disabled-mcp-profile-contract.test.mjs deploy/mcp/existing-profile-host.test.mjs
 
       - name: Build private connector installation candidate (CI only)
         if: steps.state.outputs.ready == 'true' && github.event_name == 'pull_request'
         run: docker build -f deploy/Dockerfile.mcp-candidate -t local/deepharness-mcp:candidate .
-      - name: Official offline DSH install and disabled profile composition
+      - name: Official offline install and existing Web profile read composition
         if: steps.state.outputs.ready == 'true' && github.event_name == 'pull_request'
         timeout-minutes: 5
         shell: bash
@@ -218,7 +218,7 @@ jobs:
             --tmpfs /data/dsh:rw,nosuid,nodev,size=256m,mode=0700,uid=1000,gid=1000 \
             --tmpfs /workspace:rw,nosuid,nodev,size=128m,mode=0700,uid=1000,gid=1000 \
             -e DSH_MCP_INSTALL_PROOF=true local/deepharness-mcp:candidate \
-            node /opt/wandora-mcp-verifier/verify-disabled-mcp-profile.mjs
+            node /opt/wandora-mcp-verifier/verify-existing-mcp-profile.mjs
 
       - name: Log in to GHCR
         if: steps.state.outputs.ready == 'true' && github.event_name == 'push'
