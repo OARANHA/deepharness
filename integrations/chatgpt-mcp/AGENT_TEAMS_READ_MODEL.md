@@ -578,3 +578,23 @@ TLS proxy rules, concurrency/rate limits and observability. Injected fetchers
 are trusted integration code; current negative tests use simulated responses,
 not public network access. No credentials, production endpoint, merge or
 deploy. **CI for this new gate remains unverified.**
+
+## Live JWKS snapshot → JWT verifier rotation gate (2026-10-13)
+
+`adapters/rotating-jwks-transport-authenticator.mjs` now bridges the
+bounded OIDC discovery client's current validated public-key snapshot
+to `createPinnedJwtTransportAuthenticator` on **every identity check**.
+The verifier does not cache previously accepted keys independently, request
+unrecognized key IDs from the network, or allow a stale-key fallback. The
+existing MCP HTTP request binding revalidates transport identity during the
+authorized read, so an in-flight request is denied if the corresponding
+public key is removed by an intervening successful refresh.
+
+`rotating-jwks-transport.test.mjs` covers old/new key IDs, same-ID
+key replacement, wrong signatures, failed refresh after cache expiry, and
+a key removal occurring mid-request. Test-generated RSA keys only;
+no external calls or credentials. This is a **candidate gate**, with CI
+not yet verified. Existing discovery timeout, cache and egress limitations
+still apply; in particular a compromised trusted JWKS source, an
+inadequately constrained network path, or an unavailable revocation store
+are not solved by this adapter. No OAuth login or production deploy.
