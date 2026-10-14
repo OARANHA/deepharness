@@ -1,0 +1,16 @@
+# CI-only installation candidate; not the production image or an automatic deploy.
+FROM local/deepharness:ci
+USER root
+RUN npm install --global --ignore-scripts --no-audit --no-fund --cache /tmp/mcp-build-cache pnpm@11.28.5 \
+ && npm install --prefix /opt/wandora-mcp-verifier --ignore-scripts --no-audit --no-fund \
+      --cache /tmp/mcp-build-cache js-yaml@4.3.2
+COPY integrations/chatgpt-mcp/ /opt/wandora-mcp-source/
+RUN mkdir -p /opt/wandora-mcp-artifacts \
+ && cd /opt/wandora-mcp-source \
+ && npm pack --ignore-scripts --cache /tmp/mcp-build-cache --pack-destination /opt/wandora-mcp-artifacts \
+ && cd /opt/wandora-mcp-artifacts \
+ && sha256sum ./*.tgz > SHA256SUMS \
+ && rm -rf /opt/wandora-mcp-source /tmp/mcp-build-cache
+COPY deploy/verify-disabled-mcp-profile.mjs /opt/wandora-mcp-verifier/verify-disabled-mcp-profile.mjs
+USER node
+# Inherits existing Web CMD/3080 only. No MCP listener/port/policy is configured.
