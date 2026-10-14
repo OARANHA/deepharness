@@ -7,7 +7,7 @@ const url = x => {
   if (typeof x !== 'string' || x.length > 2048) deny();
   let u; try { u = new URL(x); } catch { deny(); }
   if (u.protocol !== 'https:' || !u.hostname || u.username || u.password ||
-      u.search || u.hash || u.href !== x) deny();
+      u.search || u.hash || (u.href !== x && !(u.pathname === '/' && u.origin === x))) deny();
   return u;
 };
 export function createMcpOAuthResourceMetadata({ resource, issuer, scope = 'agent-teams:read' }) {
