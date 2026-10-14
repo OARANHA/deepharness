@@ -34,11 +34,6 @@ services:
     volumes:
       - dsh_data:/data/dsh
       - dsh_workspace:/workspace
-      # Fresh volumes copy image-owned directories; legacy contents remain in dsh_data.
-      - dsh_npm_cache_v1:/data/dsh/.npm-cache
-      - dsh_npm_global_v1:/data/dsh/.npm-global
-      - dsh_tool_cache_v1:/data/dsh/.cache
-      - dsh_hyperframes_state_v1:/data/dsh/.hyperframes
     networks:
       - traefik-public
     labels:
@@ -55,10 +50,6 @@ services:
 volumes:
   dsh_data:
   dsh_workspace:
-  dsh_npm_cache_v1:
-  dsh_npm_global_v1:
-  dsh_tool_cache_v1:
-  dsh_hyperframes_state_v1:
 
 networks:
   traefik-public:
