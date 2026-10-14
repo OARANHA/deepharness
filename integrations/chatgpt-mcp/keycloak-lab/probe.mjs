@@ -1,5 +1,5 @@
 /** Disposable Keycloak profile inspection: never logs JWT, client secret or user claims. */
-const base = process.env.KEYCLOAK_LAB_URL ?? 'http://127.0.0.1:18080';
+const base = process.env.KEYCLOAK_LAB_URL ?? 'https://127.0.0.1:18080';
 const realm = 'deepharness-mcp-lab';
 const resource = 'https://mcp.example/mcp';
 const endpoint = base + '/realms/' + realm;
