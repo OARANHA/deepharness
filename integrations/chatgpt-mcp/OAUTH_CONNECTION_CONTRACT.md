@@ -66,3 +66,12 @@ Fonte do transporte remoto: https://developers.openai.com/plugins/build/mcp-serv
 
 ### Revisão independente deste incremento
 Dois achados corrigidos: (1) após reinício de pool e de container, o teste agora exige consulta SQL saudável do hash exato issuer/subject/jti com uma linha revoked=true, antes de verificar negação do JWT; falha de DB não pode contar como prova de persistência. (2) alterações em sql/** também disparam o workflow combinado. Syntax check aprovado; resultado runtime continua pendente da CI. Nenhuma alteração na validação JWT ou grants de aplicação.
+
+
+## Preparação de callback, registro e transporte (2026-10-14)
+
+Ficha inerte: oauth-onboarding.review.json. Procedimento: OAUTH_ONBOARDING_PREPARATION.md.
+Esses arquivos não são import de realm ou configuração runtime; valores reais não comprovados permanecem null.
+Base atual comprovada: 2ded7e16348cbd7c51ebcf2296c9b2360cfb0e74, cinco workflows GREEN; instalação offline oficial e composição com conector disabled preservando toda configuração existente comprovadas. Isso supersede apenas os estados pendentes dos incrementos laboratoriais anteriores, não os bloqueios de produção.
+Registro dedicado permanece pré-registrado, sem DCR anônimo; callback deve vir da página de gestão da conexão. Transporte proposto: proxy HTTPS com mTLS comprovado e OAuth independente; alternativa de túnel exige disponibilidade e revisão específicas. Plugin atual não abre listener e rejeita endpointEnabled:true: composição futura separada é necessária. Origin ausente continua negada.
+Nenhum cliente, callback real, endpoint, grant operacional, credencial ou recurso de infraestrutura criado. Nenhuma mudança em autenticação/autorização runtime. A ficha não autoriza ativação.
