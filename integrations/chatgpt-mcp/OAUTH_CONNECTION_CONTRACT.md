@@ -75,3 +75,31 @@ Esses arquivos não são import de realm ou configuração runtime; valores reai
 Base atual comprovada: 2ded7e16348cbd7c51ebcf2296c9b2360cfb0e74, cinco workflows GREEN; instalação offline oficial e composição com conector disabled preservando toda configuração existente comprovadas. Isso supersede apenas os estados pendentes dos incrementos laboratoriais anteriores, não os bloqueios de produção.
 Registro dedicado permanece pré-registrado, sem DCR anônimo; callback deve vir da página de gestão da conexão. Transporte proposto: proxy HTTPS com mTLS comprovado e OAuth independente; alternativa de túnel exige disponibilidade e revisão específicas. Plugin atual não abre listener e rejeita endpointEnabled:true: composição futura separada é necessária. Origin ausente continua negada.
 Nenhum cliente, callback real, endpoint, grant operacional, credencial ou recurso de infraestrutura criado. Nenhuma mudança em autenticação/autorização runtime. A ficha não autoriza ativação.
+
+
+## Candidato executável de OAuth/proxy (novo incremento; CI pendente)
+
+A base GREEN atual é 510faad: pacote lab.4 instalado + JWT humano Keycloak +
+MCP/mTLS + DSH oficial + PostgreSQL real. Os estados pendentes dos incrementos
+anteriores acima são históricos e não representam o laboratório atual.
+
+Novo gerador: deploy/mcp/render-operational-candidate.mjs; runbook em
+deploy/mcp/README.md. Produz clientes desativados com os mappers revisados e
+proxy Envoy v1.40.0 sem bind, sem registrar cliente nem criar chaves/listener.
+Requer issuer/resource/callback/client/backend reais: o input review permanece
+vazio e não é ativável. Mantém canário inicial <=300s sem refresh.
+
+O proxy exige cadeia OpenAI Connectors e SAN mtls.prod.connectors.openai.com,
+mais mTLS interno separado. A policy/backend mantêm JWT/grants/revogação.
+A ausência de Origin pode ser convertida num marcador de canal interno somente
+na rota com essa autenticação mTLS obrigatória; Origin presente inválida/vazia
+é negada. Nenhum header do caller é prova de identidade. Código do pacote
+lab.4 não mudou. Esse candidato requer uma topologia sem terminação TLS antes
+do ponto que verifica o certificado OpenAI; nenhuma alteração de ingress foi feita.
+
+Cinco testes locais gerador/CLI e regressões passaram. O teste real Envoy com
+certificados descartáveis/backend double ainda aguarda CI e exige
+OPERATIONAL_PROXY_MTLS_SAN_ORIGIN_MATCH. Depois, testar o proxy junto do
+fluxo humano/DSH/PostgreSQL já existente. O gerador não fecha callback real,
+metadata/TTL operacionais, composição do host DSH, digest ou autorização de
+implantação. Não equivale a conexão ChatGPT ativa.
