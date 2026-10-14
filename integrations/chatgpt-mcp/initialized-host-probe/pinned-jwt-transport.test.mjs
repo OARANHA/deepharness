@@ -68,7 +68,8 @@ test('reject invalid signature, issuer, audience, lifetime, algorithm, kind and 
 });
 
 test('deny oversize composed principal before returning transport identity', async () => {
-  const longIssuer = 'https://id.example/' + 'a'.repeat(231);
+  const longIssuer = 'https://id.example/' + 'a'.repeat(257 - 'https://id.example/#alice'.length);
+  assert.equal((longIssuer + '#alice').length, 257);
   const authenticate = verifier({ issuer: longIssuer });
   const signed = token({ ...claims, iss: longIssuer });
   await assert.rejects(authenticate({ headers: headers(signed) }), /denied/);
