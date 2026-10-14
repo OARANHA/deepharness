@@ -3,7 +3,17 @@
 services:
   keycloak:
     image: ${WANDORA_KEYCLOAK_IMAGE:?Provide tested optimized Keycloak digest}
-    command: ["start", "--optimized"]
+    entrypoint: ["/bin/bash", "-ec"]
+    command:
+      - |
+        export KC_DB_PASSWORD="$(cat /run/secrets/identity-db-password)"
+        if test -s /run/secrets/identity-bootstrap-password; then
+          export KC_BOOTSTRAP_ADMIN_PASSWORD="$(cat /run/secrets/identity-bootstrap-password)"
+        fi
+        exec /opt/keycloak/bin/kc.sh start --optimized
+    secrets:
+      - identity-db-password
+      - identity-bootstrap-password
     restart: unless-stopped
     init: true
     security_opt: ["no-new-privileges:true"]
@@ -15,7 +25,6 @@ services:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://identity-db:5432/keycloak
       KC_DB_USERNAME: keycloak
-      KC_DB_PASSWORD: ${WANDORA_ID_DB_PASSWORD:?Set privately}
       KC_HOSTNAME: https://id.wandora.com.br
       KC_HOSTNAME_STRICT: "true"
       KC_HTTP_ENABLED: "true"
@@ -27,8 +36,7 @@ services:
       KC_DB_POOL_MIN_SIZE: "2"
       KC_DB_POOL_MAX_SIZE: "10"
       KC_CACHE: local
-      KC_BOOTSTRAP_ADMIN_USERNAME: ${WANDORA_ID_BOOTSTRAP_USER:-}
-      KC_BOOTSTRAP_ADMIN_PASSWORD: ${WANDORA_ID_BOOTSTRAP_PASSWORD:-}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${WANDORA_ID_BOOTSTRAP_USER:-initial-owner}
     depends_on:
       identity-db:
         condition: service_healthy
@@ -52,8 +60,9 @@ services:
     environment:
       POSTGRES_DB: keycloak
       POSTGRES_USER: keycloak
-      POSTGRES_PASSWORD: ${WANDORA_ID_DB_PASSWORD:?Set privately}
+      POSTGRES_PASSWORD_FILE: /run/secrets/identity-db-password
       POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    secrets: ["identity-db-password"]
     volumes:
       - identity_pgdata:/var/lib/postgresql/data
     networks: ["identity-private"]
@@ -75,3 +84,9 @@ networks:
     internal: true
   wandora-edge:
     external: true
+
+secrets:
+  identity-db-password:
+    file: /opt/wandora/data/identity/secrets/db-password
+  identity-bootstrap-password:
+    file: /opt/wandora/data/identity/secrets/bootstrap-password
