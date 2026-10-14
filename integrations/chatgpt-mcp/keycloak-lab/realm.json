@@ -90,6 +90,7 @@
         }
       ],
       "defaultClientScopes": [
+        "basic",
         "agent-teams:read"
       ],
       "redirectUris": [
