@@ -1,6 +1,10 @@
 name: ChatGPT MCP — isolated Keycloak profile probe
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/chatgpt-mcp-keycloak-lab.yml'
+      - 'integrations/chatgpt-mcp/keycloak-lab/**'
 permissions:
   contents: read
 jobs:
