@@ -68,6 +68,9 @@ Antes de aplicar:
    WANDORA_KEYCLOAK_IMAGE, WANDORA_ID_POSTGRES_IMAGE,
    WANDORA_ID_DB_PASSWORD, WANDORA_ID_TRUSTED_PROXY,
    WANDORA_ID_BOOTSTRAP_USER, WANDORA_ID_BOOTSTRAP_PASSWORD.
+   No primeiro start de banco vazio, fornecer ambos os campos bootstrap.
+   Depois eles são opcionais no Compose e devem ser removidos da configuração
+   privada. Não iniciar banco vazio sem planejar o bootstrap administrativo.
    Nenhum valor secreto entra no Git, chat ou memória. Bootstrap é temporário:
    criar admin permanente com MFA e remover conta temporária e variáveis após
    readback da gestão. Definir backup/restore antes de uso operacional.
