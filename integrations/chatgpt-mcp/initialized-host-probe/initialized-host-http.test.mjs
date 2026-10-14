@@ -136,7 +136,14 @@ test('initialized official TeamService WorkspaceRegistry JSONL host through SDK 
   assert.deepEqual(individualResult.members, realProjection.members);
   await assert.rejects(individualRead(jwt('bob')), /denied/);
   await assert.rejects(individualRead(alice, { ...individualTarget, leadSessionId: 'other' }), /denied/);
-  await assert.rejects(individualRead(alice, { ...individualTarget, principalId: issuer + '#alice' }), /denied/);
+  // The internal reader deliberately ignores argument identity claims.
+  // The externally registered MCP tool separately rejects extra keys.
+  assert.deepEqual(await individualRead(alice, {
+    ...individualTarget, principalId: issuer + '#bob',
+  }), individualResult, 'argument identity must not replace authenticated Alice');
+  await assert.rejects(individualRead(jwt('bob'), {
+    ...individualTarget, principalId: issuer + '#alice',
+  }), /denied/, 'Bob cannot acquire Alice grants through an argument claim');
   individualRevoked = true;
   await assert.rejects(individualRead(alice), /denied/);
   assert.deepEqual(ctx.sessionProjections.snapshot(lead, ['agentTeam']).values.agentTeam, realProjection);
