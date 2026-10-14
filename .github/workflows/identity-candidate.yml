@@ -36,6 +36,12 @@ jobs:
           prefix="identity-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           db_password="$(openssl rand -hex 24)"
           admin_password="$(openssl rand -hex 24)"
+          secret_dir="$(mktemp -d)"
+          chmod 700 "$secret_dir"
+          printf "%s" "$db_password" > "$secret_dir/db-password"
+          printf "%s" "$admin_password" > "$secret_dir/bootstrap-password"
+          sudo chown 1000:0 "$secret_dir/db-password" "$secret_dir/bootstrap-password"
+          sudo chmod 400 "$secret_dir/db-password" "$secret_dir/bootstrap-password"
           echo "::add-mask::$db_password"
           echo "::add-mask::$admin_password"
           cleanup() {
@@ -49,13 +55,16 @@ jobs:
             docker rm -f "$prefix-kc" "$prefix-pg" >/dev/null 2>&1 || true
             docker volume rm "$prefix-data" >/dev/null 2>&1 || true
             docker network rm "$prefix-net" >/dev/null 2>&1 || true
+            sudo rm -f "$secret_dir/db-password" "$secret_dir/bootstrap-password"
+            rmdir "$secret_dir"
           }
           trap cleanup EXIT
           docker network create --internal "$prefix-net" >/dev/null
           docker volume create "$prefix-data" >/dev/null
           start_db() {
             docker run -d --name "$prefix-pg" --network "$prefix-net" --network-alias identity-db \
-              -e POSTGRES_USER=keycloak -e POSTGRES_DB=keycloak -e POSTGRES_PASSWORD="$db_password" \
+              -e POSTGRES_USER=keycloak -e POSTGRES_DB=keycloak -e POSTGRES_PASSWORD_FILE=/run/secrets/identity-db-password \
+              -v "$secret_dir/db-password:/run/secrets/identity-db-password:ro" \
               -v "$prefix-data:/var/lib/postgresql/data" postgres:16.15-bookworm >/dev/null
             for _ in $(seq 1 60); do
               if docker exec "$prefix-pg" pg_isready -h 127.0.0.1 -U keycloak -d keycloak >/dev/null; then return; fi
@@ -67,11 +76,13 @@ jobs:
             docker run -d --name "$prefix-kc" --network "$prefix-net" \
               --security-opt no-new-privileges --cap-drop ALL --memory 1536m \
               -e KC_DB_URL=jdbc:postgresql://identity-db:5432/keycloak \
-              -e KC_DB_USERNAME=keycloak -e KC_DB_PASSWORD="$db_password" \
+              -e KC_DB_USERNAME=keycloak \
+              -v "$secret_dir/db-password:/run/secrets/identity-db-password:ro" \
+              -v "$secret_dir/bootstrap-password:/run/secrets/identity-bootstrap-password:ro" \
               -e KC_HOSTNAME=https://id.wandora.com.br -e KC_HOSTNAME_STRICT=true \
               -e KC_HTTP_ENABLED=true -e KC_HTTP_MANAGEMENT_SCHEME=http \
-              -e KC_BOOTSTRAP_ADMIN_USERNAME=ci-bootstrap -e KC_BOOTSTRAP_ADMIN_PASSWORD="$admin_password" \
-              local/wandora-keycloak:ci start --optimized >/dev/null
+              -e KC_BOOTSTRAP_ADMIN_USERNAME=ci-bootstrap \
+              --entrypoint /bin/bash local/wandora-keycloak:ci -ec 'export KC_DB_PASSWORD="$(cat /run/secrets/identity-db-password)"; if test -s /run/secrets/identity-bootstrap-password; then export KC_BOOTSTRAP_ADMIN_PASSWORD="$(cat /run/secrets/identity-bootstrap-password)"; fi; exec /opt/keycloak/bin/kc.sh start --optimized' >/dev/null
             ready=0
             for _ in $(seq 1 90); do
               state="$(docker inspect --format '{{.State.Status}}' "$prefix-kc")"
