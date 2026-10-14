@@ -4,3 +4,22 @@
 !deploy/
 !deploy/Dockerfile
 !.dockerignore
+
+# Private connector candidate inputs only; fixtures, keys and lab data stay excluded.
+!deploy/Dockerfile.mcp-candidate
+!deploy/verify-disabled-mcp-profile.mjs
+!integrations/
+!integrations/chatgpt-mcp/
+!integrations/chatgpt-mcp/package.json
+!integrations/chatgpt-mcp/runtime.mjs
+!integrations/chatgpt-mcp/policy.mjs
+!integrations/chatgpt-mcp/plugin.mjs
+!integrations/chatgpt-mcp/cordis.patch.yml
+!integrations/chatgpt-mcp/LICENSE
+!integrations/chatgpt-mcp/README.md
+!integrations/chatgpt-mcp/PACKAGE_README.md
+!integrations/chatgpt-mcp/adapters/
+!integrations/chatgpt-mcp/adapters/*.mjs
+!integrations/chatgpt-mcp/sql/
+!integrations/chatgpt-mcp/sql/001_token_revocations.sql
+!integrations/chatgpt-mcp/sql/002_read_grants.sql
