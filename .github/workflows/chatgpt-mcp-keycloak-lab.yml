@@ -19,11 +19,14 @@ jobs:
           set -euo pipefail
           LAB_CLIENT_SECRET="$(openssl rand -hex 32)"
           LAB_ADMIN_PASSWORD="$(openssl rand -hex 32)"
+          LAB_HUMAN_PASSWORD="$(openssl rand -hex 32)"
           echo "::add-mask::$LAB_CLIENT_SECRET"
           echo "::add-mask::$LAB_ADMIN_PASSWORD"
+          echo "::add-mask::$LAB_HUMAN_PASSWORD"
           echo "KEYCLOAK_LAB_CLIENT_SECRET=$LAB_CLIENT_SECRET" >> "$GITHUB_ENV"
-          export LAB_CLIENT_SECRET
-          node -e 'const fs=require("node:fs"); const t=fs.readFileSync(process.argv[1],"utf8"); fs.writeFileSync(process.argv[2],t.replace("__CI_GENERATED_CLIENT_SECRET__",process.env.LAB_CLIENT_SECRET))' "$PWD/integrations/chatgpt-mcp/keycloak-lab/realm.json" "$RUNNER_TEMP/keycloak-realm.json"
+          echo "KEYCLOAK_LAB_HUMAN_PASSWORD=$LAB_HUMAN_PASSWORD" >> "$GITHUB_ENV"
+          export LAB_CLIENT_SECRET LAB_HUMAN_PASSWORD
+          node -e 'const fs=require("node:fs"); const t=fs.readFileSync(process.argv[1],"utf8"); fs.writeFileSync(process.argv[2],t.replace("__CI_GENERATED_CLIENT_SECRET__",process.env.LAB_CLIENT_SECRET).replace("__CI_GENERATED_HUMAN_PASSWORD__",process.env.LAB_HUMAN_PASSWORD))' "$PWD/integrations/chatgpt-mcp/keycloak-lab/realm.json" "$RUNNER_TEMP/keycloak-realm.json"
           docker run -d --name keycloak-mcp-lab \
             --network bridge -p 127.0.0.1:18080:8080 \
             -e KC_BOOTSTRAP_ADMIN_USERNAME=lab-admin \
@@ -42,6 +45,11 @@ jobs:
           KEYCLOAK_LAB_URL: http://127.0.0.1:18080
           KEYCLOAK_LAB_CLIENT_SECRET: ${{ env.KEYCLOAK_LAB_CLIENT_SECRET }}
         run: node integrations/chatgpt-mcp/keycloak-lab/probe.mjs
+      - name: Test human authorization code PKCE on loopback
+        env:
+          KEYCLOAK_LAB_URL: http://127.0.0.1:18080
+          KEYCLOAK_LAB_HUMAN_PASSWORD: ${{ env.KEYCLOAK_LAB_HUMAN_PASSWORD }}
+        run: node integrations/chatgpt-mcp/keycloak-lab/human-pkce-probe.mjs
       - name: Tear down ephemeral service
         if: always()
         run: docker rm -f keycloak-mcp-lab || true
