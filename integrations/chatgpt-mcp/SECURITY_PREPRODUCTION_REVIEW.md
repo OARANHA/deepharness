@@ -111,3 +111,19 @@ indicator propagation, refresh-token policy, primary-backed revocation
 and safe public ingress. The strict verifier does not accept opaque
 access tokens or multi-audience lists; incompatible providers must not
 be connected by weakening the guard. CI pending; NO-GO.
+
+## First real ChatGPT read readiness — rotating JWKS scope enforcement (2026-10-14)
+
+Security integration finding: the rotating JWKS transport verifier did
+not forward the previously added opt-in `requiredScope` setting to the
+underlying pinned JWT verifier. This is now fixed and covered by a
+regression test that rejects absent and incorrect scopes in otherwise
+signed tokens, and accepts the exact `agent-teams:read` scope.
+
+This closes a local integration gap, **not** the external-login gate.
+Operator must still select a real OAuth issuer whose **access** JWT
+profile satisfies the pinned verifier, explicitly wire issuer/JWKS/
+`requiredScope`/resource audience and durable revocation, and prove
+real ChatGPT client authorization and safe HTTPS ingress. Do not select
+an IdP merely by assuming its ID token is an access token. No production
+listener or credentials configured, CI unverified, NO-GO.
