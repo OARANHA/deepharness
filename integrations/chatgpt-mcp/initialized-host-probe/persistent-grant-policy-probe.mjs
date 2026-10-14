@@ -18,16 +18,18 @@ import {SessionProjectionRegistry} from '@deepseek-ai/dsh-session-projection';
 import {WorkspaceRegistry} from '@deepseek-ai/dsh-workspace';
 import TeamService from '@deepseek-ai/dsh-experimental-agent-team';
 import {createPersistentDshMcpReadPolicy} from '../policy.mjs';
+import {createPostgresRevocationBackend} from '../adapters/postgres-token-revocation.mjs';
 import {createPostgresReadGrantStore} from '../adapters/postgres-read-grants.mjs';
 import * as plugin from '../plugin.mjs';
 const exec=promisify(execFile),container='keycloak-mcp-postgres';
-export async function probePersistentGrantPolicy({issuer,resource,keys,request,principal}) {
+export async function probePersistentGrantPolicy({issuer,resource,keys,request,principal,withPrivateTransport=false,claims,controlRequest,controlClaims}) {
   if(process.env.GITHUB_ACTIONS!=='true'||process.env.PGHOST!=='127.0.0.1'||
       process.env.PGPORT!=='15432'||process.env.PGDATABASE!=='token_revocation_test'||
       process.env.PGUSER!=='integration'||!process.env.PGPASSWORD)throw Error('Disposable grant CI configuration required');
   const root=await mkdtemp(join(tmpdir(),'dsh-persistent-grants-')),ctx=new Context();
   const open=()=>new Pool({host:'127.0.0.1',port:15432,user:'integration',database:'token_revocation_test',
     password:process.env.PGPASSWORD,max:1,connectionTimeoutMillis:1000,idleTimeoutMillis:1000,allowExitOnIdle:true});
+  let wire,databaseStopped=false;const origin=withPrivateTransport?'https://client.example':'http://127.0.0.1:18081';
   let pool=open(),fiber,runtime,phase='schema',revokeDuringGrantCheck=false,grantHash;
   const query=async(sql,params)=>{
     const result=await pool.query(sql,params);
@@ -66,7 +68,7 @@ export async function probePersistentGrantPolicy({issuer,resource,keys,request,p
     phase='operational policy';
     const policy=createPersistentDshMcpReadPolicy({
       issuer,resource,discovery:{get:async()=>({issuer,publicKeys:keys})},query,
-      allowedOrigins:['http://127.0.0.1:18081'],allowMissingNotBefore:true,revocationTimeoutMs:1500,
+      allowedOrigins:[origin],allowMissingNotBefore:true,revocationTimeoutMs:1500,
     });
     phase='plugin mount';
     ctx.provide('chatgptMcpReadPolicy',policy);
@@ -77,7 +79,12 @@ export async function probePersistentGrantPolicy({issuer,resource,keys,request,p
     };
     await mount();
     const target={workspaceId:workspace.id,leadSessionId:lead.id};
-    const read=(args=target)=>runtime.runHttpRequest(request,()=>runtime.readTeam(args));
+    if(withPrivateTransport){
+      const {createLoopbackPrivateMcpProbe}=await import('./loopback-private-mcp-probe.mjs');
+      wire=await createLoopbackPrivateMcpProbe({resource,getService:()=>runtime,bearer:request.headers.authorization,origin});
+      await wire.assertLifecycle();
+    }
+    const read=(args=target)=>wire?wire.read(args):runtime.runHttpRequest(request,()=>runtime.readTeam(args));
     const assertRow=async allowed=>{
       const result=await pool.query('SELECT allowed FROM chatgpt_mcp_read_grants WHERE grant_hash = $1',[grantHash]);
       assert.equal(result.rowCount,1);assert.deepEqual(result.rows,[{allowed}]);
@@ -113,16 +120,46 @@ export async function probePersistentGrantPolicy({issuer,resource,keys,request,p
     phase='database unavailable';
     await pool.query('UPDATE chatgpt_mcp_read_grants SET allowed = TRUE WHERE grant_hash = $1',[grantHash]);
     await assertRow(true);assert.equal((await read()).leadSessionId,lead.id);
-    await pool.end();await exec('docker',['stop',container],{timeout:30000});pool=open();
+    await pool.end();await exec('docker',['stop',container],{timeout:30000});databaseStopped=true;pool=open();
     await assert.rejects(store.hasReadGrant(scope),/denied/);
     await assert.rejects(read(),/denied/);
-    await pool.end();await exec('docker',['start',container],{timeout:30000});await ready();
+    await pool.end();await exec('docker',['start',container],{timeout:30000});await ready();databaseStopped=false;
     pool=open();await mount();await assertRow(true);
     assert.equal((await read()).leadSessionId,lead.id,'healthy restored primary must authorize its preserved exact grant');
     await pool.query('UPDATE chatgpt_mcp_read_grants SET allowed = FALSE WHERE grant_hash = $1',[grantHash]);
     await assertRow(false);await assert.rejects(read(),/denied/);
+    if(wire){
+      phase='wire token revocation';
+      await pool.query('UPDATE chatgpt_mcp_read_grants SET allowed = TRUE WHERE grant_hash = $1',[grantHash]);
+      await assertRow(true);assert.equal((await read()).leadSessionId,lead.id);
+      const identity={issuer,subject:claims.sub,tokenId:claims.jti};
+      await createPostgresRevocationBackend({query,timeoutMs:1500}).revoke(identity);
+      const tokenHash=createHash('sha256').update(JSON.stringify([issuer,claims.sub,claims.jti])).digest('hex');
+      const assertTokenRow=async()=>{
+        const result=await pool.query('SELECT revoked FROM chatgpt_mcp_token_revocations WHERE token_hash = $1',[tokenHash]);
+        assert.equal(result.rowCount,1);assert.deepEqual(result.rows,[{revoked:true}]);
+      };
+      const assertRevokedWithHealthyControl=async()=>{
+        const now=Math.floor(Date.now()/1000);
+        assert.ok(claims.exp>now&&controlClaims.exp>now,'both signed tokens must still be unexpired');
+        const controlHash=createHash('sha256').update(JSON.stringify([issuer,controlClaims.sub,controlClaims.jti])).digest('hex');
+        const controlRow=await pool.query('SELECT revoked FROM chatgpt_mcp_token_revocations WHERE token_hash = $1',[controlHash]);
+        assert.equal(controlRow.rowCount,0);
+        assert.equal((await wire.read(target,controlRequest.headers.authorization)).leadSessionId,lead.id);
+        await assertTokenRow();await assert.rejects(read(),/denied/);
+        assert.ok(claims.exp>Math.floor(Date.now()/1000),'revoked token must not have expired during denial');
+      };
+      await assertRevokedWithHealthyControl();
+      await pool.end();pool=open();await mount();await assertRow(true);await assertRevokedWithHealthyControl();
+      phase='wire revoked token database restart';
+      await pool.end();await exec('docker',['restart',container],{timeout:30000});await ready();
+      pool=open();await mount();await assertRow(true);await assertTokenRow();await assert.rejects(read(),/denied/);
+      await pool.query('UPDATE chatgpt_mcp_read_grants SET allowed = FALSE WHERE grant_hash = $1',[grantHash]);
+      await assertRow(false);
+    }
     assert.equal(ctx.sessions.get(lead.id),lead);assert.equal(ctx.sessions.get(other.id),other);
     assert.deepEqual(ctx.sessionProjections.snapshot(lead,['agentTeam']).values.agentTeam,baseline);
+    if(wire)console.log('KEYCLOAK_MTLS_OFFICIAL_DSH_PERSISTENT_GRANTS_MATCH: human PKCE JWT + direct mTLS SDK + official plugin + primary grants + token/grant persistent revocation + restart + outage denied');
     console.log('KEYCLOAK_CORDIS_PERSISTENT_GRANTS_MATCH: real human JWT + official plugin + exact primary grants + allowed/revoked restart + in-flight revocation + outage denied');
   }catch(error){
     const safeCodes=['28P01','42P01','42601','42703','42883','ECONNREFUSED','ECONNRESET','ETIMEDOUT'];
@@ -131,8 +168,10 @@ export async function probePersistentGrantPolicy({issuer,resource,keys,request,p
     throw Error('Persistent grant policy gate failed at '+phase+' ('+category+')');
   }
   finally{
-    try{await ctx.fiber.dispose();}finally{
+    try{
+      if(databaseStopped){await exec('docker',['start',container],{timeout:30000});await ready();}
+    }finally{try{await wire?.close();}finally{try{await ctx.fiber.dispose();}finally{
       await pool.end().catch(()=>{});await rm(root,{recursive:true,force:true});
-    }
+    }}}
   }
 }
