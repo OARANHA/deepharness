@@ -1,0 +1,74 @@
+name: CI — identity candidate
+on:
+  pull_request:
+    paths:
+      - "deploy/identity/**"
+      - ".github/workflows/identity-candidate.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: identity-candidate-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  identity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build optimized Keycloak candidate (no publication)
+        run: docker build -f deploy/identity/Dockerfile -t local/wandora-keycloak:ci .
+      - name: Production startup, hostname and PostgreSQL persistence (CI only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          prefix="identity-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          db_password="$(openssl rand -hex 24)"
+          admin_password="$(openssl rand -hex 24)"
+          echo "::add-mask::$db_password"
+          echo "::add-mask::$admin_password"
+          cleanup() {
+            docker rm -f "$prefix-kc" "$prefix-pg" >/dev/null 2>&1 || true
+            docker volume rm "$prefix-data" >/dev/null 2>&1 || true
+            docker network rm "$prefix-net" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          docker network create --internal "$prefix-net" >/dev/null
+          docker volume create "$prefix-data" >/dev/null
+          start_db() {
+            docker run -d --name "$prefix-pg" --network "$prefix-net" --network-alias identity-db \
+              -e POSTGRES_USER=keycloak -e POSTGRES_DB=keycloak -e POSTGRES_PASSWORD="$db_password" \
+              -v "$prefix-data:/var/lib/postgresql/data" postgres:16.15-bookworm >/dev/null
+            for _ in $(seq 1 60); do
+              if docker exec "$prefix-pg" pg_isready -U keycloak -d keycloak >/dev/null; then return; fi
+              sleep 2
+            done
+            echo "::error::PostgreSQL readiness failed"; exit 1
+          }
+          start_kc() {
+            docker run -d --name "$prefix-kc" --network "$prefix-net" \
+              --security-opt no-new-privileges --cap-drop ALL --memory 1536m \
+              -p 127.0.0.1:18089:8080 \
+              -e KC_DB_URL=jdbc:postgresql://identity-db:5432/keycloak \
+              -e KC_DB_USERNAME=keycloak -e KC_DB_PASSWORD="$db_password" \
+              -e KC_HOSTNAME=https://id.wandora.com.br -e KC_HOSTNAME_STRICT=true \
+              -e KC_HTTP_ENABLED=true -e KC_HTTP_MANAGEMENT_SCHEME=http \
+              -e KC_BOOTSTRAP_ADMIN_USERNAME=ci-bootstrap -e KC_BOOTSTRAP_ADMIN_PASSWORD="$admin_password" \
+              local/wandora-keycloak:ci start --optimized >/dev/null
+            ready=0
+            for _ in $(seq 1 90); do
+              if curl -fsS http://127.0.0.1:18089/realms/master/.well-known/openid-configuration > /tmp/identity-ci-discovery.json; then ready=1; break; fi
+              sleep 2
+            done
+            test "$ready" = 1
+            python3 -c 'import json; d=json.load(open("/tmp/identity-ci-discovery.json")); assert d["issuer"]=="https://id.wandora.com.br/realms/master"; assert d["authorization_endpoint"].startswith(d["issuer"]+"/"); print("HTTPS hostname metadata verified")'
+          }
+          start_db
+          start_kc
+          docker exec "$prefix-pg" psql -U keycloak -d keycloak -v ON_ERROR_STOP=1 \
+            -c "CREATE TABLE ci_identity_persistence (marker text PRIMARY KEY); INSERT INTO ci_identity_persistence VALUES ('preserved');" >/dev/null
+          docker rm -f "$prefix-kc" "$prefix-pg" >/dev/null
+          start_db
+          start_kc
+          test "$(docker exec "$prefix-pg" psql -U keycloak -d keycloak -Atc 'SELECT marker FROM ci_identity_persistence')" = preserved
+          echo "IDENTITY_OPTIMIZED_HOSTNAME_POSTGRES_PERSISTENCE_MATCH"
