@@ -697,3 +697,12 @@ the pinned DSH application dependency lock is unchanged.
 
 **CI not verified yet for this new gate.** No production credentials,
 infrastructure changes, schema migration outside CI, merge or deploy.
+
+
+## Individual identity → official initialized host seam (2026-10-14)
+
+Independent Keycloak wrong-verifier gate is verified at `7ae8472aec82fd4fe43d505464359fbdbb904835`: run 38518303627 emitted `KEYCLOAK_INDEPENDENT_WRONG_PKCE_DENIED`; all five workflows succeeded. The negative transaction obtains its own state, verifier/challenge and authorization code.
+
+Increment `218ed98824defd7864cd73fee565de5ab6139dca` extends the existing initialized official-host test through `prepareOfficialDshTeamRead`, using a disposable test-generated RS256 JWT, issuer/subject individual principal and exact workspace/Lead grants. The same real WorkspaceRegistry, SessionStore and TeamService projection used by the HTTP probe are injected. Tests cover authorized projection, different signed subject, ungranted Lead, forged argument identity and token revocation; the official projection remains unchanged.
+
+Evidence boundary: syntax check passed locally; execution of this new integration test is **CI pending**. RSA keys/JWT are test-generated, not issued by Keycloak. Existing agents/subagents dependencies remain inert, and the test team contains only its Lead with an empty task board. No production reads, agent execution, public listener in the adapter, deployment, merge or VPS changes. JEV advised deep review and allowed this bounded test-only increment. Next gate: owner-reported GREEN/RED for the current HEAD; then review the exact test result before combining real Keycloak human JWT with this official-host path.
