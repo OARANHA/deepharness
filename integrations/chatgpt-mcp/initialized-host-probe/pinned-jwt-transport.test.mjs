@@ -74,3 +74,18 @@ test('deny oversize composed principal before returning transport identity', asy
   const signed = token({ ...claims, iss: longIssuer });
   await assert.rejects(authenticate({ headers: headers(signed) }), /denied/);
 });
+
+test('optional nbf is explicit and still enforces issued-at, expiry and present not-before', async () => {
+  const missing = { ...claims }; delete missing.nbf;
+  await assert.rejects(verifier()({ headers: headers(token(missing)) }), /denied/);
+  const optional = verifier({ allowMissingNotBefore: true });
+  assert.equal((await optional({ headers: headers(token(missing)) })).principalId, issuer + '#alice');
+  for (const invalid of [
+    { ...missing, iat: time + 1 },
+    { ...missing, exp: time },
+    { ...missing, nbf: time + 1 },
+    { ...missing, nbf: 'not-a-date' },
+    { ...missing, nbf: time - 30 },
+  ]) await assert.rejects(optional({ headers: headers(token(invalid)) }), /denied/);
+  assert.throws(() => verifier({ allowMissingNotBefore: 'yes' }), /denied/);
+});
