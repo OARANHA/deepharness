@@ -37,6 +37,8 @@ let phase='baseline';
 try{
   const beforeTree=await dump(),before=rows(beforeTree);
   assert.equal(before.filter(row=>row.id==='wandora-chatgpt-mcp-read').length,0);
+  phase='immutable installer prerequisite';
+  assert.equal((await exec('/usr/local/bin/pnpm',['--version'],{timeout:10000})).stdout.trim(),'11.28.5');
   phase='offline official install';
   await exec('dsh',['plugin','--profile','web','add','--offline','--ignore-scripts',tarball],
     {timeout:90000,maxBuffer:2*1024*1024});
