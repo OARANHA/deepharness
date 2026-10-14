@@ -14,5 +14,7 @@ RUN mkdir -p /opt/wandora-mcp-artifacts \
  && rm -rf /opt/wandora-mcp-source /tmp/mcp-build-cache
 COPY deploy/disabled-mcp-profile-contract.mjs /opt/wandora-mcp-verifier/disabled-mcp-profile-contract.mjs
 COPY deploy/verify-disabled-mcp-profile.mjs /opt/wandora-mcp-verifier/verify-disabled-mcp-profile.mjs
+COPY deploy/mcp/existing-profile-host.mjs /opt/wandora-mcp-verifier/mcp/existing-profile-host.mjs
+COPY deploy/verify-existing-mcp-profile.mjs /opt/wandora-mcp-verifier/verify-existing-mcp-profile.mjs
 USER node
 # Inherits existing Web CMD/3080 only. No MCP listener/port/policy is configured.
