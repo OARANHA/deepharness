@@ -1,128 +1,103 @@
-# Estado das ferramentas — correção candidata, sem implantação
+# Permissões das ferramentas — volumes existentes
 
-## Diagnóstico verificado em 2026-10-14
+Estado em 2026-10-14: correção candidata no Git, sem implantação.
+Por decisão do proprietário, a stack usa somente dsh_data e dsh_workspace.
+A proposta anterior de quatro volumes de ferramentas foi retirada;
+nenhum desses volumes adicionais foi criado no28server.
 
-A imagem define USER node (UID/GID 1000 no Node oficial), HOME e DSH_HOME
-em /data/dsh, NPM_CONFIG_CACHE=/data/dsh/.npm-cache e
-XDG_CACHE_HOME=/data/dsh/.cache. Portanto não faltam essas variáveis.
-Exports em uma chamada shell não alteram chamadas seguintes; a configuração
-da imagem/Compose é a persistência declarativa adequada.
+## Diagnóstico
 
-A propriedade real dos diretórios no 28server não foi inspecionada.
-O relatório fornecido é compatível com arquivos legados pertencentes ao root,
-mas não comprova quando ou por quem foram criados. Chown durante docker build
-não corrige conteúdo de um volume já existente.
+A imagem roda como node, com HOME e DSH_HOME em /data/dsh.
+Já havia NPM_CONFIG_CACHE e XDG_CACHE_HOME. O relatório de instalação
+aponta falhas nos caminhos abaixo; a propriedade real no servidor ainda
+precisa ser inspecionada. Chown no build não modifica um volume existente.
 
-Stack informada pelo proprietário:
-- Git ref: refs/heads/main.
-- DEEPHARNESS_IMAGE: ghcr.io/oaranha/deepharness@sha256:27c6073e2dc4e8f4f34555aa89915285d8a7e25031dc4964cb7e80abbfb11075.
-- Esses valores são readback informado pelo proprietário, não inspeção
-  independente do container. A revisão Git aplicada continua desconhecida.
+| Caminho no dsh_data | Finalidade |
+| --- | --- |
+| .npm-cache | Cache npm |
+| .cache/hyperframes | Cache HyperFrames/browser |
+| .hyperframes | Configuração e estado HyperFrames |
+| .npm-global | Ferramentas npm instaladas pelo usuário |
 
-## Correção preparada
+A imagem inicializa os diretórios de ferramentas como node, modo0700.
+NPM_CONFIG_PREFIX=/data/dsh/.npm-global vale na imagem e no Compose.
+PATH preserva /opt/dsh/node_modules/.bin primeiro e inclui o bin do prefixo
+do usuário depois. Isso fornece destino para npm install -g sem root.
+HOME e workspace não mudam; skills/plugins continuam nos destinos próprios
+dentro dos volumes existentes. Nenhum overlay oculta configurações antigas.
 
-A imagem prepara quatro diretórios privados 0700 pertencentes ao usuário node.
-O Compose monta volumes novos e específicos nos mesmos caminhos:
+## Inventário e reparo operacional pendentes
 
-| Volume | Destino | Conteúdo |
-| --- | --- | --- |
-| dsh_npm_cache_v1 | /data/dsh/.npm-cache | Cache npm |
-| dsh_npm_global_v1 | /data/dsh/.npm-global | Ferramentas npm instaladas pelo usuário |
-| dsh_tool_cache_v1 | /data/dsh/.cache | Cache de ferramentas, incluindo browser HyperFrames |
-| dsh_hyperframes_state_v1 | /data/dsh/.hyperframes | Configuração/estado HyperFrames |
+1. Confirmar usuário/UID/GID efetivos do processo, nomes reais dos dois
+   volumes e montagens. Não deduzir o nome do volume pelo nome da stack.
+2. Como o usuário efetivo, conferir proprietário, modo, ACL quando aplicável
+   e acesso de escrita nos caminhos afetados, no HOME e nos destinos reais
+   de instalação de skills/plugins. Root como dono, sozinho, não prova falha.
+   Não imprimir conteúdo de configurações, tokens ou sessões.
+3. Preservar estado/configuração e registrar metadados antes da alteração.
+   Não apagar cache/configuração para contornar permissão.
+4. Se necessário, preparar uma ação administrativa pontual: alterar apenas
+   os diretórios e arquivos identificados que o usuário precisa escrever,
+   usando UID/GID confirmados. Arquivos internos também podem bloquear
+   gravação; corrigir só o diretório superior pode ser insuficiente.
+   Não executar chown -R em /data/dsh, chmod777 nem seguir symlinks para
+   caminhos externos. Suspender escritores durante a manutenção.
+5. Criar .npm-global como o usuário efetivo se ausente e verificar acesso.
+   Aplicar configuração/imagem pelo Portainer GitOps após autorização;
+   não operar um Compose paralelo pelo shell.
+6. Testar instalação npm no espaço do usuário e uma instalação oficial
+   de skill/plugin autorizada em sessão nova; verificar persistência e
+   saúde do Harness após recriação.
 
-A inicialização de volume vazio utiliza copy-up do diretório na imagem.
-Não usar volume-nocopy, imagem antiga sem diretórios preparados ou volumes
-v1 previamente inicializados por root. Não há chown em startup, usuário root
-no serviço, chmod777 nem alteração recursiva do volume de sessões.
-Volumes dsh_data e dsh_workspace permanecem os mesmos.
+Esse reparo não está automatizado na inicialização e não foi executado.
+O processo principal continua não-root, rootfs read-only, sem capabilities
+e com no-new-privileges. Os volumes continuam graváveis. Instalações que
+exigem apt ou bibliotecas de sistema necessitam empacotamento revisado;
+não prometer que qualquer plugin arbitrário pode instalar tudo sozinho.
 
-ATENÇÃO operacional: as novas montagens ocultam os diretórios antigos
-durante execução, sem apagá-los. Em especial, .hyperframes é ESTADO, não apenas
-cache. Antes de implantação, inventariar e preservar sua configuração,
-identidade/consentimento de telemetria e eventual autenticação; migrar os
-arquivos necessários para o novo volume com proprietário1000:1000 e permissões
-privadas, mediante ação operacional autorizada. Não substituir configurações
-existentes por defaults nem divulgar seu conteúdo. A implantação fica
-bloqueada até decidir e executar essa migração ou comprovar estado descartável.
-Não remover diretórios antigos ou novos volumes para contornar falhas.
+## Teste da candidata
 
-## Verificação
+deploy/tool-state-volume-smoke.mjs lê o Compose e exige exatamente os
+destinos /data/dsh e /workspace. Cria somente dois volumes descartáveis de CI.
 
-deploy/tool-state-volume-smoke.mjs usa somente Docker/volumes descartáveis da CI:
-1. Cria dsh_data com raiz writable por UID1000 e três diretórios legados
-   root-owned0700, reproduzindo EACCES no processo não-root.
-2. Usa os destinos/variáveis do Compose real e a imagem candidata sob rootfs
-   read-only, rede none, sem capabilities e sem privilégios adicionais.
-3. Exige escrita nos três destinos e npm pack/cache add/verify offline.
-4. Recria o container com os mesmos volumes e verifica marcadores e cache npm.
-5. Confere que sentinelas e propriedade root dos diretórios antigos continuam
-   intactas quando observados sem overlays.
-6. Remove somente volumes descartáveis criados pelo próprio teste.
+- Fixture root cria três diretórios0700 e sentinelas legadas.
+- Processo UID1000 reproduz EACCES sem reparo.
+- Uma ação restrita à fixture corrige só os três diretórios e suas sentinelas.
+- Processo não-root verifica que estado antigo continua legível, escreve
+  nos caches/config/prefixo e executa npm pack/cache add/verify offline.
+- Instala uma CLI local via npm install --global --offline --ignore-scripts.
+- Em outro container, executa a mesma CLI por PATH e relê skill e marcadores,
+  sem reinstalação e mantendo os mesmos volumes.
+- Verifica preservação das sentinelas e remove apenas os volumes próprios da CI.
 
-O teste prova escrita e persistência de cache, não instalação arbitrária
-offline nem funcionamento de HyperFrames/Chrome/renderização. Sintaxe Node
-verificada localmente. Docker não está instalado no executor local; uma
-tentativa local adicional de fixture Unix esbarrou em chown não suportado pelo
-filesystem, portanto não há alegação de reprodução local concluída.
-O resultado do novo teste Docker depende da CI; não foi verificado GREEN ainda.
+Marcador: TOOL_STATE_EXISTING_VOLUME_NONROOT_INSTALL_MATCH.
+Sintaxe do módulo e dos scripts internos verificada localmente. Docker não
+está disponível no executor local, portanto execução real depende da CI.
+Não testa rede, scripts arbitrários, renderização HyperFrames ou instalações
+oficiais de todos os plugins. O gate de instalação offline do plugin DSH
+existente permanece separado.
 
-## HyperFrames e demais sintomas
+## Origem dos caminhos HyperFrames
 
 Fonte upstream consultada no SHA6f90ca15a7fc937d9d6cf3ec289f2a26eca3724f:
-- packages/cli/src/browser/manager.ts usa homedir()/.cache/hyperframes,
-  não apenas XDG_CACHE_HOME; por isso mantemos HOME e o caminho original.
-- packages/cli/src/telemetry/config.ts usa homedir()/.hyperframes/config.json
-  e install-state.json, reforçando a necessidade de preservar estado.
+- packages/cli/src/browser/manager.ts usa homedir()/.cache/hyperframes;
+  redirecionar apenas XDG_CACHE_HOME não garante mudança desse caminho.
+- packages/cli/src/telemetry/config.ts usa ~/.hyperframes/config.json
+  e install-state.json. Preservar configuração/consentimento/estado.
 
-A versão usada na sessão reportada é desconhecida. A imagem bootstrap não
-instala HyperFrames nem um browser completo. Esta correção NÃO afirma que
-Chrome, bibliotecas Linux ou captura/render estejam disponíveis. Verificar
-versão efetiva e diagnóstico da ferramenta antes de adicionar dependências.
+Versão na sessão reportada desconhecida. Bootstrap não instala browser
+completo. unsupported_harness, navegador indisponível e todo_write malformado
+não são resolvidos por ajuste de permissões; exigem diagnóstico separado.
 
-unsupported_harness e navegador indisponível podem ser restrições da
-integração oferecida ao agente. Não inventar suporte nem desligar sandbox.
-todo_write malformado exige comparar argumentos com schema real da ferramenta
-e comportamento do provedor; caches não corrigem esse contrato.
+## Referência de implantação e rollback
 
-## Implantação e rollback posteriores
+Proprietário informou Git ref refs/heads/main e:
+ghcr.io/oaranha/deepharness@sha256:27c6073e2dc4e8f4f34555aa89915285d8a7e25031dc4964cb7e80abbfb11075.
+São valores fornecidos pelo proprietário, não inspeção independente do
+container. Revisão aplicada desconhecida; registrar antes de cutover.
 
-Após CI e revisão, publicar imagem somente pelo pipeline GitHub autorizado;
-não construir no28server. Usar digest da imagem nova compatível com o Compose
-novo, com readback do usuário, modos, montagens e variáveis, depois testar uma
-sessão nova. Não efetuar redeploy usando digest antigo e montagens novas.
-
-Rollback exige restaurar TANTO digest quanto revisão anterior do Compose
-(retirando os overlays), preservando todos os volumes. O digest informado
-acima é a referência anterior; a revisão antiga deve ser capturada antes do
-cutover. A configuração atual do MCP/OAuth/Keycloak/PostgreSQL não muda neste
-ajuste. Nenhuma ação na VPS ou no Portainer foi executada.
-
-
-## Instalações recorrentes de ferramentas e skills
-
-NPM_CONFIG_PREFIX=/data/dsh/.npm-global passa a valer na imagem e no Compose.
-Antes deste ajuste, não havia prefixo global declarativo gravável: npm global
-podia tentar escrever na árvore de sistema read-only. O ajuste elimina essa
-dependência de root para instalações npm no espaço do usuário.
-
-PATH mantém /opt/dsh/node_modules/.bin primeiro e inclui
-/data/dsh/.npm-global/bin depois. Assim ferramentas instaladas ficam
-disponíveis nas chamadas seguintes sem substituir o dsh empacotado.
-HOME e DSH_HOME continuam /data/dsh; workspace continua /workspace.
-
-O teste agora instala um tarball local com npm install --global --offline
---ignore-scripts, executa sua CLI por PATH e volta a executá-la em outro
-container, sem reinstalar. Também grava e relê uma fixture de skill em
-HOME/.agents/skills entre containers. Não testa downloads nem scripts de
-instalação arbitrários; não afirma compatibilidade universal de plugins.
-A instalação oficial do plugin DSH permanece coberta pelo gate existente
-de pacote offline/perfil desativado.
-
-Antes do cutover, conferir como UID1000 os diretórios reais de skills/plugins
-no HOME e workspace. Se arquivos existentes pertencem a root, preparar
-migração/correção somente dos caminhos confirmados e autorizados, sem chown
-recursivo de todo /data/dsh. Volumes novos não reparam skills legadas fora
-de seus destinos. Não precisa pedir privilégio root para cada nova instalação
-em diretório corretamente preparado; ferramentas que exigem apt, bibliotecas
-de sistema ou escrita na imagem precisam empacotamento revisado próprio.
+Imagem nova publicada somente pelo pipeline autorizado, sem build naVPS.
+Rollback preserva dsh_data/workspace e restaura digest/config anteriores.
+Para reparos de permissões, manter inventário e backup de metadados;
+não reverter ownership cegamente nem apagar instalações/sessões.
+Nenhuma alteração OAuth/MCP/Keycloak/PostgreSQL faz parte deste ajuste.
