@@ -37,3 +37,13 @@ test('no read service means composition fails closed',async()=>{
   await assert.rejects(bootExistingProfileReadHost(x.opts),/denied/);
   assert.equal(x.events.at(-1),'disposed');
 });
+for(const replace of [false,true])test('fresh Cordis trace proxies '+(replace?'still deny replaced implementation':'keep the same implementation'),async()=>{
+  const x=setup(),impl={workspaceRegistry:{},sessions:{},sessionProjections:{}};
+  const original=Symbol.for('cordis.original');
+  for(const key of Object.keys(impl))Object.defineProperty(x.ctx,key,{get:()=>new Proxy(impl[key],{
+    get:(target,property)=>property===original?target:Reflect.get(target,property),
+  })});
+  x.opts.createPolicy=async()=>{if(replace)impl.sessions={};return {};};
+  if(replace)await assert.rejects(bootExistingProfileReadHost(x.opts),/denied/);
+  else assert.equal((await bootExistingProfileReadHost(x.opts)).ctx,x.ctx);
+});
