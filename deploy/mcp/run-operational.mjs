@@ -13,7 +13,8 @@ try{
   const {loadLayeredEnv}=await imported(official,'@deepseek-ai/dsh-app-boot');
   const plugin=await imported(installed,'@wandora/deepharness-chatgpt-mcp-read/plugin');
   const {createPersistentDshMcpReadPolicy:createPolicy}=await imported(installed,'@wandora/deepharness-chatgpt-mcp-read/policy');
-  const {Pool}=await imported(dependencies,'pg');
+  // require.resolve selects pg's CommonJS entry; read its actual module.exports.
+  const {Pool}=dependencies('pg');
   const {McpServer}=await imported(dependencies,'@modelcontextprotocol/sdk/server/mcp.js');
   const {StreamableHTTPServerTransport}=await imported(dependencies,'@modelcontextprotocol/sdk/server/streamableHttp.js');
   const {z}=await imported(dependencies,'zod');
