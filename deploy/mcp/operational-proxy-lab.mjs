@@ -62,9 +62,12 @@ try{
   listener.bind_to_port=true;listener.address.socket_address.port_value=port;
   await writeFile(join(root,'envoy.json'),JSON.stringify(config));
   const mounts=['-v',root+':/review:ro','-v',certs+':/run/secrets:ro'];
-  await exec('docker',['run','--rm','--user','0:0','--network','none',...mounts,'envoyproxy/envoy:v1.40.0',
+  // Keep fixture permissions private: run the binary as their actual owner.
+  // The image shell entrypoint otherwise drops root to its unrelated envoy UID.
+  const identity=['--user',process.getuid()+':'+process.getgid(),'--entrypoint','/usr/local/bin/envoy'];
+  await exec('docker',['run','--rm',...identity,'--network','none',...mounts,'envoyproxy/envoy:v1.40.0',
     '--mode','validate','-c','/review/envoy.json','--log-level','error'],{timeout:60000});
-  await exec('docker',['run','-d','--name',name,'--user','0:0','--network','host','--read-only','--cap-drop','ALL',
+  await exec('docker',['run','-d','--name',name,...identity,'--network','host','--read-only','--cap-drop','ALL',
     '--security-opt','no-new-privileges:true','--tmpfs','/tmp:rw,nosuid,nodev,size=16m',...mounts,
     'envoyproxy/envoy:v1.40.0','-c','/review/envoy.json','--log-level','error'],{timeout:15000});
   const ca=await file('root.pem'),cert=await file('chatgpt-client-chain.pem'),key=await file('chatgpt-client-key.pem');
