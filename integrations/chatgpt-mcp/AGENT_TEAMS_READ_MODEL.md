@@ -675,3 +675,25 @@ there is no live production DB connection.
 
 **CI for this gate unverified.** PR remains Draft; no merge, VPS
 mutation or deployment.
+
+## Real PostgreSQL integration CI gate (2026-10-13)
+
+`.github/workflows/chatgpt-mcp-postgres-revocation-integration.yml`
+adds an **isolated disposable PostgreSQL 16 service** in GitHub Actions
+with local test-only credentials and no VPS/production connection.
+`postgres-real-integration.test.mjs` applies the proposed schema
+to that disposable database, checks previously unseen tokens, writes
+and reads revocations, verifies idempotency and hashed identifiers,
+reopens a fresh database client/pool to show state persists beyond
+the client lifecycle, and checks fail-closed behavior when the client
+has been closed.
+
+This tests **client/pool restart**, not an actual PostgreSQL server
+restart, process crash, database failover or network partition.
+Those additional resilience checks and real deployment safeguards
+remain pending; do not characterize this as fully production verified.
+The `pg` driver is installed only in the separate integration workflow;
+the pinned DSH application dependency lock is unchanged.
+
+**CI not verified yet for this new gate.** No production credentials,
+infrastructure changes, schema migration outside CI, merge or deploy.
