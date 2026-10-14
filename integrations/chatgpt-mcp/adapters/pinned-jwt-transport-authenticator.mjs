@@ -56,6 +56,8 @@ export function createPinnedJwtTransportAuthenticator({
     try { revoked = await isRevoked({ issuer: claims.iss, subject: claims.sub, tokenId: claims.jti }); }
     catch { deny(); }
     if (revoked !== false) deny();
-    return { principalId: claims.iss + '#' + claims.sub, kind: 'individual' };
+    const principalId = claims.iss + '#' + claims.sub;
+    if (!valid(principalId)) deny();
+    return { principalId, kind: 'individual' };
   };
 }
