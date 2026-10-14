@@ -38,7 +38,9 @@ jobs:
             if curl -fsS --max-time 2 http://127.0.0.1:18080/realms/deepharness-mcp-lab/.well-known/openid-configuration >/dev/null; then exit 0; fi
             sleep 3
           done
-          echo "Keycloak lab did not become ready" >&2
+          echo "Keycloak lab did not become ready; sanitized startup diagnostics:" >&2
+          docker inspect --format "state={{.State.Status}} exit={{.State.ExitCode}}" keycloak-mcp-lab || true
+          docker logs --tail 65 keycloak-mcp-lab 2>&1 | sed -E "s/(password|secret|token)([=: ]+)[^[:space:]]+/\\1\\2[REDACTED]/Ig" || true
           exit 1
       - name: Probe actual JWT profile without printing tokens
         env:
