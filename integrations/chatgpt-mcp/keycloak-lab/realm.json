@@ -87,6 +87,17 @@
             "id.token.claim": "false",
             "userinfo.token.claim": "false"
           }
+        },
+        {
+          "name": "human-subject-from-keycloak-user-session",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "consentRequired": false,
+          "config": {
+            "access.token.claim": "true",
+            "lightweight.claim": "false",
+            "introspection.token.claim": "true"
+          }
         }
       ],
       "defaultClientScopes": [
