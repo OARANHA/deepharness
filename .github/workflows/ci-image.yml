@@ -191,6 +191,10 @@ jobs:
           print("Portainer Stack syntax OK: shared Traefik network, no published ports")
           '
 
+      - name: Test disabled profile composition contract
+        if: steps.check.outputs.ready == 'true' && github.event_name == 'pull_request'
+        run: node --test deploy/disabled-mcp-profile-contract.test.mjs
+
       - name: Build private connector installation candidate (CI only)
         if: steps.state.outputs.ready == 'true' && github.event_name == 'pull_request'
         run: docker build -f deploy/Dockerfile.mcp-candidate -t local/deepharness-mcp:candidate .
