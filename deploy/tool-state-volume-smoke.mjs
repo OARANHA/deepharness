@@ -59,15 +59,17 @@ try {
       assert.equal(process.env.DSH_HOME, '/data/dsh');
       assert.equal(process.env.NPM_CONFIG_CACHE, '/data/dsh/.npm-cache');
       assert.equal(process.env.XDG_CACHE_HOME, '/data/dsh/.cache');
+      assert.equal(process.env.NPM_CONFIG_PREFIX, '/data/dsh/.npm-global');
       const pass = Number(process.env.PROBE_PASS);
-      for (const dir of [process.env.NPM_CONFIG_CACHE, process.env.XDG_CACHE_HOME, '/data/dsh/.hyperframes']) {
+      for (const dir of [process.env.NPM_CONFIG_CACHE, process.env.XDG_CACHE_HOME, '/data/dsh/.hyperframes', process.env.NPM_CONFIG_PREFIX]) {
         assert.equal(fs.statSync(dir).uid, process.getuid());
         if (pass === 2) assert.equal(fs.readFileSync(dir + '/write-probe', 'utf8'), 'persisted');
         fs.writeFileSync(dir + '/write-probe', 'persisted');
       }
       fs.mkdirSync('/tmp/npm-fixture', {recursive:true});
-      fs.writeFileSync('/tmp/npm-fixture/package.json', JSON.stringify({name:'dsh-cache-fixture',version:'1.0.0'}));
+      fs.writeFileSync('/tmp/npm-fixture/package.json', JSON.stringify({name:'dsh-cache-fixture',version:'1.0.0',bin:{'dsh-tool-install-probe':'cli.js'}}));
       fs.writeFileSync('/tmp/npm-fixture/index.js', 'module.exports=1;');
+      fs.writeFileSync('/tmp/npm-fixture/cli.js', '#!/usr/bin/env node\\nconsole.log("PERSISTENT_USER_INSTALL_OK");\\n', {mode:0o755});
       function npm(args, cwd='/tmp') {
         const r=spawnSync('npm', args, {cwd,encoding:'utf8'});
         assert.equal(r.status,0,r.stderr); return r.stdout;
@@ -75,9 +77,16 @@ try {
       if (pass===1) {
         npm(['pack','--offline','--ignore-scripts','--silent'], '/tmp/npm-fixture');
         npm(['cache','add','/tmp/npm-fixture/dsh-cache-fixture-1.0.0.tgz','--offline','--ignore-scripts']);
+        npm(['install','--global','/tmp/npm-fixture/dsh-cache-fixture-1.0.0.tgz','--offline','--ignore-scripts','--no-audit','--no-fund']);
       }
       assert.match(npm(['cache','ls','--offline']), /dsh-cache-fixture/);
       npm(['cache','verify','--offline']);
+      const binary=spawnSync('dsh-tool-install-probe', [], {encoding:'utf8'});
+      assert.equal(binary.status,0,binary.stderr || String(binary.error));
+      assert.match(binary.stdout,/PERSISTENT_USER_INSTALL_OK/);
+      const skill='/data/dsh/.agents/skills/dsh-install-probe';
+      if(pass===1) {fs.mkdirSync(skill,{recursive:true});fs.writeFileSync(skill+'/SKILL.md','local fixture');}
+      assert.equal(fs.readFileSync(skill+'/SKILL.md','utf8'),'local fixture');
       console.log('TOOL_STATE_PASS_' + pass);`);
   }
   // Inspect original paths without the overlays: no recursive repair or data loss.
