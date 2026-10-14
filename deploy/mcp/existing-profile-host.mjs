@@ -7,23 +7,29 @@ export async function bootExistingProfileReadHost({runProfile,environment,args,p
       !Array.isArray(patchFiles)||!patchFiles.every(x=>typeof x==='string'))throw Error('Existing DSH host configuration denied');
   const booted=await runProfile({environment,profile:'web',args:[...args],patchFiles:[...patchFiles]});
   const ctx=booted?.ctx;
+  let phase='context';
   try {
     if(typeof ctx?.provide!=='function'||typeof ctx?.plugin!=='function'||typeof ctx?.get!=='function'||
         typeof ctx?.fiber?.dispose!=='function')throw Error('Existing DSH host unavailable');
     const services=['workspaceRegistry','sessions','sessionProjections'];
     const original=services.map(key=>ctx[key]);
+    phase='services-'+original.map(value=>value?'present':'absent').join('-');
     if(original.some(value=>!value)||ctx.get('chatgptMcpRead')!==undefined||
         ctx.get('chatgptMcpReadPolicy')!==undefined)throw Error('Existing DSH host unavailable');
     const unchanged=()=>services.every((key,i)=>ctx[key]===original[i]);
+    phase='policy';
     const policy=await createPolicy(ctx);
     if(!unchanged())throw Error('Existing DSH services replaced');
+    phase='provide-policy';
     ctx.provide('chatgptMcpReadPolicy',policy);
+    phase='plugin-mount';
     await ctx.plugin(plugin,{endpointEnabled:false});
+    phase='read-service';
     const service=ctx.get('chatgptMcpRead');
     if(!unchanged()||typeof service?.createPrivateTransport!=='function')throw Error('Existing DSH read service unavailable');
     return Object.freeze({...booted,service});
   } catch {
     await ctx?.fiber?.dispose?.().catch(()=>{});
-    throw Error('Existing DSH read host composition denied');
+    throw Error('Existing DSH read host composition denied ('+phase+')');
   }
 }
