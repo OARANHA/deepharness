@@ -16,9 +16,8 @@ import { createServer, request } from 'node:https';
 import {execFileSync} from 'node:child_process';
 import {readFile,writeFile,chmod} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
-import {createPrivateMcpHttpHandler} from '../adapters/private-mcp-http-handler.mjs';
-import {apply as readPlugin} from '../plugin.mjs';
-import {createPersistentDshMcpReadPolicy} from '../policy.mjs';
+import {createRequire} from 'node:module';
+import {fileURLToPath,pathToFileURL} from 'node:url';
 import { generateKeyPairSync, sign, randomBytes, randomUUID } from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -32,6 +31,17 @@ import { registerScopedTeamReadTool } from '../adapters/register-scoped-team-rea
 
 test('direct mTLS stateless MCP on official initialized DSH plugin', {timeout:30000},async t=>{
   const root = await mkdtemp(join(tmpdir(), 'dsh-mcp-official-e2e-'));
+  const source=fileURLToPath(new URL('../',import.meta.url));
+  const [packed]=JSON.parse(execFileSync('npm',['pack',source,'--ignore-scripts','--json','--pack-destination',root],{encoding:'utf8'}));
+  const manifest=JSON.parse(await readFile(new URL('../package.json',import.meta.url),'utf8'));
+  assert.deepEqual(packed.files.map(f=>f.path).sort(),['package.json',...manifest.files].sort());
+  const install=join(root,'installed');await (await import('node:fs/promises')).mkdir(install);
+  execFileSync('npm',['install','--prefix',install,'--offline','--ignore-scripts','--no-audit','--no-fund','--package-lock=false',join(root,packed.filename)],{stdio:'pipe'});
+  const resolve=createRequire(join(install,'package.json'));
+  const entry=resolve.resolve('@wandora/deepharness-chatgpt-mcp-read/plugin');
+  assert.ok(entry.startsWith(join(install,'node_modules')));
+  const {apply:readPlugin}=await import(pathToFileURL(entry).href);
+  const {createPersistentDshMcpReadPolicy}=await import(pathToFileURL(resolve.resolve('@wandora/deepharness-chatgpt-mcp-read/policy')).href);
   const ctx = new Context();
   t.after(async () => {
     try { await ctx.fiber.dispose(); }
@@ -98,8 +108,7 @@ test('direct mTLS stateless MCP on official initialized DSH plugin', {timeout:30
   const fiber=await ctx.plugin({name:'lab-read-plugin',inject:['workspaceRegistry','sessions','sessionProjections','chatgptMcpReadPolicy'],apply:readPlugin},{endpointEnabled:false});
   const service=ctx.chatgptMcpRead;
   assert.ok(service);
-  handler=createPrivateMcpHttpHandler({enabled:true,resource,allowedOrigins:['https://client.example'],
-    service,McpServer,StreamableHTTPServerTransport,
+  handler=service.createPrivateTransport({enabled:true,McpServer,StreamableHTTPServerTransport,
     inputSchema:z.object({workspaceId:z.string().min(1).max(256),leadSessionId:z.string().min(1).max(256)}).strict()});
   const encode=v=>Buffer.from(JSON.stringify(v)).toString('base64url');
   const jwt=subject=>{
@@ -171,7 +180,9 @@ test('direct mTLS stateless MCP on official initialized DSH plugin', {timeout:30
   await workspace.attachSession(lead.id);
   assert.deepEqual(ctx.sessionProjections.snapshot(lead,['agentTeam']).values.agentTeam,realProjection);
   await fiber.dispose();
-  const unloaded=await call();assert.ok([401,403].includes(unloaded.status));
+  const unloaded=await call();assert.equal(unloaded.status,503,'plugin unload must dispose its retained transport');
+  assert.throws(()=>service.createPrivateTransport({enabled:true,McpServer,StreamableHTTPServerTransport,inputSchema:{}}),/denied/);
   handler.dispose();assert.equal((await call()).status,503);
+  console.log('PACKED_PRIVATE_MTLS_OFFICIAL_DSH_MCP_MATCH: installed tarball + plugin-owned transport + unload disposal');
   console.log('PRIVATE_MTLS_OFFICIAL_DSH_MCP_MATCH: verified TLS peer + scoped SDK lifecycle + official plugin read + denied principal/Lead + revocation + unload');
 });
