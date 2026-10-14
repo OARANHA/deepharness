@@ -141,3 +141,6 @@ required user actions or login CSRF-cookie flows may require adapting
 the test. A lab GREEN would establish only this issuer's human code +
 PKCE behavior, not real ChatGPT registration, real TLS, hosted OAuth,
 or persistent revocation. New CI is pending; no production activation.
+
+## Human PKCE redemption ordering correction (2026-10-14)
+The prior RED (Keycloak run 38515665052) reached the correct human OAuth callback, but token redemption returned HTTP 400 after the test intentionally attempted a wrong code verifier on the SAME authorization code. Some issuers consume/invalidates that code on failed proof. The lab now performs the valid redemption first and verifies replay denial. A **separate independently issued code** is needed for a conclusive negative wrong-verifier test; do not describe the current lab as proving that negative case. New CI pending; no production approval.
