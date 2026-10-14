@@ -51,7 +51,7 @@ jobs:
           tag=ghcr.io/oaranha/wandora-keycloak:tested-3260eecc5121d08144f8ba55c72a4d3aa65349d4
           docker tag local/wandora-keycloak:ci "$tag"
           docker push "$tag" > /tmp/identity-push.txt
-          digest="$(sed -nE 's/.*digest: (sha256:[a-f0-9]{64}).*/\\1/p' /tmp/identity-push.txt | tail -n 1)"
+          digest="$(sed -nE 's/.*digest: (sha256:[a-f0-9]{64}).*/\1/p' /tmp/identity-push.txt | tail -n 1)"
           test -n "$digest"
           echo "Published exact tested image: ghcr.io/oaranha/wandora-keycloak@$digest" >> "$GITHUB_STEP_SUMMARY"
           echo "Source artifact:11921337925; GREEN run:38620831361; no rebuild; no deploy" >> "$GITHUB_STEP_SUMMARY"
