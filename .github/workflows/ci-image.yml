@@ -200,7 +200,7 @@ jobs:
 
       - name: Test disabled profile composition contract
         if: steps.state.outputs.ready == 'true' && github.event_name == 'pull_request'
-        run: node --test deploy/disabled-mcp-profile-contract.test.mjs deploy/mcp/existing-profile-host.test.mjs deploy/mcp/private-read-listener.test.mjs
+        run: node --test deploy/disabled-mcp-profile-contract.test.mjs deploy/mcp/existing-profile-host.test.mjs deploy/mcp/private-read-listener.test.mjs deploy/mcp/operational-host.test.mjs
 
       - name: Build private connector installation candidate (CI only)
         if: steps.state.outputs.ready == 'true' && github.event_name == 'pull_request'
