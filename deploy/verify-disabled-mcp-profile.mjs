@@ -1,5 +1,6 @@
 /** CI only: official DSH profile install, boot-free composition, no listener. */
 import assert from 'node:assert/strict';
+import {verifyDisabledProfileDelta} from './disabled-mcp-profile-contract.mjs';
 import {readFile,readdir} from 'node:fs/promises';
 import {createRequire} from 'node:module';
 import {pathToFileURL} from 'node:url';
@@ -34,7 +35,7 @@ const rows=tree=>{
 };
 let phase='baseline';
 try{
-  const before=rows(await dump());
+  const beforeTree=await dump(),before=rows(beforeTree);
   assert.equal(before.filter(row=>row.id==='wandora-chatgpt-mcp-read').length,0);
   phase='offline official install';
   await exec('dsh',['plugin','--profile','web','add','--offline','--ignore-scripts',tarball],
@@ -51,16 +52,6 @@ try{
   assert.equal(typeof plugin.apply,'function');
   assert.deepEqual(plugin.inject,['workspaceRegistry','sessions','sessionProjections','chatgptMcpReadPolicy']);
   phase='official composed profile';
-  const after=rows(await dump()),connector=after.filter(row=>row.id==='wandora-chatgpt-mcp-read');
-  assert.equal(connector.length,1,'only one connector row may compose');
-  assert.equal(connector[0].name,name+'/plugin');
-  assert.equal(connector[0].disabled,true);
-  assert.equal(connector[0].config.endpointEnabled,false);
-  const counts=entries=>{
-    const result=new Map();for(const row of entries)result.set(row.id,(result.get(row.id)||0)+1);return result;
-  };
-  const oldCounts=counts(before),newCounts=counts(after);
-  for(const [id,count] of oldCounts)assert.equal(newCounts.get(id),count,'existing profile rows must remain unchanged');
-  assert.equal(newCounts.size,oldCounts.size+1,'bundle must add only its disabled row');
+  verifyDisabledProfileDelta(beforeTree,await dump());
   console.log('DSH_OFFICIAL_DISABLED_PROFILE_INSTALL_MATCH: offline official CLI + selected bundle + disabled composed row + unchanged existing services');
 }catch{throw Error('DSH disabled profile installation proof failed at '+phase);}
