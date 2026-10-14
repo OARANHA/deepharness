@@ -5,6 +5,8 @@ on:
     paths:
       - '.github/workflows/chatgpt-mcp-keycloak-lab.yml'
       - 'integrations/chatgpt-mcp/keycloak-lab/**'
+      - 'integrations/chatgpt-mcp/adapters/**'
+      - 'integrations/chatgpt-mcp/initialized-host-probe/**'
 permissions:
   contents: read
 jobs:
@@ -13,6 +15,11 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install pinned official DSH host probe dependencies
+        run: npm ci --prefix integrations/chatgpt-mcp/initialized-host-probe --ignore-scripts --no-audit --no-fund
       - name: Start throwaway Keycloak on loopback only
         shell: bash
         run: |
