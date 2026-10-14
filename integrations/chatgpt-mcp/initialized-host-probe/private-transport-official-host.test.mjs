@@ -71,10 +71,10 @@ test('direct mTLS stateless MCP on official initialized DSH plugin', {timeout:30
   ssl(['req','-x509','-newkey','rsa:2048','-nodes','-keyout','rogue.key','-out','rogue.crt','-days','1','-subj','/CN=untrusted']);
   await chmod(join(certRoot,'ca.key'),0o600);await chmod(join(certRoot,'rogue.key'),0o600);
   const file=name=>readFile(join(certRoot,name));
-  let handler;
+  let handler,httpRequests=0;
   const http=createServer({key:await file('server.key'),cert:await file('server.crt'),
     ca:await file('ca.crt'),requestCert:true,rejectUnauthorized:true},(req,res)=>{
-      handler.handle(req,res).catch(()=>res.destroy());
+      httpRequests++;handler.handle(req,res).catch(()=>res.destroy());
     });
   await new Promise(resolve=>http.listen(0,'127.0.0.1',resolve));
   t.after(async()=>{handler?.dispose();await new Promise(resolve=>{http.close(resolve);http.closeAllConnections();});});
@@ -124,15 +124,19 @@ test('direct mTLS stateless MCP on official initialized DSH plugin', {timeout:30
     });
   };
   const certificateRejection=async tls=>{
-    let timer;
+    let timer;const beforeRequests=httpRequests;
     const serverError=new Promise((resolve,reject)=>{
-      http.once('tlsClientError',resolve);
+      http.once('tlsClientError',(error,socket)=>resolve({error,socket}));
       timer=setTimeout(()=>reject(Error('no TLS rejection observed')),2500);
     });
     try{
       await assert.rejects(send('tools/list',{}, {},tls),error=>error.message!=='lab timeout');
-      const error=await serverError;
-      assert.match(error.message,/certificate|unknown ca|verify/i,'server must report certificate rejection');
+      const {error,socket}=await serverError;
+      assert.equal(socket.authorized,false);
+      assert.ok(/certificate|unknown ca|verify/i.test(error.message)||
+        ['DEPTH_ZERO_SELF_SIGNED_CERT','SELF_SIGNED_CERT_IN_CHAIN','UNABLE_TO_VERIFY_LEAF_SIGNATURE','UNABLE_TO_GET_ISSUER_CERT_LOCALLY'].includes(socket.authorizationError),
+        'server TLS state must prove certificate rejection');
+      assert.equal(httpRequests,beforeRequests,'rejected peer must not reach HTTP handler');
     }finally{clearTimeout(timer);}
   };
   await certificateRejection({cert:undefined,key:undefined});
