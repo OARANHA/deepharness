@@ -75,3 +75,6 @@ GitHub may require workflow_dispatch workflow registration on the
 default branch before the manual run is selectable: do not merge a
 draft PR merely to enable the button; use an approved isolated test
 branch/workflow mechanism instead.
+
+## CI trigger update (2026-10-14)
+The disposable Keycloak laboratory now also uses a narrowly scoped `pull_request` trigger for changes to its workflow or `keycloak-lab/**` files. This avoids reliance on the GitHub Actions manual dispatch UI (which may require a workflow registered on the default branch). It does not deploy, merge, install on the VPS, or prove ChatGPT login. Read the **KEYCLOAK_LAB_PROFILE** / **KEYCLOAK_CONTRACT_NO_GO** diagnostics even if the workflow itself turns green: a technically successful lab with incompatible JWT fields is still NO-GO. Lab CI outcome pending.
