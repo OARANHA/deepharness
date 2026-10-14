@@ -218,7 +218,7 @@ jobs:
             --tmpfs /data/dsh:rw,nosuid,nodev,size=256m,mode=0700,uid=1000,gid=1000 \
             --tmpfs /workspace:rw,nosuid,nodev,size=128m,mode=0700,uid=1000,gid=1000 \
             -e DSH_MCP_INSTALL_PROOF=true local/deepharness-mcp:candidate \
-            node /opt/wandora-mcp-verifier/verify-existing-mcp-profile.mjs
+            node /opt/wandora-mcp-verifier/verify-existing-mcp-profile.mjs 2>&1 | python3 -c 'import re,sys; [print("[redacted potentially sensitive log line]" if re.search(r"(?i)(?:https?://|token|passphrase|password|secret|api[_-]?key|authorization|bearer|cookie)", line) else line.rstrip()) for line in sys.stdin]'
 
       - name: Log in to GHCR
         if: steps.state.outputs.ready == 'true' && github.event_name == 'push'
