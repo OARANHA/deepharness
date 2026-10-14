@@ -47,6 +47,7 @@ export async function probePersistentGrantPolicy({issuer,resource,keys,request,p
     for(const file of ['001_token_revocations.sql','002_read_grants.sql']){
       await pool.query(await readFile(new URL('../sql/'+file,import.meta.url),'utf8'));
     }
+    phase='official host init';
     await ctx.plugin(Storage);storageJson(ctx,{root:join(root,'storage')});
     const facility=new DomainFacility(ctx,{backend:'json',routes:{}});
     ctx.storage.mount('domain',facility);ctx.provide('storageDomain',facility);
@@ -62,10 +63,12 @@ export async function probePersistentGrantPolicy({issuer,resource,keys,request,p
     const scope={principalId:principal,workspaceId:workspace.id,leadSessionId:lead.id};
     grantHash=createHash('sha256').update(JSON.stringify(Object.values(scope))).digest('hex');
     const store=createPostgresReadGrantStore({query,timeoutMs:1500});
+    phase='operational policy';
     const policy=createPersistentDshMcpReadPolicy({
       issuer,resource,discovery:{get:async()=>({issuer,publicKeys:keys})},query,
       allowedOrigins:['http://127.0.0.1:18081'],allowMissingNotBefore:true,revocationTimeoutMs:1500,
     });
+    phase='plugin mount';
     ctx.provide('chatgptMcpReadPolicy',policy);
     const mount=async()=>{
       if(fiber)await fiber.dispose();
@@ -121,7 +124,12 @@ export async function probePersistentGrantPolicy({issuer,resource,keys,request,p
     assert.equal(ctx.sessions.get(lead.id),lead);assert.equal(ctx.sessions.get(other.id),other);
     assert.deepEqual(ctx.sessionProjections.snapshot(lead,['agentTeam']).values.agentTeam,baseline);
     console.log('KEYCLOAK_CORDIS_PERSISTENT_GRANTS_MATCH: real human JWT + official plugin + exact primary grants + allowed/revoked restart + in-flight revocation + outage denied');
-  }catch{throw Error('Persistent grant policy gate failed at '+phase);}
+  }catch(error){
+    const safeCodes=['28P01','42P01','42601','42703','42883','ECONNREFUSED','ECONNRESET','ETIMEDOUT'];
+    const category=safeCodes.includes(error?.code)?error.code:
+      error?.message==='MCP OAuth metadata denied'?'HTTPS_METADATA_DENIED':'INTERNAL_ERROR';
+    throw Error('Persistent grant policy gate failed at '+phase+' ('+category+')');
+  }
   finally{
     try{await ctx.fiber.dispose();}finally{
       await pool.end().catch(()=>{});await rm(root,{recursive:true,force:true});
