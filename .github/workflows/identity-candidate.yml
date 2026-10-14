@@ -37,6 +37,13 @@ jobs:
           echo "::add-mask::$db_password"
           echo "::add-mask::$admin_password"
           cleanup() {
+            rc="$?"
+            if test "$rc" -ne 0; then
+              for name in "$prefix-kc" "$prefix-pg"; do
+                docker inspect --format "status={{.State.Status}} exit={{.State.ExitCode}} oom={{.State.OOMKilled}}" "$name" 2>/dev/null || true
+                docker logs --tail 80 "$name" 2>&1 | python3 -c 'import re,sys; [print("[redacted potentially sensitive line]" if re.search(r"(?i)(password|secret|token|authorization|bearer|cookie)",s) else s.rstrip()) for s in sys.stdin]' || true
+              done
+            fi
             docker rm -f "$prefix-kc" "$prefix-pg" >/dev/null 2>&1 || true
             docker volume rm "$prefix-data" >/dev/null 2>&1 || true
             docker network rm "$prefix-net" >/dev/null 2>&1 || true
@@ -49,7 +56,7 @@ jobs:
               -e POSTGRES_USER=keycloak -e POSTGRES_DB=keycloak -e POSTGRES_PASSWORD="$db_password" \
               -v "$prefix-data:/var/lib/postgresql/data" postgres:16.15-bookworm >/dev/null
             for _ in $(seq 1 60); do
-              if docker exec "$prefix-pg" pg_isready -U keycloak -d keycloak >/dev/null; then return; fi
+              if docker exec "$prefix-pg" pg_isready -h 127.0.0.1 -U keycloak -d keycloak >/dev/null; then return; fi
               sleep 2
             done
             echo "::error::PostgreSQL readiness failed"; exit 1
@@ -57,7 +64,6 @@ jobs:
           start_kc() {
             docker run -d --name "$prefix-kc" --network "$prefix-net" \
               --security-opt no-new-privileges --cap-drop ALL --memory 1536m \
-              -p 127.0.0.1:18089:8080 \
               -e KC_DB_URL=jdbc:postgresql://identity-db:5432/keycloak \
               -e KC_DB_USERNAME=keycloak -e KC_DB_PASSWORD="$db_password" \
               -e KC_HOSTNAME=https://id.wandora.com.br -e KC_HOSTNAME_STRICT=true \
@@ -66,7 +72,11 @@ jobs:
               local/wandora-keycloak:ci start --optimized >/dev/null
             ready=0
             for _ in $(seq 1 90); do
-              if curl -fsS http://127.0.0.1:18089/realms/master/.well-known/openid-configuration > /tmp/identity-ci-discovery.json; then ready=1; break; fi
+              state="$(docker inspect --format '{{.State.Status}}' "$prefix-kc")"
+              if test "$state" != running; then echo "::error::Keycloak exited during startup"; exit 1; fi
+              if docker exec "$prefix-kc" bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080; printf "GET /realms/master/.well-known/openid-configuration HTTP/1.0\\r\\nHost: id.wandora.com.br\\r\\nConnection: close\\r\\n\\r\\n" >&3; cat <&3' > /tmp/identity-ci-http.txt 2>/dev/null; then
+                if python3 -c 'import json; raw=open("/tmp/identity-ci-http.txt","rb").read(); head,body=raw.split(b"\\r\\n\\r\\n",1); assert b" 200 " in head.split(b"\\r\\n",1)[0]; d=json.loads(body); assert d["issuer"]=="https://id.wandora.com.br/realms/master"; json.dump(d,open("/tmp/identity-ci-discovery.json","w"))' 2>/dev/null; then ready=1; break; fi
+              fi
               sleep 2
             done
             test "$ready" = 1
