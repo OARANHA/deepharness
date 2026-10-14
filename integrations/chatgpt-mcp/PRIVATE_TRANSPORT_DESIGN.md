@@ -1,6 +1,11 @@
 # Transporte privado MCP — laboratório
 
-Estado: implementação opt-in, sem listener ou ativação de produção.
+Estado: implementação opt-in, sem ativação de produção; listeners somente nos testes loopback.
+Estado atual em 2026-10-14: o fluxo combinado por módulos source passou em
+3d2f727; o pacote lab.4 instalado, transporte e instalação oficial desativada
+passaram em 68948a7. O novo teste combinado pelo pacote instalado está preparado,
+mas ainda aguarda CI. As seções anteriores abaixo registram os incrementos
+históricos; seu estado pendente foi substituído por essas evidências.
 Base anterior GREEN: bcf78ca2bd856c738327eceb5179f1e0de927762.
 Arquivos: adapters/private-mcp-http-handler.mjs; test/private-mcp-http-handler.test.mjs;
 initialized-host-probe/private-transport-official-host.test.mjs.
@@ -98,3 +103,30 @@ A combinação real exige a CI e o marcador
 KEYCLOAK_MTLS_OFFICIAL_DSH_PERSISTENT_GRANTS_MATCH. Ainda não comprovada
 neste incremento. Não altera adapters de produção, whitelist/exports lab.3,
 Keycloak de produção, credenciais persistentes ou conexão ChatGPT.
+
+
+## Pacote instalado + Keycloak humano + PostgreSQL real (CI pendente)
+
+O probe agora gera e instala offline o tarball lab.4 em um diretório descartável.
+Verifica a whitelist e a resolução dentro do pacote instalado, sem fallback para
+source. Plugin, policy, stores de grants/revogação e schemas SQL vêm desse
+artefato. SDK/DSH/pg continuam dependências oficiais fixadas do laboratório.
+
+O listener loopback chama o handler criado por
+chatgptMcpRead.createPrivateTransport. Após cada descarga/recriação do plugin,
+wire.rebind exige HTTP 503 do handler antigo antes de criar o novo. Não descarta
+manualmente o antigo para mascarar falha de lifecycle. Permanecem mTLS,
+Host/Origin exatos, identidade individual, grants exatos e nenhuma escrita MCP.
+
+Todos os checks anteriores continuam: JWT humano PKCE independente, outro Lead,
+grant/token revogado, linhas SQL exatas saudáveis, pool/plugin/banco reiniciados,
+indisponibilidade e restauração. Após o último reinício do banco, exige também
+leitura de controle com JWT válido não revogado do mesmo principal e ambos os
+tokens ainda não expirados antes de aceitar a negação do alvo.
+
+O novo teste local offline verifica imports, schemas, consulta de grants e
+handlers invalidado/novo em mounts separados; usa doubles explícitos de host,
+query e SDK e não simula sucesso do gate humano. 98 testes locais passaram.
+A execução completa somente será comprovada por CI com o marcador
+KEYCLOAK_PACKED_MTLS_OFFICIAL_DSH_PERSISTENT_GRANTS_MATCH.
+Nenhuma configuração de produção, credencial, callback ou ingress foi alterada.
