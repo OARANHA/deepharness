@@ -85,3 +85,15 @@ test('rotating identity cannot continue an MCP read after key removal', async ()
     return binding.readTeam(target);
   }), /denied/);
 });
+
+test('rotating JWKS verifier enforces required OAuth access-token scope on signed JWTs', async () => {
+  const f = fixture();
+  const scoped = createRotatingJwksTransportAuthenticator({
+    discovery: f.discovery, audience, requiredScope: 'agent-teams:read',
+    isRevoked: async () => false, now: () => 2000000000,
+  });
+  await assert.rejects(scoped(request(jwt(first, 'old'))), /denied/);
+  await assert.rejects(scoped(request(jwt(first, 'old', { ...claims, scope: 'other:read' }))), /denied/);
+  const ok = await scoped(request(jwt(first, 'old', { ...claims, scope: 'agent-teams:read' })));
+  assert.equal(ok.principalId, issuer + '#alice');
+});
