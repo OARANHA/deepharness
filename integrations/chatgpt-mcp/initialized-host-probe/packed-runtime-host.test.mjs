@@ -64,12 +64,13 @@ test('actual private tarball installs and reads official initialized host with e
   let revoked=false,offline=false;
   // Package composition uses a primary-query contract double here.
   // The actual PostgreSQL/keycloak combined lifecycle gate is separate.
-  const runtime=exported.createOfficialDshMcpReadRuntime(host,{
+  const policy={
     issuer,resource,discovery:{get:async()=>({issuer,publicKeys:{pack:{...publicKey.export({format:'jwk'}),alg:'RS256'}}})},
     query:async()=>{if(offline)throw Error('offline');return {rows:revoked?[{revoked:true}]:[]};},
     grants:[{principalId:issuer+'#alice',workspaceId:workspace.id,leadSessionId:lead.id}],
     allowedOrigins:['https://client.example'],
-  });
+  };
+  const runtime=exported.createOfficialDshMcpReadRuntime(host,policy);
   assert.deepEqual(Object.keys(runtime).sort(),['handleOAuthRequest','readTeam','runHttpRequest']);
   const target={workspaceId:workspace.id,leadSessionId:lead.id};
   const read=(subject='alice',args=target)=>runtime.runHttpRequest({
@@ -81,6 +82,29 @@ test('actual private tarball installs and reads official initialized host with e
   revoked=true;await assert.rejects(read(),/denied/);
   revoked=false;offline=true;await assert.rejects(read(),/denied/);
   offline=false;
+  const bundlePatch=await readFile(join(install,'node_modules','@wandora','deepharness-chatgpt-mcp-read','cordis.patch.yml'),'utf8');
+  assert.equal(manifest.dsh.bundle.patch,'./cordis.patch.yml');
+  assert.match(bundlePatch,/disabled: true/);
+  assert.match(bundlePatch,/endpointEnabled: false/);
+  assert.equal((bundlePatch.match(/- id:/g)||[]).length,1,'bundle must not recreate host services');
+  const plugin=await import(pathToFileURL(resolve.resolve('@wandora/deepharness-chatgpt-mcp-read/plugin')).href);
+  assert.deepEqual(plugin.inject,['workspaceRegistry','sessions','sessionProjections','chatgptMcpReadPolicy']);
+  assert.equal(ctx.get('chatgptMcpRead'),undefined);
+  ctx.provide('chatgptMcpReadPolicy',policy);
+  const pluginFiber=await ctx.plugin(plugin,{endpointEnabled:false});
+  const mounted=ctx.get('chatgptMcpRead');
+  assert.ok(mounted,'official Cordis must mount the packaged internal read service');
+  const mountedRead=()=>mounted.runHttpRequest({
+    headers:{authorization:'Bearer '+token('alice'),origin:'https://client.example'},
+  },()=>mounted.readTeam(target));
+  assert.equal((await mountedRead()).leadSessionId,lead.id);
+  assert.equal(ctx.sessions.get(lead.id),lead,'plugin must reuse existing Lead');
+  await pluginFiber.dispose();
+  assert.equal(ctx.get('chatgptMcpRead'),undefined,'unload must remove the internal service');
+  await assert.rejects(mountedRead(),/denied/,'retained reference must fail after plugin unload');
+  await assert.rejects(async()=>{await ctx.plugin(plugin,{endpointEnabled:true});},/denied/);
+  assert.equal(ctx.sessions.get(lead.id),lead,'plugin unload must preserve existing sessions');
+  console.log('PACKED_OFFICIAL_DSH_CORDIS_PLUGIN_MATCH: installed bundle + official inject/apply + existing Lead + no endpoint + unload denies retained handles');
   host.sessions={get:()=>undefined};await assert.rejects(read(),/denied/);
   assert.deepEqual(ctx.sessionProjections.snapshot(lead,['agentTeam']).values.agentTeam,baseline);
   console.log('PACKED_OFFICIAL_DSH_READ_RUNTIME_MATCH: installed tarball + official host + individual exact grants + revocation contract + replacement denial');
