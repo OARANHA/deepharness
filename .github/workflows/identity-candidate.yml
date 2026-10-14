@@ -93,3 +93,21 @@ jobs:
           start_kc
           test "$(docker exec "$prefix-pg" psql -U keycloak -d keycloak -Atc 'SELECT marker FROM ci_identity_persistence')" = preserved
           echo "IDENTITY_OPTIMIZED_HOSTNAME_POSTGRES_PERSISTENCE_MATCH"
+
+      - name: Export exact tested identity image for reviewed publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p identity-release
+          docker image inspect --format '{{.Id}}' local/wandora-keycloak:ci > identity-release/keycloak-image-id.txt
+          docker image inspect --format '{{json .RepoDigests}}' postgres:16.15-bookworm > identity-release/postgres-repo-digests.json
+          docker save local/wandora-keycloak:ci | gzip -n > identity-release/keycloak-tested.tar.gz
+          (cd identity-release && sha256sum keycloak-tested.tar.gz > SHA256SUMS)
+          printf '%s\n' "${{ github.event.pull_request.head.sha || github.sha }}" > identity-release/source-head.txt
+          printf '%s\n' "${GITHUB_SHA}" > identity-release/tested-checkout.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: identity-tested-image-${{ github.run_id }}
+          path: identity-release/
+          retention-days: 7
+          if-no-files-found: error
