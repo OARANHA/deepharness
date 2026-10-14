@@ -138,6 +138,8 @@ await probeKeycloakOfficialHost({
   authenticateTransport: authenticated, request, principal,
   revoke: async () => { revokedTokens.add(claims.jti); },
 });
+const { probePersistentGrantPolicy } = await import('../initialized-host-probe/persistent-grant-policy-probe.mjs');
+await probePersistentGrantPolicy({ issuer, resource, keys, request, principal });
 const { probePersistentKeycloakHost } = await import('../initialized-host-probe/keycloak-postgres-host-probe.mjs');
 await probePersistentKeycloakHost({ issuer, resource, keys, claims, request, principal });
 revokedTokens.add(claims.jti);
