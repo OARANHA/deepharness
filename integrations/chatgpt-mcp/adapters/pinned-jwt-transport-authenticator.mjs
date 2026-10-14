@@ -15,11 +15,12 @@ const decode = raw => {
   return out;
 };
 export function createPinnedJwtTransportAuthenticator({
-  issuer, audience, publicKeys, isRevoked, requiredScope, now = () => Math.floor(Date.now() / 1000),
+  issuer, audience, publicKeys, isRevoked, requiredScope, allowMissingNotBefore = false, now = () => Math.floor(Date.now() / 1000),
 }) {
   if (!valid(issuer) || !valid(audience) || !publicKeys ||
       typeof publicKeys !== 'object' || Array.isArray(publicKeys) ||
       typeof isRevoked !== 'function' || typeof now !== 'function' ||
+      typeof allowMissingNotBefore !== 'boolean' ||
       (requiredScope !== undefined && (typeof requiredScope !== 'string' ||
         !/^[a-z][a-z0-9:-]{0,63}$/.test(requiredScope)))) deny();
   const keys = new Map();
@@ -49,11 +50,12 @@ export function createPinnedJwtTransportAuthenticator({
     const time = now();
     if (!Number.isSafeInteger(time) || claims.iss !== issuer ||
         claims.aud !== audience || !valid(claims.sub) || !valid(claims.jti) ||
-        !Number.isSafeInteger(claims.iat) || !Number.isSafeInteger(claims.nbf) ||
+        !Number.isSafeInteger(claims.iat) ||
+        (claims.nbf === undefined ? !allowMissingNotBefore : !Number.isSafeInteger(claims.nbf)) ||
         !Number.isSafeInteger(claims.exp) ||
-        claims.iat > time || claims.nbf > time || claims.exp <= time ||
+        claims.iat > time || (claims.nbf !== undefined && claims.nbf > time) || claims.exp <= time ||
         claims.exp <= claims.iat || claims.exp - claims.iat > 3600 ||
-        claims.nbf < claims.iat || claims.token_use !== 'access' ||
+        (claims.nbf !== undefined && claims.nbf < claims.iat) || claims.token_use !== 'access' ||
         (requiredScope !== undefined && (typeof claims.scope !== 'string' ||
           !claims.scope.split(' ').includes(requiredScope)))) deny();
     let revoked;
