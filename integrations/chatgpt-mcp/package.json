@@ -1,6 +1,6 @@
 {
   "name": "@wandora/deepharness-chatgpt-mcp-read",
-  "version": "0.1.0-lab.3",
+  "version": "0.1.0-lab.4",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -37,7 +37,9 @@
     "policy.mjs",
     "adapters/postgres-read-grants.mjs",
     "sql/001_token_revocations.sql",
-    "sql/002_read_grants.sql"
+    "sql/002_read_grants.sql",
+    "adapters/private-mcp-http-handler.mjs",
+    "adapters/register-scoped-team-read-tool.mjs"
   ],
   "scripts": {
     "test": "node --test test/runtime-package.test.mjs test/plugin-entry.test.mjs test/postgres-read-grants.test.mjs"
