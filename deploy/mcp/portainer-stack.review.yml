@@ -168,9 +168,15 @@ services:
       options:
         max-size: 10m
         max-file: '3'
+# Bind the existing 28server DSH volumes by immutable observed Docker names.
+# Prevent accidental creation of new empty data/workspace volumes during review.
 volumes:
-  dsh_data: null
-  dsh_workspace: null
+  dsh_data:
+    external: true
+    name: deepharness_dsh_data
+  dsh_workspace:
+    external: true
+    name: deepharness_dsh_workspace
   mcp_grants_data: null
 networks:
   traefik-public:
