@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Owner-run backup and disabled-only package migration, never starts a second DSH."""
 import hashlib
+import json
 import os
 import pathlib
 import re
@@ -13,6 +14,21 @@ ROOT=pathlib.Path('/opt/wandora/data/deepharness-mcp')
 IMAGE='ghcr.io/oaranha/deepharness-mcp@sha256:2483c85cc3fbe6172bf284e67859572b8b6b5dc75bfea11ae160298f7202a62f'
 SOURCE=pathlib.Path('/opt/wandora/ops-workspace/install-existing-mcp-profile.mjs')
 EXPECTED_SCRIPT_SHA='4f540be9ce666437b99fc49251e91fe43a785e65d06d6f49cc3f97b83f7b6868'
+
+def verify_candidate_identity(info):
+    # The approved manifest commits to the tested config AND compressed layers.
+    # Docker 29/containerd can expose the manifest ID with empty config fields.
+    config='sha256:3d0d025371a574c4e711e5c0e110ff003bf0f9a6c01e6d263d81fdad2f3e8476'
+    digest=IMAGE.split('@')[1]
+    if info.get('Os') not in ('','linux') or info.get('Architecture') not in ('','amd64'):
+        raise RuntimeError('Plataforma candidata inesperada; nenhuma alteracao')
+    if info.get('Id')==config:
+        return
+    expected={'digest':digest,'mediaType':'application/vnd.docker.distribution.manifest.v2+json','size':4707}
+    descriptor=info.get('Descriptor') or {}
+    if (info.get('Id')!=digest or IMAGE not in info.get('RepoDigests',[]) or
+            any(descriptor.get(k)!=v for k,v in expected.items())):
+        raise RuntimeError('Imagem candidata diferente da testada; nenhuma alteracao')
 
 def close_installer(cidfile,name):
     reference=name
@@ -54,7 +70,16 @@ def main():
     if mounts!='deepharness_dsh_data':
         raise RuntimeError('Volume DSH inesperado; nenhuma alteracao')
     if run(['docker','image','inspect','--format','{{.Id}}',IMAGE]).decode().strip()!='sha256:3d0d025371a574c4e711e5c0e110ff003bf0f9a6c01e6d263d81fdad2f3e8476':
-        raise RuntimeError('Imagem candidata diferente da testada; nenhuma alteracao')
+        metadata=json.loads(run(['docker','image','inspect',IMAGE]))
+        if not isinstance(metadata,list) or len(metadata)!=1:
+            raise RuntimeError('Metadados candidatos inesperados; nenhuma alteracao')
+        verify_candidate_identity(metadata[0])
+        probe=run(['docker','run','--rm','--pull','never','--network','none','--read-only',
+                   '--user','1000:1000','--cap-drop','ALL','--security-opt','no-new-privileges',
+                   '--pids-limit','64','--memory','256m','--entrypoint','node',IMAGE,
+                   '-e','console.log(process.platform+"/"+process.arch)']).decode().strip()
+        if probe!='linux/x64':
+            raise RuntimeError('Execucao candidata inesperada; nenhuma alteracao')
     size=run(['docker','exec','--user','node','deepharness-web-1','du','-sk','/data/dsh/profiles/web']).decode().split()[0]
     if not size.isdecimal() or shutil.disk_usage(ROOT).free < int(size)*1024*2+256*1024*1024:
         raise RuntimeError('Espaco insuficiente para backup privado; nenhuma alteracao')
