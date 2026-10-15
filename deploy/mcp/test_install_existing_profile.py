@@ -11,6 +11,18 @@ module=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 
 class InstallerGuards(unittest.TestCase):
+    def test_image_identity_accepts_only_reviewed_config_or_manifest(self):
+        config='sha256:3d0d025371a574c4e711e5c0e110ff003bf0f9a6c01e6d263d81fdad2f3e8476'
+        digest=module.IMAGE.split('@')[1]
+        descriptor={'digest':digest,'mediaType':'application/vnd.docker.distribution.manifest.v2+json','size':4707}
+        module.verify_candidate_identity({'Id':config,'Os':'linux','Architecture':'amd64'})
+        good={'Id':digest,'Descriptor':descriptor,'RepoDigests':[module.IMAGE],'Os':'','Architecture':''}
+        module.verify_candidate_identity(good)
+        for change in [{'Id':'sha256:'+'f'*64},{'Descriptor':{**descriptor,'digest':'sha256:'+'f'*64}},
+                       {'RepoDigests':[]},{'Architecture':'arm64'},{'Os':'windows'}]:
+            with self.assertRaises(RuntimeError):
+                module.verify_candidate_identity({**good,**change})
+
     def test_cleanup_refuses_unrelated_container_and_unconfirmed_daemon(self):
         with tempfile.TemporaryDirectory() as directory:
             cidfile=pathlib.Path(directory)/'id'
