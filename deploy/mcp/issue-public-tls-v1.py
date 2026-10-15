@@ -105,7 +105,8 @@ def main():
         token=validate_token(getpass.getpass('Token Cloudflare restrito a DNS Edit em wandora.com.br (oculto): ').strip())
         create_file(credential,('dns_cloudflare_api_token = '+token+'\n').encode())
         del token
-    email=input('Email para avisos ACME: ').strip()
+    # Read the controlling terminal even when invoked through a verified heredoc.
+    email=getpass.getpass('Email para avisos ACME (entrada oculta): ').strip()
     if not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',email) or len(email)>254:
         raise RuntimeError('Email ACME invalido')
     base=['docker','run','--rm','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges',
