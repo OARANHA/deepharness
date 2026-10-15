@@ -81,7 +81,7 @@ services:
     - --disable-hot-restart
     - --log-level
     - error
-    restart: 'no'
+    restart: unless-stopped
     read_only: true
     init: true
     cap_drop:
@@ -123,7 +123,7 @@ services:
     - mcp-review-only
     image: ${DSH_MCP_GRANTS_IMAGE:?Provide tested immutable grants image digest}
     user: 999:999
-    restart: 'no'
+    restart: unless-stopped
     read_only: true
     cap_drop:
     - ALL
