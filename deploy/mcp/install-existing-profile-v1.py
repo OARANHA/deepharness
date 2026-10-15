@@ -114,7 +114,7 @@ def main():
           '--mount','type=volume,src=deepharness_dsh_workspace,dst=/workspace',
           '--mount','type=bind,src='+str(runner)+',dst=/run/mcp-installer.mjs,readonly',
           '--mount','type=bind,src='+str(log)+',dst=/run/mcp-installer.log',
-          '-e','DSH_MCP_OPERATOR_INSTALL=disabled-only-v1','-e','PATH=/usr/local/bin:/usr/bin:/bin',
+          '-e','DSH_MCP_OPERATOR_INSTALL=disabled-only-v1','-e','PATH=/opt/dsh/node_modules/.bin:/usr/local/bin:/usr/bin:/bin',
           IMAGE,'node','/run/mcp-installer.mjs']
     try:
         result=subprocess.run(args,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=600)
