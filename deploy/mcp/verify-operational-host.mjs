@@ -65,12 +65,16 @@ try{
     if(response.status===200){const rpc=JSON.parse(response.text);assert.ok(rpc.error||rpc.result?.isError===true);}
     else assert.ok([401,403].includes(response.status));
   };
-  phase='transport and OAuth fences';
+  phase='missing client certificate';
   await assert.rejects(call(undefined,{clientCertificate:false}));
+  phase='oauth challenge';
   assert.equal((await call(undefined,{authenticated:false})).status,401);
+  phase='origin fence';
   assert.equal((await call(undefined,{origin:'https://untrusted.invalid'})).status,403);
+  phase='protected resource metadata';
   const metadata=await call(undefined,{authenticated:false,method:'GET',path:'/.well-known/oauth-protected-resource/mcp'});
   assert.equal(metadata.status,200);assert.equal(JSON.parse(metadata.text).resource,resource);
+  phase='authenticated tool listing';
   const tools=await call({jsonrpc:'2.0',id:++sequence,method:'tools/list',params:{}});
   assert.equal(tools.status,200);assert.deepEqual(JSON.parse(tools.text).result.tools.map(tool=>tool.name),['dsh_read_agent_team']);
   phase='ungranted read';await denied();
@@ -87,6 +91,9 @@ try{
   phase='root disposal';await host.ctx.fiber.dispose();host=undefined;await assert.rejects(call(undefined));
   console.log('MCP_OPERATIONAL_HOST_PRIMARY_MTLS_MATCH: real operational launcher + official Web services + real restricted reader + mTLS/OAuth + sole tool + exact grant + revocations + disposal; disposable signer only');
 }catch(error){
+  if(error?.name==='AssertionError'&&typeof error.actual==='number'&&typeof error.expected==='number')console.error('Operational CI status expected '+error.expected+' actual '+error.actual);
+  const safeCodes=['ECONNREFUSED','ECONNRESET','ENOTFOUND','EAI_AGAIN','EACCES','ERR_TLS_CERT_ALTNAME_INVALID','UNABLE_TO_VERIFY_LEAF_SIGNATURE','ERR_SSL_TLSV13_ALERT_CERTIFICATE_REQUIRED'];
+  if(safeCodes.includes(error?.code))console.error('Operational CI error code '+error.code);
   const detail=error?.name==='AssertionError'?'ASSERTION':error?.message==='Operational MCP host initialization denied'?'STARTUP_DENIED':'INTERNAL';
   throw Error('Operational integration failed at '+phase+' ('+detail+')');
 }finally{await host?.ctx.fiber.dispose();await admin.end();}
