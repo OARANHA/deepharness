@@ -15,6 +15,10 @@ const installed=createRequire('/data/dsh/profiles/web/package.json');
 const imported=async(resolve,name)=>import(pathToFileURL(resolve.resolve(name)).href);
 const {runProfile}=await imported(official,'@deepseek-ai/dsh/profile-boot');
 const {loadLayeredEnv}=await imported(official,'@deepseek-ai/dsh-app-boot');
+// Shipped Web profiles intentionally leave Agent Teams off. This disposable
+// canary explicitly composes the shipped opt-in bundle, without replacing services.
+const teamPatch=official.resolve('@deepseek-ai/dsh-experimental-agent-team-profile/cordis.patch.yml');
+const runTeamProfile=options=>runProfile({...options,patchFiles:[...options.patchFiles,teamPatch]});
 const plugin=await imported(installed,'@wandora/deepharness-chatgpt-mcp-read/plugin');
 const {createPersistentDshMcpReadPolicy:createPolicy}=await imported(installed,'@wandora/deepharness-chatgpt-mcp-read/policy');
 const {Pool}=dependencies('pg');
@@ -36,7 +40,7 @@ try{
   console.log('OPERATIONAL_CI_STAGE start operational host');
   host=await startOperationalReadHost({version:1,enabled:true,issuer,resource,backendPort:3443,
     allowedOrigins:['https://chatgpt.com','https://chatgpt-mtls-proxy.invalid']},
-    {runProfile,loadLayeredEnv,plugin,createPolicy,Pool,
+    {runProfile:runTeamProfile,loadLayeredEnv,plugin,createPolicy,Pool,
       // Fixture signer only. Real production discovery is independently probed from 28server.
       createDiscovery:()=>({get:async()=>({issuer,publicKeys:{disposable:jwk}})}),
       sdk:{McpServer,StreamableHTTPServerTransport,inputSchema:z.object({workspaceId:z.string(),leadSessionId:z.string()}).strict()}});
