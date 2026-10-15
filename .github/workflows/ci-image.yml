@@ -220,6 +220,13 @@ jobs:
             -e DSH_MCP_INSTALL_PROOF=true local/deepharness-mcp:candidate \
             node /opt/wandora-mcp-verifier/verify-existing-mcp-profile.mjs 2>&1 | python3 -c 'import re,sys; [print("[redacted potentially sensitive log line]" if re.search(r"(?i)(?:https?://|token|passphrase|password|secret|api[_-]?key|authorization|bearer|cookie)", line) else line.rstrip()) for line in sys.stdin]'
 
+      - name: Build primary and verify actual operational Web host with restricted PostgreSQL and mTLS
+        if: steps.state.outputs.ready == 'true' && github.event_name == 'pull_request'
+        timeout-minutes: 6
+        run: |
+          docker build -f deploy/mcp/Dockerfile.grants -t local/deepharness-grants:ci .
+          node deploy/mcp/run-operational-ci.mjs
+
       - name: Log in to GHCR
         if: steps.state.outputs.ready == 'true' && github.event_name == 'push'
         uses: docker/login-action@v3
