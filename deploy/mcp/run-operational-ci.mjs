@@ -1,6 +1,6 @@
 /** GitHub CI only; creates and removes exactly its own containers/networks/volume. */
 import assert from 'node:assert/strict';
-import {execFileSync} from 'node:child_process';
+import {execFileSync,spawnSync} from 'node:child_process';
 import {mkdtemp,writeFile,mkdir,rm,chmod} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -56,15 +56,18 @@ try{
     '--mount','type=bind,src='+join(root,'client')+',dst=/ci,readonly',
     '-e','GITHUB_ACTIONS=true','-e','DSH_MCP_INSTALL_PROOF=true','local/deepharness-mcp:candidate',
     'node','/opt/wandora-mcp-verifier/mcp/verify-operational-host.mjs']);
+  phase='attach private operational network';
   docker(['network','connect','--alias','deepharness-mcp-backend',backend,name]);
   assert.equal(docker(['inspect','--format','{{len .HostConfig.PortBindings}}',name]).trim(),'0');
+  phase='run operational integration';
   const output=run('docker',['start','-a',name],{timeout:150000});
   const marker='MCP_OPERATIONAL_HOST_PRIMARY_MTLS_MATCH';assert.ok(output.includes(marker),'full integration marker required');
   assert.equal(docker(['inspect','--format','{{.State.ExitCode}}',name]).trim(),'0');
   console.log(marker+': isolated two-network runtime passed; no production data or published ports');
 }catch{
   // DSH launch output may contain credentials. Keep only explicit safe stage errors.
-  try{const output=run('docker',['logs','--tail','100',name]);
+  try{const logs=spawnSync('docker',['logs','--tail','100',name],{encoding:'utf8',timeout:10000});
+    const output=(logs.stdout??'')+'\n'+(logs.stderr??'');
     for(const line of output.split('\n'))if(/^Error: (?:Operational integration failed at [a-z -]+ \([A-Z_]+\)|DSH disabled profile installation proof failed at [a-z -]+)$/.test(line))console.error(line);
   }catch{}
   throw Error('Disposable operational CI failed at '+phase);
