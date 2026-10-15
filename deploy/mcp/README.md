@@ -2,6 +2,16 @@
 
 Estado verificado em 2026-10-14: configuração candidata e teste combinado GREEN no commit f68ac5b7a37b3bb915909bf2f710c8c950dfabcc. Não é instalação, registro OAuth, autorização de produção ou prova de conexão ChatGPT. O laboratório usa pacote lab.4 instalado, JWT humano Keycloak, Envoy/mTLS, DSH oficial e PostgreSQL real.
 
+
+## Evidência operacional atualizada — 2026-10-15 (sem deploy)
+
+- A stack existente **já é Git-backed no Portainer do 28server**: repositório `OARANHA/deepharness`, arquivo `deploy/portainer-stack.yml`, atualizações GitOps automáticas desativadas (capturas fornecidas pelo proprietário). Isso não comprova qual commit dessa stack está efetivamente aplicado; reconciliar antes de qualquer cutover.
+- A inspeção Docker autorizada confirma o projeto `deepharness`, container `deepharness-web-1`, volumes existentes `deepharness_dsh_data` e `deepharness_dsh_workspace`, restartCount 0 no instante da consulta. O Portainer local usa o volume `portainer_data`; o conteúdo do arquivo ativo ainda não foi lido de forma independente.
+- O candidato inativo `deploy/mcp/portainer-stack.review.yml` preserva os nomes externos dos dois volumes; o Docker Compose v2.40.3 validou nativamente a configuração no 28server, sem criar/reiniciar containers. Este GREEN é estrutural, **não** é gate de ativação.
+- Os valores operacionais não sigilosos, inclusive callback **observado pelo proprietário**, estão preenchidos em `deploy/mcp/operational-input.review.json`. Não interpretar as linhas históricas deste README que dizem “não definido” como o estado atual.
+- Keycloak real: scope `agent-teams:read` criado e clientes `dsh-chatgpt-human` e `dsh-mcp-resource` criados **desativados**; o proprietário executou verificações de configuração com resultado `ALL_PASS`. Isso **não** equivale a OAuth humano ou autorização de leitura funcionando em produção.
+- Seguem bloqueados: grant explícito principal/workspace/Lead, conteúdo exato da stack ativa/revisão Portainer, geração/revisão dos artefatos inativos na VPS, mTLS/ingresso público real, ativação OAuth e canário humano. Preservar Web/UI, Chutes, JEV, sessão e dados existentes. Nenhum `Pull and redeploy` autorizado.
+
 ## Produzir a configuração revisável
 
 Copiar `operational-input.review.json` para área privada do operador e preencher somente os valores comprovados. O arquivo versionado permanece vazio; o gerador recusa null, valores incompletos, wildcard e segredos. Não substituir issuer/resource pelo laboratório. O resource usa hostname MCP dedicado e `/mcp`; `deep.wandora.com.br` fica reservado à Web UI.
