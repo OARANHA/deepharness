@@ -37,7 +37,10 @@ jobs:
           unzip -q /tmp/mcp-artifact.zip -d /tmp/mcp-reviewed
           cd /tmp/mcp-reviewed
           sha256sum --check SHA256SUMS
-          test "$(cat source-head.txt)" = a81a8a9b9fd614a1a2247c96528880a4c21d3234
+          # PR Actions checkout tests the synthetic merge, not the branch head.
+          test "$(cat source-head.txt)" = 3547934888277c9c262381655deec5ffae7e5509
+          gh api repos/OARANHA/deepharness/commits/3547934888277c9c262381655deec5ffae7e5509 > /tmp/mcp-tested-merge.json
+          python3 -c 'import json; d=json.load(open("/tmp/mcp-tested-merge.json")); assert d["sha"]=="3547934888277c9c262381655deec5ffae7e5509"; assert [p["sha"] for p in d["parents"]]==["9b27b000fe3e4aebcb5b33d611cba25c55dabe10","a81a8a9b9fd614a1a2247c96528880a4c21d3234"]'
           test "$(cat deepharness-mcp-image-id.txt)" = sha256:3d0d025371a574c4e711e5c0e110ff003bf0f9a6c01e6d263d81fdad2f3e8476
           test "$(cat deepharness-grants-image-id.txt)" = sha256:1eab01301f7cc9fa11321d1d2e2f8d2ad93d958f36771bf26cf069d374bc4a27
           gzip -dc tested-images.tar.gz | docker load
