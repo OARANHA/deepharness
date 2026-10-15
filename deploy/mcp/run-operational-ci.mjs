@@ -68,7 +68,7 @@ try{
   // DSH launch output may contain credentials. Keep only explicit safe stage errors.
   try{const logs=spawnSync('docker',['logs','--tail','100',name],{encoding:'utf8',timeout:10000});
     const output=(logs.stdout??'')+'\n'+(logs.stderr??'');
-    for(const line of output.split('\n'))if(/^Error: (?:Operational integration failed at [a-z -]+ \([A-Z_]+\)|DSH disabled profile installation proof failed at [a-z -]+)$/.test(line))console.error(line);
+    for(const line of output.split('\n'))if(/^(?:Operational CI status expected [0-9]+ actual [0-9]+|Operational CI error code [A-Z0-9_]+|Error: (?:Operational integration failed at [a-zA-Z -]+ \([A-Z_]+\)|DSH disabled profile installation proof failed at [a-z -]+))$/.test(line))console.error(line);
   }catch{}
   throw Error('Disposable operational CI failed at '+phase);
 }finally{
