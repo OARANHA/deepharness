@@ -64,11 +64,21 @@ try{
   const marker='MCP_OPERATIONAL_HOST_PRIMARY_MTLS_MATCH';assert.ok(output.includes(marker),'full integration marker required');
   assert.equal(docker(['inspect','--format','{{.State.ExitCode}}',name]).trim(),'0');
   console.log(marker+': isolated two-network runtime passed; no production data or published ports');
-}catch{
-  // DSH launch output may contain credentials. Keep only explicit safe stage errors.
-  try{const logs=spawnSync('docker',['logs','--tail','100',name],{encoding:'utf8',timeout:10000});
-    const output=(logs.stdout??'')+'\n'+(logs.stderr??'');
-    for(const line of output.split('\n'))if(/^(?:Operational CI status expected [0-9]+ actual [0-9]+|Operational CI error code [A-Z0-9_]+|Error: (?:Operational integration failed at [a-zA-Z -]+ \([A-Z_]+\)|DSH disabled profile installation proof failed at [a-z -]+))$/.test(line))console.error(line);
+}catch(error){
+  // Include startup errors even when no process reached the container log driver.
+  const diagnostic = line => {
+    if(typeof line!=='string'||line.length>500||
+      /https?:\/\/|token|passphrase|password|secret|api[_-]?key|authorization|bearer|cookie|PRIVATE KEY/i.test(line))return;
+    if(/^(?:Error(?: response from daemon)?|TypeError|ReferenceError|SyntaxError|AssertionError)(?: \[[A-Z0-9_]+\])?:/.test(line)||
+      /^Operational CI (?:status expected [0-9]+ actual [0-9]+|error code [A-Z0-9_]+)$/.test(line)||
+      /^OPERATIONAL_CI_STAGE [a-z -]+$/.test(line))console.error(line);
+  };
+  for(const value of [error?.stdout,error?.stderr])for(const line of String(value??'').split('\n'))diagnostic(line);
+  try{
+    const logs=spawnSync('docker',['logs','--tail','100',name],{encoding:'utf8',timeout:10000});
+    for(const line of ((logs.stdout??'')+'\n'+(logs.stderr??'')).split('\n'))diagnostic(line);
+    const state=docker(['inspect','--format','{{.State.Status}} {{.State.ExitCode}} {{.State.OOMKilled}}',name]).trim();
+    if(/^[a-z]+ [0-9]+ (?:true|false)$/.test(state))console.error('Operational CI container state '+state);
   }catch{}
   throw Error('Disposable operational CI failed at '+phase);
 }finally{
