@@ -1,14 +1,16 @@
 {
   "issuer": "https://id.wandora.com.br/realms/deepharness",
-  "resource": null,
+  "resource": "https://dsh-mcp.wandora.com.br/mcp",
   "clientId": null,
   "resourceClientId": null,
   "redirectUri": null,
   "redirectUriEvidence": null,
   "authorizationResponseIssuerSupported": true,
   "tokenEndpointAuthMethod": null,
-  "backendHost": null,
-  "backendPort": null,
-  "allowedOrigins": [],
+  "backendHost": "deepharness-mcp-backend",
+  "backendPort": 3443,
+  "allowedOrigins": [
+    "https://chatgpt.com"
+  ],
   "missingOriginPolicy": "verified-mtls-channel"
 }
