@@ -42,8 +42,11 @@ try{
       sdk:{McpServer,StreamableHTTPServerTransport,inputSchema:z.object({workspaceId:z.string(),leadSessionId:z.string()}).strict()}});
   phase='official persisted session';console.log('OPERATIONAL_CI_STAGE '+phase.toLowerCase());
   const lead=host.ctx.sessions.create('operational-ci-lead',{meta:{cwd:'/workspace'}});
+  phase='create official workspace';console.log('OPERATIONAL_CI_STAGE '+phase);
   const workspace=await host.ctx.workspaceRegistry.create('/workspace');
+  phase='attach official lead';console.log('OPERATIONAL_CI_STAGE '+phase);
   await workspace.attachSession(lead.id);
+  phase='snapshot official team projection';console.log('OPERATIONAL_CI_STAGE '+phase);
   const baseline=host.ctx.sessionProjections.snapshot(lead,['agentTeam']).values.agentTeam;
   assert.ok(baseline,'official Web profile must have its real Agent Team projection');
   const target={workspaceId:workspace.id,leadSessionId:lead.id};
@@ -94,6 +97,10 @@ try{
   phase='root disposal';console.log('OPERATIONAL_CI_STAGE '+phase.toLowerCase());await host.ctx.fiber.dispose();host=undefined;await assert.rejects(call(undefined));
   console.log('MCP_OPERATIONAL_HOST_PRIMARY_MTLS_MATCH: real operational launcher + official Web services + real restricted reader + mTLS/OAuth + sole tool + exact grant + revocations + disposal; disposable signer only');
 }catch(error){
+  // Emit before official root teardown, which can itself terminate this process.
+  console.error('Operational integration failed at '+phase);
+  const description=String(error?.message??'');
+  if(description.length<=500&&!/https?:\/\/|token|passphrase|password|secret|authorization|bearer|cookie|PRIVATE KEY|[A-Za-z0-9+/_=-]{80}/i.test(description))console.error('Operational CI exception '+description);
   if(error?.name==='AssertionError'&&typeof error.actual==='number'&&typeof error.expected==='number')console.error('Operational CI status expected '+error.expected+' actual '+error.actual);
   const safeCodes=['ECONNREFUSED','ECONNRESET','ENOTFOUND','EAI_AGAIN','EACCES','ERR_TLS_CERT_ALTNAME_INVALID','UNABLE_TO_VERIFY_LEAF_SIGNATURE','ERR_SSL_TLSV13_ALERT_CERTIFICATE_REQUIRED'];
   if(safeCodes.includes(error?.code))console.error('Operational CI error code '+error.code);
