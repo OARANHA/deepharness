@@ -3,10 +3,10 @@
   "resource": "https://dsh-mcp.wandora.com.br/mcp",
   "clientId": null,
   "resourceClientId": null,
-  "redirectUri": null,
-  "redirectUriEvidence": null,
+  "redirectUri": "https://chatgpt.com/connector/oauth/W33m7nv9EP9o",
+  "redirectUriEvidence": "Owner copied exact URL from ChatGPT custom MCP OAuth settings, 2026-10-15",
   "authorizationResponseIssuerSupported": true,
-  "tokenEndpointAuthMethod": null,
+  "tokenEndpointAuthMethod": "none",
   "backendHost": "deepharness-mcp-backend",
   "backendPort": 3443,
   "allowedOrigins": [
