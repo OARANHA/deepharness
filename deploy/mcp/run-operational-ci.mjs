@@ -69,7 +69,7 @@ try{
   const diagnostic = line => {
     if(typeof line!=='string'||line.length>500||
       /https?:\/\/|token|passphrase|password|secret|api[_-]?key|authorization|bearer|cookie|PRIVATE KEY/i.test(line))return;
-    if(/^(?:Error(?: response from daemon)?|TypeError|ReferenceError|SyntaxError|AssertionError)(?: \[[A-Z0-9_]+\])?:/.test(line)||
+    if(/^Operational (?:CI exception |integration failed at )/.test(line)||/^(?:Error(?: response from daemon)?|TypeError|ReferenceError|SyntaxError|AssertionError)(?: \[[A-Z0-9_]+\])?:/.test(line)||
       /^Operational CI (?:status expected [0-9]+ actual [0-9]+|error code [A-Z0-9_]+)$/.test(line)||
       /^OPERATIONAL_CI_STAGE [a-z -]+$/.test(line))console.error(line);
   };
