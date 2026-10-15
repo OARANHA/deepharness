@@ -46,6 +46,8 @@ class InstallerGuards(unittest.TestCase):
                 value=b''
                 if args[:2]==['docker','run']:
                     if '--cidfile' in args:
+                        self.assertIn('PATH=/opt/dsh/node_modules/.bin:/usr/local/bin:/usr/bin:/bin',args)
+                    if '--cidfile' in args:
                         pathlib.Path(args[args.index('--cidfile')+1]).write_text(container)
                     raise subprocess.TimeoutExpired(args,600)
                 if args[:3]==['docker','container','inspect']:
