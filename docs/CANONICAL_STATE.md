@@ -1,6 +1,23 @@
 # DeepHarness — canonical state
 
-Updated: 2026-10-12
+Updated: 2026-10-15 UTC
+
+## Current operational checkpoint — 2026-10-15 UTC
+
+This section supersedes the historical bootstrap failures below.
+
+- Existing production DSH is `deepharness-web-1` on **28server**, using immutable image `ghcr.io/oaranha/deepharness@sha256:27c6073e2dc4e8f4f34555aa89915285d8a7e25031dc4964cb7e80abbfb11075`. Existing named data/workspace volumes and protected Web route remain in use.
+- Owner-authorized identity exception: Keycloak + its dedicated PostgreSQL are deployed on **wandora-vps-01**. Permanent administrator with MFA verified; bootstrap retired. Dedicated issuer: `https://id.wandora.com.br/realms/deepharness`.
+- Owner ran the guarded key-profile alignment on identity host. Subsequent actual pinned discovery/JWKS probe from **28server** exited 0 with `OIDC_PINNED_DISCOVERY_MATCH`, one RS256 signing key. This proves metadata compatibility, not ChatGPT login.
+- PR #4 commit `25cac98b316dd1a5f2284b865501c0bd0ce250d9`: all six PR workflows succeeded, including actual official Web-profile composition and authorization-primary role persistence. [bootstrap evidence](https://github.com/OARANHA/deepharness/actions/runs/38657196288).
+- New preparation adds an integrated operational-host/real-primary/mTLS canary, immutable image artifacts, inactive full stack composition and guarded secret/certificate provisioning. **New CI outcome pending**; local Docker is unavailable. Local tests distinguish fixtures from real identity/production.
+- New stack is a replacement candidate for the existing `deepharness` stack, not a second DSH. Review profiles, disabled Envoy routing and disabled runtime remain intentional. Existing DSH volumes/labels are preserved; one planned new database volume stores grants/revocations.
+- **Not activated:** MCP endpoint, OAuth clients/human account in dedicated realm, primary grants database, public MCP certificate/renewal, image publication and real ChatGPT read. No production change is implied by CI or this document.
+- Next: require integrated CI success, review exact artifacts and configuration, provision on the correct host, publish exact tested images, apply scoped deployment, configure the exact observed ChatGPT callback and human PKCE client, then provision one explicit workspace/Lead grant and run the real read canary. No agent execution tools.
+
+## Historical record — retained for provenance
+
+
 
 ## Verified
 - `OARANHA/deepharness` existed as an empty public GitHub repository with write access before setup.
