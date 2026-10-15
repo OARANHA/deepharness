@@ -43,12 +43,12 @@ export async function startLoopbackEnvoyProxy({certRoot,issuer,resource,origin,b
     config.static_resources.listeners[0].address.socket_address.port_value=port;
     const path=join(certRoot,'human-proxy.json');await writeFile(path,JSON.stringify(config),{mode:0o600});
     const mounts=['-v',certRoot+':/run/secrets:ro'],identity=['--user',process.getuid()+':'+process.getgid(),'--entrypoint','/usr/local/bin/envoy'];
-    await exec('docker',['run','--rm',...identity,'--network','none',...mounts,'envoyproxy/envoy:v1.40.0',
+    await exec('docker',['run','--rm',...identity,'--network','none',...mounts,'envoyproxy/envoy@sha256:459f2a6404c340fe6afccd69d85527012d47f3c036765493e6f8f3113fa384de',
       '--mode','validate','-c','/run/secrets/human-proxy.json','--log-level','error'],{timeout:60000});
     // Mark before run: cleanup also covers a Docker client timeout after create.
     started=true;
     await exec('docker',['run','-d','--name',name,...identity,'--network','host','--read-only','--cap-drop','ALL',
-      '--security-opt','no-new-privileges:true','--tmpfs','/tmp:rw,nosuid,nodev,size=16m',...mounts,'envoyproxy/envoy:v1.40.0',
+      '--security-opt','no-new-privileges:true','--tmpfs','/tmp:rw,nosuid,nodev,size=16m',...mounts,'envoyproxy/envoy@sha256:459f2a6404c340fe6afccd69d85527012d47f3c036765493e6f8f3113fa384de',
       '-c','/run/secrets/human-proxy.json','--log-level','error'],{timeout:15000});
     assert.ok(candidate.backendPolicy.allowedOrigins.includes(candidate.channelOrigin));
     return {port,channelOrigin:candidate.channelOrigin,cert:await readFile(join(certRoot,'managed-client.pem')),
