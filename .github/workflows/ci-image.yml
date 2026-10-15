@@ -202,6 +202,10 @@ jobs:
         if: steps.state.outputs.ready == 'true' && github.event_name == 'pull_request'
         run: node --test deploy/disabled-mcp-profile-contract.test.mjs deploy/mcp/existing-profile-host.test.mjs deploy/mcp/private-read-listener.test.mjs deploy/mcp/operational-host.test.mjs
 
+      - name: Verify secret provisioning guards, real certificates and Linux UID/GID ownership in disposable fixtures
+        if: steps.state.outputs.ready == 'true' && github.event_name == 'pull_request'
+        run: sudo env GITHUB_ACTIONS=true python3 deploy/mcp/test_provision_runtime_secrets.py
+
       - name: Build private connector installation candidate (CI only)
         if: steps.state.outputs.ready == 'true' && github.event_name == 'pull_request'
         run: docker build -f deploy/Dockerfile.mcp-candidate -t local/deepharness-mcp:candidate .
@@ -226,6 +230,30 @@ jobs:
         run: |
           docker build -f deploy/mcp/Dockerfile.grants -t local/deepharness-grants:ci .
           node deploy/mcp/run-operational-ci.mjs
+
+      - name: Preserve exact tested MCP host, grants and proxy images without publishing
+        if: steps.state.outputs.ready == 'true' && github.event_name == 'pull_request'
+        timeout-minutes: 8
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull envoyproxy/envoy@sha256:459f2a6404c340fe6afccd69d85527012d47f3c036765493e6f8f3113fa384de
+          docker tag envoyproxy/envoy@sha256:459f2a6404c340fe6afccd69d85527012d47f3c036765493e6f8f3113fa384de local/deepharness-envoy:ci
+          mkdir /tmp/mcp-tested-images
+          printf '%s\n' "$GITHUB_SHA" > /tmp/mcp-tested-images/source-head.txt
+          for image in deepharness-mcp:candidate deepharness-grants:ci deepharness-envoy:ci; do
+            docker image inspect --format '{{.Id}}' "local/$image" > "/tmp/mcp-tested-images/${image%%:*}-image-id.txt"
+          done
+          docker save local/deepharness-mcp:candidate local/deepharness-grants:ci local/deepharness-envoy:ci | gzip -1 > /tmp/mcp-tested-images/tested-images.tar.gz
+          cd /tmp/mcp-tested-images
+          sha256sum tested-images.tar.gz source-head.txt *-image-id.txt > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        if: steps.state.outputs.ready == 'true' && github.event_name == 'pull_request'
+        with:
+          name: mcp-tested-images-${{ github.run_id }}
+          path: /tmp/mcp-tested-images/
+          retention-days: 7
+          compression-level: 0
 
       - name: Log in to GHCR
         if: steps.state.outputs.ready == 'true' && github.event_name == 'push'
@@ -260,11 +288,15 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate inactive MCP proxy and authorization database composition
         env:
+          DSH_MCP_HOST_IMAGE: ghcr.io/oaranha/deepharness-mcp@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          DSH_BASIC_AUTH_USERS: ci-placeholder-no-secret
           DSH_MCP_PROXY_IMAGE: ghcr.io/oaranha/wandora-envoy@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
           DSH_MCP_GRANTS_IMAGE: ghcr.io/oaranha/deepharness-grants@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
           DSH_MCP_REVIEW_ROOT: /opt/wandora/ops-workspace/mcp-candidate
           DSH_MCP_SECRET_ROOT: /opt/wandora/data/deepharness-mcp/secrets
-        run: docker compose -f deploy/mcp/portainer-ingress.review.yml -f deploy/mcp/portainer-grants.review.yml config --quiet
+        run: |
+          docker compose -f deploy/mcp/portainer-ingress.review.yml -f deploy/mcp/portainer-grants.review.yml config --quiet
+          docker compose -f deploy/mcp/portainer-stack.review.yml config --quiet
       - name: Build authorization primary candidate without publishing
         run: docker build -f deploy/mcp/Dockerfile.grants -t local/deepharness-grants:ci .
       - name: Verify runtime SELECT privileges and persisted role boundaries on real PostgreSQL
