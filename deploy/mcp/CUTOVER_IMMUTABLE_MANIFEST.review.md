@@ -1,3 +1,13 @@
+## Targeted immutable image inspection — owner-confirmed on 28server (2026-10-16)
+
+Owner ran read-only `docker image inspect` for each of the three **exact immutable references**, with `--format 'PRESENTE {{.Id}}'`, on `root@28server` and received:
+
+- Host MCP: `PRESENTE sha256:2483c85cc3fbe6172bf284e67859572b8b6b5dc75bfea11ae160298f7202a62f`
+- Grants primary: `PRESENTE sha256:6279a36d7cd94b7309e38b2931de38dd4f07bb84a5440e1b6433203587725210`
+- Envoy: `PRESENTE sha256:9a24a2c5b3304936563440ab9b2274fb9e6fa45d3c95f5966fd498c235a8a877`
+
+All three local immutable-image references are now **CONFIRMED PRESENT**. Earlier `docker image ls --digests` output listing Envoy alone was not a reliable absence test and is superseded by the exact-reference inspections. The original Web `Config.Image` reference was also independently confirmed; four image identities are pinned for cutover/rollback preparation. **No image was pulled, rebuilt, deployed, or started by this readback.** Next blocker is the reviewed operator-owned `runtime.json` enabled only upon explicit cutover authorization, effective secret/path permissions and Portainer stack 90 replacement/rollback review; immutable image presence does not grant deployment permission.
+
 ## Owner live Docker image readback — 2026-10-16
 
 Owner executed read-only `docker inspect deepharness-web-1 --format 'ImageRef={{.Config.Image}} ImageID={{.Image}}'` on **28server**:
