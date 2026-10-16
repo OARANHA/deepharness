@@ -1,3 +1,21 @@
+## Owner root metadata readback — 2026-10-16 (CONFIRMED)
+
+The owner executed the metadata-only root probe on 28server. All five paths are **regular files**, with these numeric attributes:
+
+| File | Mode | UID | GID |
+| --- | --- | --- | --- |
+| backend-server-key.pem | `0400` | 1000 | 1000 |
+| backend-server-chain.pem | `0444` | 1000 | 1000 |
+| backend-ca.pem | `0444` | 1000 | 1000 |
+| admin-db-password | `0400` | 999 | 999 |
+| runtime-db-password | `0440` | 1000 | 999 |
+
+The ownership/modes appear consistent with a Web process running as UID 1000, and DB process running UID 999. However, **the actual Web container UID, secret projection permissions and ability to read the files have not been proven**. This root metadata check does not validate certificate trust/expiration, secret values, runtime configuration, effective stack, or services. No permission changes are authorized or needed from this evidence alone.
+
+On exact commit `7f9172b11a0c6513a8ffcd59a00497feff52e45b`, **9/9 GitHub Actions workflows GREEN**, including actual isolated operational Web/PostgreSQL/mTLS integration and official Web disposable rollback. This green status belongs to that commit, not to subsequent documentation changes.
+
+**Remaining NO-GO blockers:** operator-owned `runtime.json` still disabled in review; effective Portainer stack 90 and rollback Git commit need confirmation; actual container user/secret access and private startup conditions need controlled validation. No production modification.
+
 # Stage C — private file metadata gate (READ ONLY)
 
 The Compose candidate `deploy/mcp/portainer-stack.stage-c.review.yml` requires five exact preexisting host files:
