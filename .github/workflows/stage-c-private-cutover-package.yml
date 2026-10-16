@@ -53,6 +53,29 @@ jobs:
           assert a['workflow_run']['id']==38661846023
           print('STAGE_C_TESTED_ARTIFACT_IDENTITY_MATCH')
           PY
+      - name: Match the exact successfully published image digest artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api repos/OARANHA/deepharness/actions/runs/38663108837 > "$RUNNER_TEMP/publish-run.json"
+          gh api repos/OARANHA/deepharness/actions/artifacts/11939996050 > "$RUNNER_TEMP/publish-artifact.json"
+          python3 - "$RUNNER_TEMP/publish-run.json" "$RUNNER_TEMP/publish-artifact.json" <<'PY'
+          import json,sys
+          run,artifact=map(lambda p:json.load(open(p)),sys.argv[1:])
+          assert run['conclusion']=='success' and run['name']=='Publish reviewed MCP images'
+          assert artifact['name']=='mcp-published-digests-38663108837' and not artifact['expired']
+          assert artifact['workflow_run']['id']==38663108837
+          print('STAGE_C_PUBLISH_RUN_AND_ARTIFACT_MATCH')
+          PY
+          gh api repos/OARANHA/deepharness/actions/artifacts/11939996050/zip > "$RUNNER_TEMP/published.zip"
+          mkdir "$RUNNER_TEMP/published"
+          unzip -q "$RUNNER_TEMP/published.zip" -d "$RUNNER_TEMP/published"
+          test "$(cat "$RUNNER_TEMP/published/deepharness-mcp.txt")" = 'ghcr.io/oaranha/deepharness-mcp@sha256:2483c85cc3fbe6172bf284e67859572b8b6b5dc75bfea11ae160298f7202a62f'
+          test "$(cat "$RUNNER_TEMP/published/deepharness-grants.txt")" = 'ghcr.io/oaranha/deepharness-grants@sha256:6279a36d7cd94b7309e38b2931de38dd4f07bb84a5440e1b6433203587725210'
+          test "$(cat "$RUNNER_TEMP/published/wandora-envoy.txt")" = 'ghcr.io/oaranha/wandora-envoy@sha256:9a24a2c5b3304936563440ab9b2274fb9e6fa45d3c95f5966fd498c235a8a877'
+          echo 'STAGE_C_ALL_PUBLISHED_DIGESTS_EXACT_MATCH'
       - name: Verify pinned image manifest digest and operational launcher
         shell: bash
         run: |
