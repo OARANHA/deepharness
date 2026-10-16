@@ -1,3 +1,14 @@
+## Owner live Docker image readback — 2026-10-16
+
+Owner executed read-only `docker inspect deepharness-web-1 --format 'ImageRef={{.Config.Image}} ImageID={{.Image}}'` on **28server**:
+
+- Original rollback image reference: `ghcr.io/oaranha/deepharness@sha256:27c6073e2dc4e8f4f34555aa89915285d8a7e25031dc4964cb7e80abbfb11075`.
+- Original observed image ID: `sha256:27c6073e2dc4e8f4f34555aa89915285d8a7e25031dc4964cb7e80abbfb11075`. Both explicitly reported by Docker, not inferred from one another.
+
+The owner also executed `docker image ls --digests --format '{{.Repository}}@{{.Digest}}' | grep -E 'deepharness-mcp|deepharness-grants|wandora-envoy'`. **Only** `ghcr.io/oaranha/wandora-envoy@sha256:9a24a2c5b3304936563440ab9b2274fb9e6fa45d3c95f5966fd498c235a8a877` appeared. The operational host/grants image references were **not confirmed** by this list. This does not prove either image is absent: digest listings may omit local images without matching repository digests. Require targeted `docker image inspect` on all three immutable references, printing only ID and repo digests, before deployment. Do not pull/rebuild/cleanup automatically.
+
+**Status: rollback image reference CONFIRMED, Envoy digest LISTED, host/grants local presence UNKNOWN. Private cutover remains NO-GO.**
+
 # MCP controlled cutover — immutable review manifest (NOT EXECUTABLE)
 
 Date: 2026-10-16. Target: existing Portainer on 28server, stack **90**, repository `OARANHA/deepharness`, branch `refs/heads/main`, file `deploy/portainer-stack.yml`. This document **does not authorize** a Portainer update or change to the Git branch.
