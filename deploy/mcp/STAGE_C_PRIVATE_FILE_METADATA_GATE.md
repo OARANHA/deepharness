@@ -1,3 +1,9 @@
+## Owner-approved real Docker bind mount access canary — GREEN 5/5 (2026-10-16)
+
+Owner explicitly authorized `APROVO TESTE DE MOUNTS` and executed five ephemeral `docker run --rm` inspections on `root@28server` against the pre-existing immutable MCP host image. Each used `--network none --read-only --cap-drop ALL --security-opt no-new-privileges --pids-limit 32`, one host bind file `readonly`, a named numeric `--user`, and a Node probe performing only `openSync`+`fstatSync`+`closeSync` (no secret bytes printed/read). Returned **MOUNT_ACCESS_GREEN** for backend key (1000:1000), backend chain (1000:1000), backend CA (1000:1000), DB admin password (999:999), DB runtime password (1000:1000). **5/5 GREEN**. This directly resolves bind-mount file open/read permission uncertainty under the inspected image/user fixture even though protected host ancestor directories are root-only.
+
+Limitations: No actual Stage C Web launched, no certificate chain/expiration or DB credential value verified, no enabled runtime produced, and no live Portainer stack, DSH volume, listener or OAuth touched. Any later CI result must be independently checked for its exact commit. **Private cutover remains NO-GO** pending owner runtime/config review and explicit deployment approval.
+
 ## Owner root metadata readback — 2026-10-16 (CONFIRMED)
 
 The owner executed the metadata-only root probe on 28server. All five paths are **regular files**, with these numeric attributes:
