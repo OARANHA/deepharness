@@ -30,8 +30,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git show b5e63748aaacc9c4f719327f9f5d9ebf300840d4:deploy/portainer-stack.yml > "$RUNNER_TEMP/original-web-compose.yml"
-          cmp -s "$RUNNER_TEMP/original-web-compose.yml" deploy/portainer-stack.yml
+          # Verified original Compose Git blob from frozen safety ref.
+          # Checking the Git blob hash avoids unreliable history lookups in CI.
+          actual="$(git hash-object deploy/portainer-stack.yml)"
+          test "$actual" = "cd72a46a2e458fcc6902d3ca243ac31c2979d346"
           echo 'STAGE_C_ORIGINAL_PRODUCTION_COMPOSE_PRESERVED'
       - name: Validate dummy-only Stage C effective Compose and isolation
         run: python3 deploy/mcp/verify-effective-compose-safe.py
