@@ -5,6 +5,8 @@
 # Inactive profile, disabled proxy route, and operator-controlled runtime.json.
 services:
   web:
+    # Explicit nonroot identity required for owner-only backend TLS key (UID 1000).
+    user: 1000:1000
     image: ${DSH_MCP_HOST_IMAGE:?Provide tested immutable MCP host digest}
     command:
     - node
