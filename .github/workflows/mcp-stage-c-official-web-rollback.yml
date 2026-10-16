@@ -1,0 +1,24 @@
+name: MCP Stage C - official Web disposable rollback
+on:
+  pull_request:
+    paths:
+      - 'deploy/mcp/stage-c-official-web-rollback.sh'
+      - '.github/workflows/mcp-stage-c-official-web-rollback.yml'
+      - 'deploy/Dockerfile'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  official-web-rollback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build pinned official DSH Web image only in CI
+        run: docker build -f deploy/Dockerfile -t local/stage-c-official-dsh-web:ci .
+      - name: Simulate candidate failure and restore actual official DSH Web
+        env:
+          STAGE_C_OFFICIAL_DSH_IMAGE: local/stage-c-official-dsh-web:ci
+        run: bash deploy/mcp/stage-c-official-web-rollback.sh
