@@ -32,7 +32,17 @@ test('proxy requires OpenAI mTLS chain and exact SAN plus private backend mTLS, 
   assert.equal(tls.require_client_certificate,true);
   assert.equal(tls.common_tls_context.validation_context.match_typed_subject_alt_names[0].matcher.exact,'mtls.prod.connectors.openai.com');
   assert.match(tls.common_tls_context.validation_context.trusted_ca.filename,/openai-connectors-intermediate/);
-  assert.ok(r.envoy.static_resources.clusters[0].transport_socket.typed_config.common_tls_context.tls_certificates.length);
+  const upstream=r.envoy.static_resources.clusters[0].transport_socket.typed_config;
+  assert.equal(upstream.sni,input.backendHost);
+  assert.equal(upstream.common_tls_context.tls_certificates.length,1);
+  assert.equal(upstream.common_tls_context.tls_certificates[0].certificate_chain.filename,
+    '/run/secrets/proxy-backend-client-chain.pem');
+  assert.equal(upstream.common_tls_context.tls_certificates[0].private_key.filename,
+    '/run/secrets/proxy-backend-client-key.pem');
+  assert.equal(upstream.common_tls_context.validation_context.trusted_ca.filename,
+    '/run/secrets/backend-ca.pem');
+  assert.equal(upstream.common_tls_context.validation_context.match_typed_subject_alt_names[0].matcher.exact,
+    input.backendHost);
   assert.equal(r.activationAllowed,false);assert.ok(r.backendPolicy.allowedOrigins.includes(r.channelOrigin));
 });
 test('absent Origin is mapped only in a distinct TLS-protected route; hostile present origins reach denial',()=>{
