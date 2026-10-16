@@ -1,3 +1,9 @@
+## Docker image inspect metadata readback (2026-10-16)
+
+Owner ran full JSON `docker image inspect` against the immutable original DSH, MCP Web and grants references. All three returned the expected image IDs, but `Config.User` and `ContainerConfig.User` were absent/null (`USER=None`). An earlier Go-template lookup of `.Config.User` failed with a nil pointer. **This is missing metadata, not proof that any image runs as root or UID 1000.** Do not modify key permissions. The Stage C Web image execution identity remains a **blocking unknown**.
+
+Next safe step: inspect image build recipe `deploy/mcp/Dockerfile` / actual `docker image inspect` structure, and the existing Web container's configured user via a field-existence-aware read-only probe. For the candidate image, an isolated disposable CI test should prove `id -u` and access to a **synthetic UID-1000 0400 key fixture** without mounting actual production keys. Never start an additional Web against production DSH volumes. No Portainer write.
+
 # Stage C — host identity and Portainer rollback readback (owner gate)
 
 Last reviewed: 2026-10-16. No deploy authorization; only read-only metadata.
