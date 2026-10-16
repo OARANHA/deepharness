@@ -1,3 +1,7 @@
+## Stage C implementation progress — structural review (2026-10-15)
+
+Prepared `deploy/mcp/portainer-stack.stage-c.review.yml` as a dedicated **non-deployed** review candidate derived from the prior inactive replacement: `web` and `mcp-grants-db` no longer have inactive profiles, while `mcp-proxy` retains `mcp-review-only` and `traefik.enable: 'false'`. This means an ordinary future Compose service selection would include `web` and `mcp-grants-db`, **not** the public proxy; production operator action remains forbidden without separate approval. Python/PyYAML read-only structural gate on isolated 28server workspace returned `STAGE_C_SINGLE_WEB_PRIVATE_DB_STATIC_MATCH` and `STAGE_C_PUBLIC_PROXY_PROFILED_DISABLED_MATCH`, confirming original DSH external volume names, internal network, healthy grants dependency, no host ports and proxy isolation. **Not yet native Docker Compose validated**, and the staged `runtime.review.json` remains `enabled:false`, so this YAML is **not deployable as-is**. Next verify native Compose with placeholder values and isolated disposable operational host/rollback test before asking for any production authorization.
+
 # Stage C — single-stack operational transition gate (review only)
 
 Date: 2026-10-15. **NOT DEPLOYABLE. No Portainer change authorized.**
