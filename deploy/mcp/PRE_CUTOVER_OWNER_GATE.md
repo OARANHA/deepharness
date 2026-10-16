@@ -1,3 +1,9 @@
+## Stage C offline runtime contract — 2026-10-16
+
+At GitHub commit `3393c0f8b0bc1cced86e9649a7f86d1ea1165ef4`, added `deploy/mcp/stage-c-runtime-contract.test.mjs` and the pull-request CI workflow `.github/workflows/mcp-stage-c-runtime-contract.yml`. The tests were also run on the isolated 28server workspace: **2/2 passed, exit 0**. They verify that the committed `runtime.review.json` remains `enabled:false` and is rejected, while an `enabled:true` strict pinned schema is accepted **in memory only**, without creating a listener, grants, credentials, or production runtime file. Invalid resource or grant injection is rejected.
+
+**Boundary:** this is config-contract validation, **not** actual runtime boot, owner OAuth or production permission. The Stage C `web` launcher still cannot use the disabled review file. Do not use the new tests to justify Portainer deployment. The new HEAD needs independent CI readback after its workflows finish.
+
 # DeepHarness MCP — final pre-cutover decision sheet
 
 Date: 2026-10-16. **Decision: NO-GO for Portainer deployment until every blocking precondition is proven and owner explicitly approves.**
