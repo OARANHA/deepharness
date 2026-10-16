@@ -18,6 +18,9 @@
 7. Separate Harness/Web UI, future MCP integration, and privileged infrastructure operations. Any write-capable external action must be explicitly approved and narrowly authorized.
 
 ## Current state
+- Current verified operational checkpoint is maintained in `docs/CANONICAL_STATE.md` (2026-10-15 UTC). Existing DSH is running on 28server; owner separately authorized identity on wandora-vps-01. MCP activation remains pending. The original bootstrap observations below are historical, not current runtime status.
+
+## Historical initial observations — 2026-10-12
 - 2026-10-12: repository initially verified empty/public and writable.
 - Prior standalone Docker deployment on 28server exists but repeatedly failed startup (`No usable prebuilt binary found in linux-x64-gnu`); fixes were staged but not proven.
 - HTTPS origin was serving Traefik's default certificate; Cloudflare returned HTTP 526.

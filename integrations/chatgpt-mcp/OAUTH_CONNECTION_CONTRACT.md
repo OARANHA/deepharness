@@ -1,0 +1,105 @@
+# Contrato revisável — conexão ChatGPT ↔ DeepHarness
+
+Atualizado: 2026-10-14. Estado: preparação; nenhuma conexão real ou infraestrutura alterada.
+Plano: docs/superpowers/plans/2026-10-14-chatgpt-mcp-real-oauth.md.
+
+## Configuração definida
+
+| Campo | Valor/política |
+| --- | --- |
+| Ferramenta | dsh_read_agent_team, sem operações de escrita |
+| Fluxo | authorization_code + PKCE S256 |
+| Registro inicial | Cliente pré-registrado dedicado; não ativar DCR anônimo |
+| Identidade | issuer#sub do access JWT assinado, sem email/username como substituto |
+| Token | RS256; issuer fixado; audience string igual ao resource; token_use=access; jti/iat/exp |
+| Scope | agent-teams:read |
+| nbf | Ausência permitida somente por opção explícita já revisada; valor presente validado |
+| Grants | Tuplas exatas de principal/workspace/Lead; configuração autoritativa do operador |
+| Transporte | Streamable HTTP; TLS e identificação do cliente independente de OAuth |
+| Revogação | PostgreSQL primary em cada verificação; falha/timeout/ambiguidade negam |
+| Canário proposto | Um usuário, uma equipe existente, uma consulta de dados |
+| Limites propostos | Access token até 300s; sem refresh inicial; leitura 10s; concorrência 1 |
+| Kill switch | Bloquear transporte MCP, revogar grants/token e restaurar artefato/configuração anterior |
+
+Os limites são proposta, não configuração implantada.
+
+## Valores que dependem da conexão real
+
+| Campo | Estado e origem da informação |
+| --- | --- |
+| issuer HTTPS real | Ainda não provisionado/validado; não reutilizar issuer loopback do laboratório |
+| resource HTTPS canônico | Ainda não definido; não assumir deep.wandora.com.br como endpoint MCP |
+| redirectUri | Copiar exatamente da gestão da conexão ChatGPT; não inventar callback_id |
+| clientId / método do token endpoint | Obter do registro dedicado e confirmar suporte pela interface real |
+| Cliente público none ou autenticado | Resolver no gate de registro; segredo nunca em GitHub ou chat |
+| Certificado mTLS / proxy ou túnel | Confirmar disponibilidade e ponto de verificação; não aceitar header de cliente como prova |
+| Origin real / ausência | Observar sem registrar bearer; adaptador atual exige Origin permitido |
+| Grant real | Operador seleciona principal/workspace/Lead existentes após autorização |
+| PostgreSQL operacional | Backend, role, rede, segredo, backup e migração ainda não aplicados |
+| Artefato executável | Bootstrap npm atual não inclui os adaptadores novos; empacotamento precisa de prova |
+
+O contrato não aceita preencher lacunas com URLs ou credenciais presumidas. Até esses campos estarem comprovados, a conexão permanece não ativável.
+
+## Revogação persistente no mesmo fluxo — incremento atual
+
+keycloak-postgres-host-probe.mjs recebe em memória a requisição com JWT humano real do laboratório, usa o verificador existente e createPostgresRevocationBackend com banco descartável em 127.0.0.1:15432. Reutiliza a leitura oficial DSH com grant exato e revogação durante await. Depois exige negação em novo pool, reinicia o mesmo container PostgreSQL preservando seus dados e exige negação novamente; também verifica lookup saudável de outro token e fail-closed quando o banco para.
+
+Marcador esperado: KEYCLOAK_OFFICIAL_DSH_POSTGRES_REVOCATION_MATCH.
+CI deste incremento ainda pendente. Não caracteriza failover/backup de produção nem grants persistentes. Driver pg@8.16.3 segue o padrão existente de integração isolada e não muda o lock de aplicação; transientes não são integralmente pinados por esse comando.
+
+## Procedimento concreto para ativação futura
+
+1. Fechar testes isolados de PostgreSQL combinado, grants no reinício, Origin e identificação do emissor/callback.
+2. Preparar pacote/digest do plugin contendo os adaptadores e instruções de secret management e rollback.
+3. Apresentar os valores reais desta ficha e a alteração exata de infraestrutura para autorização do proprietário.
+4. Só após autorização: provisionar cliente/banco/transporte e configurar a conexão pela interface normal de login.
+5. Realizar uma consulta de equipe permitida; comparar baseline sem criar/retomar sessões ou executar agentes.
+6. Em qualquer desvio, aplicar kill switch e rollback sem apagar volumes DSH.
+
+## Registro de execução do plano
+
+Ruling: implementar primeiro o gate de PostgreSQL combinado — utiliza infraestrutura CI já autorizada e reduz uma dependência verificável; callback/mTLS reais dependem de interface/provisionamento ainda não disponíveis. Custo: ordem dos gates alterada, sem reduzir os critérios.
+Revisão independente do incremento teste/CI solicitada conforme skill de execução.
+Fonte oficial do contrato OAuth: https://developers.openai.com/plugins/build/auth
+Fonte do transporte remoto: https://developers.openai.com/plugins/build/mcp-server
+
+
+### Revisão independente deste incremento
+Dois achados corrigidos: (1) após reinício de pool e de container, o teste agora exige consulta SQL saudável do hash exato issuer/subject/jti com uma linha revoked=true, antes de verificar negação do JWT; falha de DB não pode contar como prova de persistência. (2) alterações em sql/** também disparam o workflow combinado. Syntax check aprovado; resultado runtime continua pendente da CI. Nenhuma alteração na validação JWT ou grants de aplicação.
+
+
+## Preparação de callback, registro e transporte (2026-10-14)
+
+Ficha inerte: oauth-onboarding.review.json. Procedimento: OAUTH_ONBOARDING_PREPARATION.md.
+Esses arquivos não são import de realm ou configuração runtime; valores reais não comprovados permanecem null.
+Base atual comprovada: 2ded7e16348cbd7c51ebcf2296c9b2360cfb0e74, cinco workflows GREEN; instalação offline oficial e composição com conector disabled preservando toda configuração existente comprovadas. Isso supersede apenas os estados pendentes dos incrementos laboratoriais anteriores, não os bloqueios de produção.
+Registro dedicado permanece pré-registrado, sem DCR anônimo; callback deve vir da página de gestão da conexão. Transporte proposto: proxy HTTPS com mTLS comprovado e OAuth independente; alternativa de túnel exige disponibilidade e revisão específicas. Plugin atual não abre listener e rejeita endpointEnabled:true: composição futura separada é necessária. Origin ausente continua negada.
+Nenhum cliente, callback real, endpoint, grant operacional, credencial ou recurso de infraestrutura criado. Nenhuma mudança em autenticação/autorização runtime. A ficha não autoriza ativação.
+
+
+## Candidato executável de OAuth/proxy (novo incremento; CI pendente)
+
+A base GREEN atual é 510faad: pacote lab.4 instalado + JWT humano Keycloak +
+MCP/mTLS + DSH oficial + PostgreSQL real. Os estados pendentes dos incrementos
+anteriores acima são históricos e não representam o laboratório atual.
+
+Novo gerador: deploy/mcp/render-operational-candidate.mjs; runbook em
+deploy/mcp/README.md. Produz clientes desativados com os mappers revisados e
+proxy Envoy v1.40.0 sem bind, sem registrar cliente nem criar chaves/listener.
+Requer issuer/resource/callback/client/backend reais: o input review permanece
+vazio e não é ativável. Mantém canário inicial <=300s sem refresh.
+
+O proxy exige cadeia OpenAI Connectors e SAN mtls.prod.connectors.openai.com,
+mais mTLS interno separado. A policy/backend mantêm JWT/grants/revogação.
+A ausência de Origin pode ser convertida num marcador de canal interno somente
+na rota com essa autenticação mTLS obrigatória; Origin presente inválida/vazia
+é negada. Nenhum header do caller é prova de identidade. Código do pacote
+lab.4 não mudou. Esse candidato requer uma topologia sem terminação TLS antes
+do ponto que verifica o certificado OpenAI; nenhuma alteração de ingress foi feita.
+
+Cinco testes locais gerador/CLI e regressões passaram. O teste real Envoy com
+certificados descartáveis/backend double ainda aguarda CI e exige
+OPERATIONAL_PROXY_MTLS_SAN_ORIGIN_MATCH. Depois, testar o proxy junto do
+fluxo humano/DSH/PostgreSQL já existente. O gerador não fecha callback real,
+metadata/TTL operacionais, composição do host DSH, digest ou autorização de
+implantação. Não equivale a conexão ChatGPT ativa.

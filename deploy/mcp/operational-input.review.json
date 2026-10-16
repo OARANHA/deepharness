@@ -1,0 +1,16 @@
+{
+  "issuer": "https://id.wandora.com.br/realms/deepharness",
+  "resource": "https://dsh-mcp.wandora.com.br/mcp",
+  "clientId": "dsh-chatgpt-human",
+  "resourceClientId": "dsh-mcp-resource",
+  "redirectUri": "https://chatgpt.com/connector/oauth/W33m7nv9EP9o",
+  "redirectUriEvidence": "Owner copied exact URL from ChatGPT custom MCP OAuth settings, 2026-10-15",
+  "authorizationResponseIssuerSupported": true,
+  "tokenEndpointAuthMethod": "none",
+  "backendHost": "deepharness-mcp-backend",
+  "backendPort": 3443,
+  "allowedOrigins": [
+    "https://chatgpt.com"
+  ],
+  "missingOriginPolicy": "verified-mtls-channel"
+}

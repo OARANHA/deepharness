@@ -1,0 +1,165 @@
+name: ChatGPT MCP — Agent Teams read model
+
+on:
+  pull_request:
+    paths:
+      - 'deploy/mcp/**'
+      - 'integrations/chatgpt-mcp/package.json'
+      - 'integrations/chatgpt-mcp/runtime.mjs'
+      - 'integrations/chatgpt-mcp/policy.mjs'
+      - 'integrations/chatgpt-mcp/sql/**'
+      - 'integrations/chatgpt-mcp/test/postgres-read-grants.test.mjs'
+      - 'integrations/chatgpt-mcp/plugin.mjs'
+      - 'integrations/chatgpt-mcp/cordis.patch.yml'
+      - 'integrations/chatgpt-mcp/test/plugin-entry.test.mjs'
+      - 'integrations/chatgpt-mcp/PACKAGE_README.md'
+      - 'integrations/chatgpt-mcp/LICENSE'
+      - 'integrations/chatgpt-mcp/adapters/**'
+      - 'integrations/chatgpt-mcp/test/private-mcp-http-handler.test.mjs'
+      - 'integrations/chatgpt-mcp/test/runtime-package.test.mjs'
+      - 'integrations/chatgpt-mcp/adapters/dsh-host-read-binding.mjs'
+      - 'integrations/chatgpt-mcp/test/dsh-host-read-binding.test.mjs'
+      - 'integrations/chatgpt-mcp/adapters/agent-teams-read-model.mjs'
+      - 'integrations/chatgpt-mcp/test/agent-teams-read-model.test.mjs'
+      - 'integrations/chatgpt-mcp/adapters/agent-teams-read-authorization.mjs'
+      - 'integrations/chatgpt-mcp/test/agent-teams-read-authorization.test.mjs'
+      - 'integrations/chatgpt-mcp/adapters/dsh-agent-teams-host-reader.mjs'
+      - 'integrations/chatgpt-mcp/test/dsh-agent-teams-host-reader.test.mjs'
+      - 'integrations/chatgpt-mcp/adapters/scoped-mcp-read-identity.mjs'
+      - 'integrations/chatgpt-mcp/test/scoped-mcp-read-identity.test.mjs'
+      - 'integrations/chatgpt-mcp/adapters/bearer-scoped-team-reader.mjs'
+      - 'integrations/chatgpt-mcp/test/bearer-scoped-team-reader.test.mjs'
+      - 'integrations/chatgpt-mcp/adapters/scoped-read-grants.mjs'
+      - 'integrations/chatgpt-mcp/test/scoped-read-grants.test.mjs'
+      - 'integrations/chatgpt-mcp/adapters/mcp-read-request-context.mjs'
+      - 'integrations/chatgpt-mcp/test/mcp-read-request-context.test.mjs'
+      - 'integrations/chatgpt-mcp/adapters/register-scoped-team-read-tool.mjs'
+      - 'integrations/chatgpt-mcp/sdk-probe/**'
+      - 'integrations/chatgpt-mcp/host-probe/**'
+      - 'integrations/chatgpt-mcp/initialized-host-probe/**'
+      - 'integrations/chatgpt-mcp/test/projection-fixture.mjs'
+      - '.github/workflows/mcp-agent-teams-read-model.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  read-model:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Read-only projection unit contract
+        run: node --test integrations/chatgpt-mcp/test/agent-teams-read-model.test.mjs integrations/chatgpt-mcp/test/agent-teams-read-authorization.test.mjs integrations/chatgpt-mcp/test/dsh-agent-teams-host-reader.test.mjs integrations/chatgpt-mcp/test/scoped-mcp-read-identity.test.mjs integrations/chatgpt-mcp/test/bearer-scoped-team-reader.test.mjs integrations/chatgpt-mcp/test/scoped-read-grants.test.mjs integrations/chatgpt-mcp/test/mcp-read-request-context.test.mjs integrations/chatgpt-mcp/test/dsh-host-read-binding.test.mjs
+
+      - name: Opt-in private transport boundary unit contract
+        run: node --test integrations/chatgpt-mcp/test/private-mcp-http-handler.test.mjs
+
+  sdk-scoped-read:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install isolated pinned MCP SDK probe
+        run: npm ci --prefix integrations/chatgpt-mcp/sdk-probe --ignore-scripts --no-audit --no-fund
+      - name: Stateful MCP HTTP scoped read and negative contract
+        run: npm test --prefix integrations/chatgpt-mcp/sdk-probe
+
+  host-lock-preflight:
+    # Temporary isolated prerequisite, not the official initialized-host gate.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install from committed lock without install scripts
+        run: npm ci --prefix integrations/chatgpt-mcp/host-probe --ignore-scripts --no-audit --no-fund
+      - name: Verify published official DSH package surfaces
+        run: npm test --prefix integrations/chatgpt-mcp/host-probe
+
+  initialized-host-dependency-gate:
+    # Separate preflight; full TeamService + JSONL runtime is not yet proven.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install from committed initialized-host lockfile
+        run: npm ci --prefix integrations/chatgpt-mcp/initialized-host-probe --ignore-scripts --no-audit --no-fund
+      - name: Verify initialized-host prerequisite contracts
+        run: npm test --prefix integrations/chatgpt-mcp/initialized-host-probe
+
+      - name: Direct mTLS stateless SDK on official DSH read plugin
+        run: node --test integrations/chatgpt-mcp/initialized-host-probe/private-transport-official-host.test.mjs
+
+  packaged-runtime-host:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Runtime composition unit contract
+        run: npm test --prefix integrations/chatgpt-mcp
+      - name: Install pinned official host dependencies
+        run: npm ci --prefix integrations/chatgpt-mcp/initialized-host-probe --ignore-scripts --no-audit --no-fund
+      - name: Install and load actual packed runtime on official initialized DSH
+        run: node --test integrations/chatgpt-mcp/initialized-host-probe/packed-runtime-host.test.mjs
+      - name: Prepare reviewable private tarball and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/runtime-package-artifact"
+          npm pack ./integrations/chatgpt-mcp --ignore-scripts --pack-destination "$RUNNER_TEMP/runtime-package-artifact"
+          cd "$RUNNER_TEMP/runtime-package-artifact"
+          sha256sum ./*.tgz > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: private-dsh-read-runtime
+          path: ${{ runner.temp }}/runtime-package-artifact
+          retention-days: 7
+          if-no-files-found: error
+
+
+  operational-oauth-proxy-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test inactive OAuth and proxy rendering contract
+        run: node --test deploy/mcp/render-operational-candidate.test.mjs
+      - name: Validate and exercise disposable Envoy mTLS proxy on loopback
+        run: node deploy/mcp/operational-proxy-lab.mjs

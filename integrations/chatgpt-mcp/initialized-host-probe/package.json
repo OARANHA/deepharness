@@ -1,0 +1,23 @@
+{
+  "name": "deepharness-dsh-initialized-host-probe",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test official-host-read-seam.test.mjs initialized-host.test.mjs initialized-host-http.test.mjs verified-transport-identity.test.mjs pinned-jwt-transport.test.mjs pinned-oidc-metadata.test.mjs pinned-oidc-discovery.test.mjs rotating-jwks-transport.test.mjs oidc-egress-revocation.test.mjs dns-pinned-oidc-fetcher.test.mjs postgres-token-revocation.test.mjs mcp-oauth-metadata.test.mjs mcp-oauth-http-gate.test.mjs mock-oauth-pkce-e2e.test.mjs"
+  },
+  "dependencies": {
+    "@deepseek-ai/cordis": "4.0.5-alpha.1",
+    "@deepseek-ai/dsh-session": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-session-projection": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-session-persistence-jsonl": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-storage": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-storage-json": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-storage-domain": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-workspace": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-experimental-agent-team": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-agent": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-subagent": "0.2.1-alpha.2",
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "zod": "4.4.3"
+  }
+}

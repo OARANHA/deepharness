@@ -1,0 +1,47 @@
+# REVIEW ONLY. Not deployed; service profile and Traefik discovery remain disabled.
+# DNS-only dsh-mcp.wandora.com.br points to 28server. Keep Web UI router unchanged.
+services:
+  mcp-proxy:
+    profiles: ["mcp-review-only"]
+    image: ${DSH_MCP_PROXY_IMAGE:?Provide reviewed immutable Envoy digest}
+    user: "1000:1000"
+    command: ["envoy", "-c", "/etc/wandora-mcp/envoy.json", "--concurrency", "1", "--disable-hot-restart", "--log-level", "error"]
+    restart: "no"
+    read_only: true
+    init: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 128
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777
+    # No host ports, Docker socket, DSH data volume or application credentials.
+    volumes:
+      - type: bind
+        source: ${DSH_MCP_REVIEW_ROOT:?Provide reviewed configuration directory}/envoy.json
+        target: /etc/wandora-mcp/envoy.json
+        read_only: true
+      - type: bind
+        source: ${DSH_MCP_SECRET_ROOT:?Provide dedicated MCP certificate directory}
+        target: /run/secrets
+        read_only: true
+    networks: ["traefik-public", "mcp-private"]
+    labels:
+      traefik.enable: "false"
+      traefik.docker.network: "traefik-public"
+      traefik.tcp.routers.deepharness-mcp.rule: "HostSNI(`dsh-mcp.wandora.com.br`)"
+      traefik.tcp.routers.deepharness-mcp.entrypoints: "websecure"
+      traefik.tcp.routers.deepharness-mcp.service: "deepharness-mcp"
+      traefik.tcp.routers.deepharness-mcp.tls.passthrough: "true"
+      traefik.tcp.services.deepharness-mcp.loadbalancer.server.port: "8443"
+    logging:
+      driver: local
+      options: {max-size: "10m", max-file: "3"}
+
+networks:
+  traefik-public:
+    external: true
+  mcp-private:
+    internal: true
+

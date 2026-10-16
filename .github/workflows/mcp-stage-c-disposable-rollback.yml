@@ -1,0 +1,19 @@
+name: MCP Stage C - disposable infrastructure rollback
+on:
+  pull_request:
+    paths:
+      - 'deploy/mcp/stage-c-disposable-rollback.sh'
+      - '.github/workflows/mcp-stage-c-disposable-rollback.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  infra-rollback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Simulate isolated single-Web candidate failure and volume-preserving rollback
+        run: bash deploy/mcp/stage-c-disposable-rollback.sh

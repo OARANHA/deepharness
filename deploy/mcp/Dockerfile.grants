@@ -1,0 +1,6 @@
+# Candidate only. Separate authorization primary; never reuse an application DB.
+FROM postgres@sha256:0ea6700a3b4f0ae6ce746519073558aed4d88a79d8d07622a9a644946c7319c4
+COPY integrations/chatgpt-mcp/sql/001_token_revocations.sql /docker-entrypoint-initdb.d/10-token-revocations.sql
+COPY integrations/chatgpt-mcp/sql/002_read_grants.sql /docker-entrypoint-initdb.d/20-read-grants.sql
+COPY --chmod=0555 deploy/mcp/init-read-role.sh /docker-entrypoint-initdb.d/30-read-role.sh
+USER 999:999

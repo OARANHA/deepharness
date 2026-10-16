@@ -1,6 +1,24 @@
 # DeepHarness — canonical state
 
-Updated: 2026-10-12
+Updated: 2026-10-15 UTC
+
+## Current operational checkpoint — 2026-10-15 UTC
+
+This section supersedes the earlier preparation and bootstrap observations below.
+
+- Production target remains **28server**, existing `deepharness-web-1`, protected Web UI and two existing named DSH volumes. No MCP redeploy occurred during the disabled installation.
+- Owner-authorized identity exception remains **wandora-vps-01**: permanent administrator with MFA, bootstrap retired, dedicated issuer `https://id.wandora.com.br/realms/deepharness`; actual pinned OIDC/JWKS probe from28server passed after owner aligned the signing-key profile.
+- Exact tested host/grants/proxy images were published without rebuilding and pulled on28server. Host: `ghcr.io/oaranha/deepharness-mcp@sha256:2483c85cc3fbe6172bf284e67859572b8b6b5dc75bfea11ae160298f7202a62f`; grants: `ghcr.io/oaranha/deepharness-grants@sha256:6279a36d7cd94b7309e38b2931de38dd4f07bb84a5440e1b6433203587725210`; proxy: `ghcr.io/oaranha/wandora-envoy@sha256:9a24a2c5b3304936563440ab9b2274fb9e6fa45d3c95f5966fd498c235a8a877`. [Publication evidence](https://github.com/OARANHA/deepharness/actions/runs/38663108837).
+- Owner reported successful runtime secret/internal TLS provisioning and public DNS01 certificate issuance plus renewal dry-run on28server. Renewal scheduling/proxy reload remain pending.
+- **Real profile disabled installation succeeded, owner terminal evidence:** `MCP_PREINSTALL_BACKUP_MATCH` then `MCP_EXISTING_WEB_PROFILE_DISABLED_INSTALL_MATCH` from `deploy/mcp/resume-existing-profile-cache-v1.py`. Existing Agent Teams, JEV and browser bundles/dependencies/patches preserved. Original private backup and earlier failure records retained. No MCP listener, Web redeploy or OAuth activation follows from this marker.
+- Corrected installer issues: Docker29/containerd incomplete inspect metadata handled by exact approved manifest identity/runtime probe; official immutable DSH executable directory retained in PATH; existing JEV GitHub archive populated into store using its **existing** lock integrity in a network container mounting only the cache. Owner verified subsequent offline reuse. Cache-only procedure did not install packages into the live profile. Existing modules metadata reports pnpm12.11.2/storev11; candidate global pnpm11.28.5. URL-only store-add was not a sufficient offline test.
+- All six workflows at `09b834de920d470a6a02c030108ea03576e2ceb6` succeeded. Later helper additions have local verification and owner runtime markers as stated; do not imply every later revision's CI has been rechecked. [CI evidence](https://github.com/OARANHA/deepharness/actions/runs/38680459510).
+- **Not yet verified/activated:** operational MCP deployment/listener, proxy route, renewal timer, exact observed ChatGPT callback and dedicated OAuth clients/human account, primary grants DB runtime, one explicit grant and real ChatGPT read canary.
+- Next: reconcile existing stack and operational files on28server; prepare reviewed replacement/rollback preserving both volumes and Web authentication; configure exact observed OAuth callback; activate controlled deployment and one authorized read. No second DSH, VPS build, shared Traefik configuration changes or agent execution tools. Connected Portainer must not be assumed to target28server.
+
+## Historical record — retained for provenance
+
+
 
 ## Verified
 - `OARANHA/deepharness` existed as an empty public GitHub repository with write access before setup.
