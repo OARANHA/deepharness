@@ -141,6 +141,19 @@ jobs:
           assert Path('deploy/mcp/portainer-stack.stage-c.proposed.yml').exists()
           print('STAGE_C_REVIEW_ONLY_DEPLOYMENT_GUARD_MATCH')
           PY
+      - name: Lint owner-only read-only preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n deploy/mcp/owner-28server-preflight.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('deploy/mcp/owner-28server-preflight.sh').read_text()
+          for forbidden in ('docker run ', 'docker compose up', 'docker start ', 'docker stop ', 'docker rm ', 'docker volume rm', 'docker pull ', 'chmod ', 'chown ', 'cat /run/secrets', 'env |', 'printenv', 'docker stack deploy'):
+              assert forbidden not in p, f'forbidden mutation or secret disclosure: {forbidden}'
+          assert 'DSH_PREFLIGHT_READ_ONLY_DONE' in p
+          print('STAGE_C_OWNER_PREFLIGHT_STATIC_SAFE')
+          PY
       - name: Require review runtime disabled
         shell: bash
         run: |
