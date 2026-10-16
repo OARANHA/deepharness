@@ -46,8 +46,18 @@ try{
     try{docker(['exec','-e','PGPASSWORD='+'b'.repeat(64),db,'psql','-X','-h','127.0.0.1','-U','dsh_mcp_reader','-d','dsh_mcp_grants','-v','ON_ERROR_STOP=1','-c','SELECT count(*) FROM chatgpt_mcp_read_grants']);ready=true;break;}catch{}
     assert.equal(docker(['inspect','--format','{{.State.Status}}',db]).trim(),'running');await delay(500);
   }assert.ok(ready,'primary initialization');
+  phase='synthetic UID-1000 private key probe';
+  // Explicit user in Stage C is vital: a root default could mask unreadable
+  // owner-only production certificates. This checks only freshly generated CI keys.
+  const uidProbe=docker(['run','--rm','--network','none','--read-only','--user','1000:1000',
+    '--security-opt','no-new-privileges','--cap-drop','ALL',
+    '--mount','type=bind,src='+join(root,'runtime/backend-server-key.pem')+',dst=/ci-key.pem,readonly',
+    '--entrypoint','node','local/deepharness-mcp:candidate',
+    '-e',`const fs=require('node:fs');if(process.getuid()!==1000||process.getgid()!==1000)process.exit(51);const key=fs.readFileSync('/ci-key.pem');if(!key.toString('utf8').startsWith('-----BEGIN '))process.exit(52);console.log('STAGE_C_UID1000_SYNTHETIC_KEY_MATCH')`]).trim();
+  assert.equal(uidProbe,'STAGE_C_UID1000_SYNTHETIC_KEY_MATCH');
+  console.log(uidProbe);
   phase='official two-interface operational host';
-  docker(['create','--name',name,'--network',edge,'--network-alias','deepharness-web-edge','--init','--read-only',
+  docker(['create','--name',name,'--user','1000:1000','--network',edge,'--network-alias','deepharness-web-edge','--init','--read-only',
     '--cap-drop','ALL','--security-opt','no-new-privileges','--memory','2g','--pids-limit','256',
     '--tmpfs','/tmp:rw,nosuid,nodev,noexec,size=128m,mode=1777',
     '--tmpfs','/data/dsh:rw,nosuid,nodev,size=256m,mode=0700,uid=1000,gid=1000',
