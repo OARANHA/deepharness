@@ -93,6 +93,20 @@ jobs:
           trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
           test "$(docker cp "$cid":/opt/wandora-mcp-verifier/mcp/run-operational.mjs - | tar -tf - | grep -c 'run-operational.mjs')" -ge 1
           echo 'STAGE_C_PINNED_HOST_LAUNCHER_EXISTS'
+      - name: Verify operational config rejects disabled and malformed settings offline
+        shell: bash
+        run: |
+          set -euo pipefail
+          host='ghcr.io/oaranha/deepharness-mcp@sha256:2483c85cc3fbe6172bf284e67859572b8b6b5dc75bfea11ae160298f7202a62f'
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --user 1000:1000 --entrypoint node "$host" --input-type=module -e '
+            import {validateOperationalHostConfig as validate} from "/opt/wandora-mcp-verifier/mcp/operational-host.mjs";
+            const good={version:1,enabled:true,issuer:"https://id.wandora.com.br/realms/deepharness",resource:"https://dsh-mcp.wandora.com.br/mcp",backendPort:3443,allowedOrigins:["https://chatgpt.com","https://chatgpt-mtls-proxy.invalid"]};
+            if (validate(good).enabled!==true) process.exit(1);
+            for (const bad of [{...good,enabled:false},{...good,backendPort:3444},{...good,rogue:true},{...good,allowedOrigins:["https://evil.invalid"]}]) {
+              let denied=false;try{validate(bad)}catch{denied=true}if(!denied)process.exit(2);
+            }
+            console.log("STAGE_C_OFFLINE_RUNTIME_FAIL_CLOSED_MATCH");
+          '
       - name: Require review runtime disabled
         shell: bash
         run: |
