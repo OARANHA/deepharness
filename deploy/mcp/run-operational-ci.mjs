@@ -59,6 +59,12 @@ try{
   phase='attach private operational network';
   docker(['network','connect','--alias','deepharness-mcp-backend',backend,name]);
   assert.equal(docker(['inspect','--format','{{len .HostConfig.PortBindings}}',name]).trim(),'0');
+  // Stage C ingress gate: only our disposable host and primary, no public proxy.
+  // The original Web profile boots inside the sole operational-host container.
+  assert.equal(docker(['inspect','--format','{{len .HostConfig.PortBindings}}',db]).trim(),'0');
+  const members=docker(['network','inspect','--format','{{range .Containers}}{{.Name}} {{end}}',backend]).trim().split(/\s+/).sort();
+  assert.deepEqual(members,[db,name].sort(),'private network must contain only CI primary and sole Web host');
+  console.log('STAGE_C_PRIVATE_ONLY_NO_PROXY_MATCH');
   phase='run operational integration';
   const output=run('docker',['start','-a',name],{timeout:150000});
   const marker='MCP_OPERATIONAL_HOST_PRIMARY_MTLS_MATCH';assert.ok(output.includes(marker),'full integration marker required');
