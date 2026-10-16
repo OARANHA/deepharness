@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - review/stage-c-private-cutover-20261016
+      - proposal/stage-c-private-cutover-20261016
     paths:
       - 'deploy/mcp/**'
       - 'deploy/portainer-stack.yml'
@@ -107,6 +108,19 @@ jobs:
             }
             console.log("STAGE_C_OFFLINE_RUNTIME_FAIL_CLOSED_MATCH");
           '
+      - name: Validate separate approval proposal without changing deployment path
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          candidate=Path('deploy/mcp/portainer-stack.stage-c.review.yml').read_text()
+          proposal=Path('deploy/mcp/portainer-stack.stage-c.proposed.yml').read_text()
+          expected=candidate.replace('STAGE C REVIEW ONLY','STAGE C OWNER-APPROVAL PROPOSAL ONLY').replace('Do not deploy this raw candidate or substitute it into Portainer stack 90.','Approval proposal; do not substitute into Portainer stack 90 until approved and effective runtime ready.')
+          assert proposal==expected, 'proposed Compose diverged from reviewed candidate'
+          assert 'mcp-review-only' in proposal and "traefik.enable: 'false'" in proposal
+          print('STAGE_C_PROPOSAL_EQUALS_REVIEWED_CANDIDATE')
+          PY
       - name: Require review runtime disabled
         shell: bash
         run: |
