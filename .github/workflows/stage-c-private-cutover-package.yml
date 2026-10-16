@@ -1,0 +1,46 @@
+name: Stage C private cutover package review
+
+on:
+  push:
+    branches:
+      - review/stage-c-private-cutover-20261016
+    paths:
+      - 'deploy/mcp/**'
+      - 'deploy/portainer-stack.yml'
+      - '.github/workflows/stage-c-private-cutover-package.yml'
+  pull_request:
+    paths:
+      - 'deploy/mcp/**'
+      - 'deploy/portainer-stack.yml'
+      - '.github/workflows/stage-c-private-cutover-package.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify original production Compose is unchanged from frozen rollback
+        shell: bash
+        run: |
+          set -euo pipefail
+          git show b5e63748aaacc9c4f719327f9f5d9ebf300840d4:deploy/portainer-stack.yml > "$RUNNER_TEMP/original-web-compose.yml"
+          cmp -s "$RUNNER_TEMP/original-web-compose.yml" deploy/portainer-stack.yml
+          echo 'STAGE_C_ORIGINAL_PRODUCTION_COMPOSE_PRESERVED'
+      - name: Validate dummy-only Stage C effective Compose and isolation
+        run: python3 deploy/mcp/verify-effective-compose-safe.py
+      - name: Require review runtime disabled
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          with open('deploy/mcp/runtime.review.json', encoding='utf8') as f:
+              config=json.load(f)
+          assert config.get('enabled') is False, 'review runtime must remain disabled'
+          assert set(config)=={'version','enabled','issuer','resource','backendPort','allowedOrigins'}
+          print('STAGE_C_REVIEW_RUNTIME_FAIL_CLOSED')
+          PY
