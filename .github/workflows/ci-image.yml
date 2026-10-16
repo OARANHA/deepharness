@@ -172,23 +172,58 @@ jobs:
         env:
           DEEPHARNESS_IMAGE: ghcr.io/oaranha/deepharness@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
           DSH_BASIC_AUTH_USERS: ci-placeholder-no-secret
+          DSH_MCP_HOST_IMAGE: ghcr.io/oaranha/deepharness-mcp@sha256:2483c85cc3fbe6172bf284e67859572b8b6b5dc75bfea11ae160298f7202a62f
+          DSH_MCP_GRANTS_IMAGE: ghcr.io/oaranha/deepharness-grants@sha256:6279a36d7cd94b7309e38b2931de38dd4f07bb84a5440e1b6433203587725210
+          DSH_MCP_PROXY_IMAGE: ghcr.io/oaranha/wandora-envoy@sha256:9a24a2c5b3304936563440ab9b2274fb9e6fa45d3c95f5966fd498c235a8a877
+          DSH_MCP_REVIEW_ROOT: /opt/wandora/data/deepharness-mcp/review
+          DSH_MCP_SECRET_ROOT: /opt/wandora/data/deepharness-mcp/tls
         shell: bash
         run: |
           set -euo pipefail
           docker compose -f deploy/portainer-stack.yml config --quiet
           docker compose -f deploy/portainer-stack.yml config --format json | python3 -c '
-          import json, sys
-          doc = json.load(sys.stdin)
-          svc = doc["services"]["web"]
-          assert not svc.get("ports"), "Port publishing is forbidden"
-          assert set(svc["networks"]) == {"traefik-public"}
+          import json, os, sys
+          doc=json.load(sys.stdin)
+          services=doc["services"]
+          assert not any(s.get("ports") for s in services.values()), "No service may publish ports"
           assert doc["networks"]["traefik-public"]["external"] is True
-          cmd = svc["command"]
-          assert len(cmd) == 3 and cmd[:2] == ["sh", "-ec"]
-          assert "hostname -i" in cmd[2]
-          assert "--public-url https://deep.wandora.com.br/" in cmd[2]
-          assert "--trusted-host deep.wandora.com.br" in cmd[2]
-          print("Portainer Stack syntax OK: shared Traefik network, no published ports")
+          web=services["web"]
+          labels=web["labels"]
+          assert labels["traefik.http.routers.deepharness.middlewares"]=="deepharness-auth"
+          assert labels["traefik.http.middlewares.deepharness-auth.basicauth.users"]==os.environ["DSH_BASIC_AUTH_USERS"]
+          assert labels["traefik.http.services.deepharness.loadbalancer.server.port"]=="3080"
+          if set(services)=={"web"}:
+              assert set(web["networks"])=={"traefik-public"}
+              cmd=web["command"]
+              assert len(cmd)==3 and cmd[:2]==["sh","-ec"]
+              assert "hostname -i" in cmd[2]
+              assert "--public-url https://deep.wandora.com.br/" in cmd[2]
+              assert "--trusted-host deep.wandora.com.br" in cmd[2]
+              assert web["image"]==os.environ["DEEPHARNESS_IMAGE"]
+              print("ORIGINAL_WEB_COMPOSE_SAFE")
+          else:
+              assert set(services)=={"web","mcp-grants-db"}, "Unexpected enabled services"
+              db=services["mcp-grants-db"]
+              assert web["image"]==os.environ["DSH_MCP_HOST_IMAGE"]
+              assert db["image"]==os.environ["DSH_MCP_GRANTS_IMAGE"]
+              assert str(web.get("user"))=="1000:1000"
+              assert str(db.get("user"))=="999:999"
+              assert web["command"]==["node","/opt/wandora-mcp-verifier/mcp/run-operational.mjs"]
+              assert set(web["networks"])=={"mcp-private","traefik-public"}
+              assert set(db["networks"])=={"mcp-private"}
+              assert doc["networks"]["mcp-private"]["internal"] is True
+              assert web["depends_on"]["mcp-grants-db"]["condition"]=="service_healthy"
+              assert doc["volumes"]["dsh_data"]["external"] is True
+              assert doc["volumes"]["dsh_data"]["name"]=="deepharness_dsh_data"
+              assert doc["volumes"]["dsh_workspace"]["external"] is True
+              assert doc["volumes"]["dsh_workspace"]["name"]=="deepharness_dsh_workspace"
+              assert {"mcp-admin-db-password","mcp-runtime-db-password"}<=set(doc["secrets"])
+              binds={v["target"]:v for v in web["volumes"]}
+              for target in ["/etc/wandora-mcp/runtime.json","/run/secrets/backend-server-key.pem","/run/secrets/backend-server-chain.pem","/run/secrets/backend-ca.pem"]:
+                  assert target in binds and binds[target]["read_only"] is True
+              assert binds["/etc/wandora-mcp/runtime.json"]["source"]==os.environ["DSH_MCP_REVIEW_ROOT"]+"/runtime.json"
+              assert "mcp-proxy" not in services, "Public MCP proxy must stay disabled"
+              print("STAGE_C_PRIVATE_COMPOSE_SAFE")
           '
 
       - name: Log in to GHCR
