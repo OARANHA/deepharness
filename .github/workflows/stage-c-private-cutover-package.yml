@@ -1,0 +1,183 @@
+name: Stage C private cutover package review
+
+on:
+  push:
+    branches:
+      - review/stage-c-private-cutover-20261016
+      - proposal/stage-c-private-cutover-20261016
+    paths:
+      - 'deploy/mcp/**'
+      - 'deploy/portainer-stack.yml'
+      - '.github/workflows/stage-c-private-cutover-package.yml'
+  pull_request:
+    paths:
+      - 'deploy/mcp/**'
+      - 'deploy/portainer-stack.yml'
+      - '.github/workflows/stage-c-private-cutover-package.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify original production Compose is unchanged from frozen rollback
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Verified original Compose Git blob from frozen safety ref.
+          # Checking the Git blob hash avoids unreliable history lookups in CI.
+          actual="$(git hash-object deploy/portainer-stack.yml)"
+          test "$actual" = "cd72a46a2e458fcc6902d3ca243ac31c2979d346"
+          echo 'STAGE_C_ORIGINAL_PRODUCTION_COMPOSE_PRESERVED'
+      - name: Validate dummy-only Stage C effective Compose and isolation
+        run: python3 deploy/mcp/verify-effective-compose-safe.py
+      - name: Verify tested MCP artifact provenance at GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api repos/OARANHA/deepharness/actions/artifacts/11939945181 > "$RUNNER_TEMP/mcp-tested-artifact.json"
+          python3 - "$RUNNER_TEMP/mcp-tested-artifact.json" <<'PY'
+          import json,sys
+          a=json.load(open(sys.argv[1]))
+          assert not a['expired']
+          assert a['name']=='mcp-tested-images-38661846023'
+          assert a['digest']=='sha256:059986453d877be47bd405b8aa8e05012890c17dcac8e01530f46ef2925e7cb8'
+          assert a['workflow_run']['id']==38661846023
+          print('STAGE_C_TESTED_ARTIFACT_IDENTITY_MATCH')
+          PY
+      - name: Match the exact successfully published image digest artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api repos/OARANHA/deepharness/actions/runs/38663108837 > "$RUNNER_TEMP/publish-run.json"
+          gh api repos/OARANHA/deepharness/actions/artifacts/11939996050 > "$RUNNER_TEMP/publish-artifact.json"
+          python3 - "$RUNNER_TEMP/publish-run.json" "$RUNNER_TEMP/publish-artifact.json" <<'PY'
+          import json,sys
+          run,artifact=map(lambda p:json.load(open(p)),sys.argv[1:])
+          assert run['conclusion']=='success' and run['name']=='Publish reviewed MCP images'
+          assert artifact['name']=='mcp-published-digests-38663108837' and not artifact['expired']
+          assert artifact['workflow_run']['id']==38663108837
+          print('STAGE_C_PUBLISH_RUN_AND_ARTIFACT_MATCH')
+          PY
+          gh api repos/OARANHA/deepharness/actions/artifacts/11939996050/zip > "$RUNNER_TEMP/published.zip"
+          mkdir "$RUNNER_TEMP/published"
+          unzip -q "$RUNNER_TEMP/published.zip" -d "$RUNNER_TEMP/published"
+          test "$(cat "$RUNNER_TEMP/published/deepharness-mcp.txt")" = 'ghcr.io/oaranha/deepharness-mcp@sha256:2483c85cc3fbe6172bf284e67859572b8b6b5dc75bfea11ae160298f7202a62f'
+          test "$(cat "$RUNNER_TEMP/published/deepharness-grants.txt")" = 'ghcr.io/oaranha/deepharness-grants@sha256:6279a36d7cd94b7309e38b2931de38dd4f07bb84a5440e1b6433203587725210'
+          test "$(cat "$RUNNER_TEMP/published/wandora-envoy.txt")" = 'ghcr.io/oaranha/wandora-envoy@sha256:9a24a2c5b3304936563440ab9b2274fb9e6fa45d3c95f5966fd498c235a8a877'
+          echo 'STAGE_C_ALL_PUBLISHED_DIGESTS_EXACT_MATCH'
+      - name: Verify pinned image manifest digest and operational launcher
+        shell: bash
+        run: |
+          set -euo pipefail
+          host='ghcr.io/oaranha/deepharness-mcp@sha256:2483c85cc3fbe6172bf284e67859572b8b6b5dc75bfea11ae160298f7202a62f'
+          grants='ghcr.io/oaranha/deepharness-grants@sha256:6279a36d7cd94b7309e38b2931de38dd4f07bb84a5440e1b6433203587725210'
+          proxy='ghcr.io/oaranha/wandora-envoy@sha256:9a24a2c5b3304936563440ab9b2274fb9e6fa45d3c95f5966fd498c235a8a877'
+          for image in "$host" "$grants" "$proxy"; do
+            docker manifest inspect "$image" > /dev/null
+          done
+          echo 'STAGE_C_ALL_PINNED_REGISTRY_MANIFESTS_RESOLVE'
+          docker pull "$host" > /dev/null
+          # No production DSH volumes, secret mounts, network or container startup.
+          cid="$(docker create --network none --entrypoint node "$host" --version)"
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+          test "$(docker cp "$cid":/opt/wandora-mcp-verifier/mcp/run-operational.mjs - | tar -tf - | grep -c 'run-operational.mjs')" -ge 1
+          echo 'STAGE_C_PINNED_HOST_LAUNCHER_EXISTS'
+      - name: Verify operational config rejects disabled and malformed settings offline
+        shell: bash
+        run: |
+          set -euo pipefail
+          host='ghcr.io/oaranha/deepharness-mcp@sha256:2483c85cc3fbe6172bf284e67859572b8b6b5dc75bfea11ae160298f7202a62f'
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --user 1000:1000 --entrypoint node "$host" --input-type=module -e '
+            import {validateOperationalHostConfig as validate} from "/opt/wandora-mcp-verifier/mcp/operational-host.mjs";
+            const good={version:1,enabled:true,issuer:"https://id.wandora.com.br/realms/deepharness",resource:"https://dsh-mcp.wandora.com.br/mcp",backendPort:3443,allowedOrigins:["https://chatgpt.com","https://chatgpt-mtls-proxy.invalid"]};
+            if (validate(good).enabled!==true) process.exit(1);
+            for (const bad of [{...good,enabled:false},{...good,backendPort:3444},{...good,rogue:true},{...good,allowedOrigins:["https://evil.invalid"]}]) {
+              let denied=false;try{validate(bad)}catch{denied=true}if(!denied)process.exit(2);
+            }
+            console.log("STAGE_C_OFFLINE_RUNTIME_FAIL_CLOSED_MATCH");
+          '
+      - name: Validate separate approval proposal without changing deployment path
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          candidate=Path('deploy/mcp/portainer-stack.stage-c.review.yml').read_text()
+          proposal=Path('deploy/mcp/portainer-stack.stage-c.proposed.yml').read_text()
+          expected=candidate.replace('STAGE C REVIEW ONLY','STAGE C OWNER-APPROVAL PROPOSAL ONLY').replace('Do not deploy this raw candidate or substitute it into Portainer stack 90.','Approval proposal; do not substitute into Portainer stack 90 until approved and effective runtime ready.')
+          assert proposal==expected, 'proposed Compose diverged from reviewed candidate'
+          assert 'mcp-review-only' in proposal and "traefik.enable: 'false'" in proposal
+          print('STAGE_C_PROPOSAL_EQUALS_REVIEWED_CANDIDATE')
+          PY
+      - name: Block deployable changes in approval-only PR
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          baseline='cd72a46a2e458fcc6902d3ca243ac31c2979d346'
+          current=subprocess.check_output(['git','hash-object','deploy/portainer-stack.yml'],text=True).strip()
+          assert current==baseline, 'production Portainer Compose was modified'
+          assert not Path('deploy/mcp/runtime.json').exists(), 'enabled runtime must not be committed'
+          for file in Path('deploy/mcp').rglob('*.json'):
+              if file.name=='runtime.review.json':
+                  continue
+              # review must not create operational enabled runtime in a deployable path
+              if file.name=='runtime.json':
+                  raise AssertionError('operational runtime was committed')
+          assert Path('deploy/mcp/portainer-stack.stage-c.proposed.yml').exists()
+          print('STAGE_C_REVIEW_ONLY_DEPLOYMENT_GUARD_MATCH')
+          PY
+      - name: Lint owner-only read-only preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n deploy/mcp/owner-28server-preflight.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('deploy/mcp/owner-28server-preflight.sh').read_text()
+          for forbidden in ('docker run ', 'docker compose up', 'docker start ', 'docker stop ', 'docker rm ', 'docker volume rm', 'docker pull ', 'chmod ', 'chown ', 'cat /run/secrets', 'env |', 'printenv', 'docker stack deploy'):
+              assert forbidden not in p, f'forbidden mutation or secret disclosure: {forbidden}'
+          assert 'DSH_PREFLIGHT_READ_ONLY_DONE' in p
+          print('STAGE_C_OWNER_PREFLIGHT_STATIC_SAFE')
+          PY
+      - name: Verify exact non-applied production deployment patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          patch=Path('deploy/mcp/STAGE_C_PORTAINER_DEPLOYMENT_PATH_REVIEW.diff').read_text().splitlines()
+          original=Path('deploy/portainer-stack.yml').read_text().splitlines()
+          proposed=Path('deploy/mcp/portainer-stack.stage-c.proposed.yml').read_text().splitlines()
+          assert patch[:2]==['--- a/deploy/portainer-stack.yml','+++ b/deploy/portainer-stack.yml']
+          assert patch[2]==f'@@ -1,{len(original)} +1,{len(proposed)} @@'
+          assert patch[3:3+len(original)]==['-'+line for line in original]
+          assert patch[3+len(original):]==['+'+line for line in proposed]
+          assert 'enabled: true' not in Path('deploy/mcp/runtime.review.json').read_text()
+          print('STAGE_C_EXACT_NON_APPLIED_DEPLOYMENT_DIFF_MATCH')
+          PY
+      - name: Require review runtime disabled
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          with open('deploy/mcp/runtime.review.json', encoding='utf8') as f:
+              config=json.load(f)
+          assert config.get('enabled') is False, 'review runtime must remain disabled'
+          assert set(config)=={'version','enabled','issuer','resource','backendPort','allowedOrigins'}
+          print('STAGE_C_REVIEW_RUNTIME_FAIL_CLOSED')
+          PY

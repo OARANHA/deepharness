@@ -1,0 +1,191 @@
+# STAGE C OWNER-APPROVAL PROPOSAL ONLY — operational Web and private grants primary; PUBLIC MCP PROXY DISABLED.
+# Requires operator-owned runtime enabled:true at separately authorized cutover.
+# Approval proposal; do not substitute into Portainer stack 90 until approved and effective runtime ready.
+# REVIEW ONLY: full replacement for the existing deepharness stack, never a second stack.
+# Inactive profile, disabled proxy route, and operator-controlled runtime.json.
+services:
+  web:
+    # Explicit nonroot identity required for owner-only backend TLS key (UID 1000).
+    user: 1000:1000
+    image: ${DSH_MCP_HOST_IMAGE:?Provide tested immutable MCP host digest}
+    command:
+    - node
+    - /opt/wandora-mcp-verifier/mcp/run-operational.mjs
+    restart: unless-stopped
+    init: true
+    read_only: true
+    security_opt:
+    - no-new-privileges:true
+    cap_drop:
+    - ALL
+    pids_limit: 256
+    mem_limit: 2g
+    cpus: 1.5
+    tmpfs:
+    - /tmp:rw,nosuid,nodev,noexec,size=128m,mode=1777
+    environment:
+      NARB_DISABLE_NATIVE_CACHE: '1'
+      NPM_CONFIG_CACHE: /data/dsh/.npm-cache
+      NPM_CONFIG_PREFIX: /data/dsh/.npm-global
+      XDG_CACHE_HOME: /data/dsh/.cache
+    volumes:
+    - dsh_data:/data/dsh
+    - dsh_workspace:/workspace
+    - type: bind
+      source: ${DSH_MCP_REVIEW_ROOT:?Provide reviewed configuration directory}/runtime.json
+      target: /etc/wandora-mcp/runtime.json
+      read_only: true
+    - type: bind
+      source: /opt/wandora/data/deepharness-mcp/tls/backend/backend-server-key.pem
+      target: /run/secrets/backend-server-key.pem
+      read_only: true
+    - type: bind
+      source: /opt/wandora/data/deepharness-mcp/tls/backend/backend-server-chain.pem
+      target: /run/secrets/backend-server-chain.pem
+      read_only: true
+    - type: bind
+      source: /opt/wandora/data/deepharness-mcp/tls/backend/backend-ca.pem
+      target: /run/secrets/backend-ca.pem
+      read_only: true
+    networks:
+      traefik-public:
+        aliases:
+        - deepharness-web-edge
+      mcp-private:
+        aliases:
+        - deepharness-mcp-backend
+    labels:
+    - traefik.enable=true
+    - traefik.docker.network=traefik-public
+    - traefik.http.routers.deepharness.rule=Host(`deep.wandora.com.br`)
+    - traefik.http.routers.deepharness.entrypoints=websecure
+    - traefik.http.routers.deepharness.tls=true
+    - traefik.http.routers.deepharness.tls.certresolver=letsencrypt
+    - traefik.http.routers.deepharness.middlewares=deepharness-auth
+    - traefik.http.middlewares.deepharness-auth.basicauth.users=${DSH_BASIC_AUTH_USERS:?Configure
+      BasicAuth credential hash in Portainer}
+    - traefik.http.services.deepharness.loadbalancer.server.port=3080
+    depends_on:
+      mcp-grants-db:
+        condition: service_healthy
+    secrets:
+    - mcp-runtime-db-password
+  mcp-proxy:
+    profiles:
+    - mcp-review-only
+    image: ${DSH_MCP_PROXY_IMAGE:?Provide reviewed immutable Envoy digest}
+    user: 1000:1000
+    command:
+    - envoy
+    - -c
+    - /etc/wandora-mcp/envoy.json
+    - --concurrency
+    - '1'
+    - --disable-hot-restart
+    - --log-level
+    - error
+    restart: unless-stopped
+    read_only: true
+    init: true
+    cap_drop:
+    - ALL
+    security_opt:
+    - no-new-privileges:true
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 128
+    tmpfs:
+    - /tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777
+    volumes:
+    - type: bind
+      source: ${DSH_MCP_REVIEW_ROOT:?Provide reviewed configuration directory}/envoy.json
+      target: /etc/wandora-mcp/envoy.json
+      read_only: true
+    - type: bind
+      source: ${DSH_MCP_SECRET_ROOT:?Provide dedicated MCP certificate directory}
+      target: /run/secrets
+      read_only: true
+    networks:
+    - traefik-public
+    - mcp-private
+    labels:
+      traefik.enable: 'false'
+      traefik.docker.network: traefik-public
+      traefik.tcp.routers.deepharness-mcp.rule: HostSNI(`dsh-mcp.wandora.com.br`)
+      traefik.tcp.routers.deepharness-mcp.entrypoints: websecure
+      traefik.tcp.routers.deepharness-mcp.service: deepharness-mcp
+      traefik.tcp.routers.deepharness-mcp.tls.passthrough: 'true'
+      traefik.tcp.services.deepharness-mcp.loadbalancer.server.port: '8443'
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: '3'
+  mcp-grants-db:
+    image: ${DSH_MCP_GRANTS_IMAGE:?Provide tested immutable grants image digest}
+    user: 999:999
+    restart: unless-stopped
+    read_only: true
+    cap_drop:
+    - ALL
+    security_opt:
+    - no-new-privileges:true
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 128
+    command:
+    - postgres
+    - -c
+    - max_connections=20
+    - -c
+    - shared_buffers=32MB
+    - -c
+    - password_encryption=scram-sha-256
+    environment:
+      POSTGRES_DB: dsh_mcp_grants
+      POSTGRES_USER: dsh_mcp_owner
+      POSTGRES_PASSWORD_FILE: /run/secrets/mcp-admin-db-password
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    secrets:
+    - mcp-admin-db-password
+    - mcp-runtime-db-password
+    volumes:
+    - mcp_grants_data:/var/lib/postgresql/data
+    tmpfs:
+    - /var/run/postgresql:rw,nosuid,nodev,noexec,size=8m,mode=0770,uid=999,gid=999
+    - /tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777
+    networks:
+    - mcp-private
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U dsh_mcp_owner -d dsh_mcp_grants
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: '3'
+# Bind the existing 28server DSH volumes by immutable observed Docker names.
+# Prevent accidental creation of new empty data/workspace volumes during review.
+volumes:
+  dsh_data:
+    external: true
+    name: deepharness_dsh_data
+  dsh_workspace:
+    external: true
+    name: deepharness_dsh_workspace
+  mcp_grants_data: null
+networks:
+  traefik-public:
+    external: true
+  mcp-private:
+    internal: true
+secrets:
+  mcp-admin-db-password:
+    file: /opt/wandora/data/deepharness-mcp/secrets/admin-db-password
+  mcp-runtime-db-password:
+    file: /opt/wandora/data/deepharness-mcp/secrets/runtime-db-password
