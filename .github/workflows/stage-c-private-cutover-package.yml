@@ -121,6 +121,26 @@ jobs:
           assert 'mcp-review-only' in proposal and "traefik.enable: 'false'" in proposal
           print('STAGE_C_PROPOSAL_EQUALS_REVIEWED_CANDIDATE')
           PY
+      - name: Block deployable changes in approval-only PR
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          baseline='cd72a46a2e458fcc6902d3ca243ac31c2979d346'
+          current=subprocess.check_output(['git','hash-object','deploy/portainer-stack.yml'],text=True).strip()
+          assert current==baseline, 'production Portainer Compose was modified'
+          assert not Path('deploy/mcp/runtime.json').exists(), 'enabled runtime must not be committed'
+          for file in Path('deploy/mcp').rglob('*.json'):
+              if file.name=='runtime.review.json':
+                  continue
+              # review must not create operational enabled runtime in a deployable path
+              if file.name=='runtime.json':
+                  raise AssertionError('operational runtime was committed')
+          assert Path('deploy/mcp/portainer-stack.stage-c.proposed.yml').exists()
+          print('STAGE_C_REVIEW_ONLY_DEPLOYMENT_GUARD_MATCH')
+          PY
       - name: Require review runtime disabled
         shell: bash
         run: |
