@@ -1,3 +1,10 @@
+## Restricted-agent readback — 2026-10-16
+
+- Agent `medicspro-managed-admin` executed a metadata-only `fs.statSync` probe of the six protected host paths: every request returned `EACCES`. That is a privilege-boundary result, **not** proof of missing or broken files.
+- `docker_inspect_safe` for `deepharness-web-1` returned `CONTAINER_NOT_ALLOWED` because the target's container allowlist is empty. Live container inspection from that target is unavailable.
+- No privilege escalation, secret read, container start, Portainer write or production file modification was performed.
+- Owner root read-only inspection, or a separately authorized safe read capability, remains required. Do not weaken host directory permissions to facilitate a remote probe. **NO-GO.**
+
 # Stage C — owner read-only 28server preflight (NO-GO until reviewed)
 
 This is **not** a deploy script. Run by owner only, in a maintenance planning session. No credentials or certificate contents must be copied into chat. **Never run docker compose up, docker stack deploy, docker run mounting DSH production volumes, portainer update, git checkout on production, or enable runtime here.**
