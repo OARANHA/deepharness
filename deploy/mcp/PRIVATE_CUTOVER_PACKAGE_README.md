@@ -1,3 +1,9 @@
+## Independent branch gate — 2026-10-16
+
+Compared against original `b5e63748aaacc9c4f719327f9f5d9ebf300840d4`: exactly four added review files; **`deploy/portainer-stack.yml` remains identical**. Ran the copied `verify-effective-compose-safe.py` and candidate Compose in the independent isolated 28server ops workspace; exit 0 and markers `STAGE_C_EFFECTIVE_COMPOSE_DUMMY_ONLY_MATCH`, `STAGE_C_UID1000_PRIVATE_NO_PROXY_MATCH`, `STAGE_C_EXISTING_VOLUMES_BASICAUTH_MATCH`. No secrets or Portainer writes.
+
+The GitHub workflow lookup for commit `7b152c488c606e8a3c94088b1c938ef277e5930e` returned **zero runs**, not an implicit GREEN. The branch is a **review-only package**, not yet a self-contained deployable artifact; operational implementation is in PR #4/pinned image and not in these four files. Further provenance checks, a dedicated branch CI gate and owner-approved runtime/deploy commit are mandatory. **NO-GO.**
+
 # DeepHarness Stage C — private cutover review branch
 
 **NOT DEPLOYABLE / NO-GO — review-only package, 2026-10-16.**
