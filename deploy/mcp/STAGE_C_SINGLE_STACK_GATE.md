@@ -1,3 +1,7 @@
+## Latest Stage C private-only disposable CI gate — 2026-10-16
+
+At code commit `83e299a825605127caafbf89da0c8af5df96a828`, the existing `deploy/mcp/run-operational-ci.mjs` disposable official Web/real PostgreSQL/mTLS integration harness was strengthened to assert **zero host port bindings** on both the official Web and grants primary and **exactly two containers** on its internal backend Docker network (one Web operational host, one grants primary; **no Envoy proxy**). It prints `STAGE_C_PRIVATE_ONLY_NO_PROXY_MATCH` only after these assertions. Code was staged on the isolated 28server ops workspace and `node --check` exited 0. This **is not yet an end-to-end test pass** at this new commit; GitHub CI success is required. A separate `runtime.review.json` remains disabled, and the candidate Stage C Compose is not authorized to deploy. Production stack 90 untouched.
+
 ## Official Web disposable rollback — verified GREEN (2026-10-16)
 
 On exact commit `2ea0282fc48263ce29ffcaf3b329c1a5eabcbef6`, GitHub Actions returned **8/8 workflows completed successfully**, including [MCP Stage C — official Web disposable rollback run 38844271194](https://github.com/OARANHA/deepharness/actions/runs/38844271194), job `official-web-rollback` ID `116791108741` conclusion `success`. The steps **Build pinned official DSH Web image only in CI** and **Simulate candidate failure and restore actual official DSH Web** both concluded `success`. Source: `deploy/mcp/stage-c-official-web-rollback.sh` and `.github/workflows/mcp-stage-c-official-web-rollback.yml`.
