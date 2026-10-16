@@ -1,6 +1,6 @@
 # Stage B — Private operational MCP integration gate (2026-10-15)
 
-**Status: isolated local tests GREEN; disposable end-to-end integration previously GREEN on an older PR SHA. Not authorized for production.**
+**Status: isolated local tests GREEN; disposable end-to-end integration GREEN at commit `19d618ba0266fa97e743789f53b9b05ea8dd030a`. Not authorized for production.**
 
 ## Goal and architecture
 
@@ -23,9 +23,15 @@ Observed **15 tests / 15 pass / 0 fail / exit 0**: disabled and malformed config
 
 The earlier PR parent SHA `9085faddee1c4f847710cd2519b0b2b36bae4a3e` passed full disposable CI run [38805937413](https://github.com/OARANHA/deepharness/actions/runs/38805937413), including official Web host, real disposable PostgreSQL, private TLS, grant and token revocation. **Do not carry its GREEN result forward to the current branch HEAD without new CI evidence.**
 
+## CI confirmation for Stage B commit 19d618b (2026-10-15)
+
+At exact branch commit `19d618ba0266fa97e743789f53b9b05ea8dd030a`, six pull-request-triggered workflows completed with **conclusion=success**, independently read from the GitHub Actions run API. In [bootstrap run 38836869201](https://github.com/OARANHA/deepharness/actions/runs/38836869201), job `docker` (116767842008) and job `mcp-grants-primary` (116767842078) both passed. Crucially the step **Build primary and verify actual operational Web host with restricted PostgreSQL and mTLS** passed in `docker`; **Verify runtime SELECT privileges and persisted role boundaries on real PostgreSQL** passed in `mcp-grants-primary`. Other successful runs: isolated PostgreSQL revocation 38836869121; isolated alpha compatibility 38836869184; Agent Teams read model 38836869141; isolated Keycloak profile probe 38836869199; identity candidate 38836869159.
+
+**Decision:** Stage B disposable CI integration gate GREEN **for this exact commit SHA**. Do not extrapolate to a later documentation/implementation HEAD without rechecking. No live 28server operational MCP service, grants DB, proxy, public route, OAuth client, ChatGPT session or production cutover was activated by these CI checks.
+
 ## Required next technical gates (no production action)
 
-1. On the **current** PR HEAD, run CI's disposable operational integration and record actual workflow run ID, commit SHA, green/red and the `MCP_OPERATIONAL_HOST_PRIMARY_MTLS_MATCH` marker. Do not claim this happened based on older results.
+1. Completed for Stage B commit `19d618b`: operational CI and PostgreSQL primary steps are GREEN. Recheck later HEADs after changes; the marker is enforced by the CI harness, though the workflow step summary alone does not display raw logs.
 2. Produce an explicit reviewed **single-stack** transition design: original Web must remain available while private MCP host is attached or safely replaced. Keep the proxy's Traefik ingress disabled and maintain zero operational grants. A private runtime `enabled:true` is **not** equivalent to public exposure; isolate it from Traefik routing and require successful official profile boot and authenticated private denial tests.
 3. Review exact Portainer environment names, image **digests**, file existence/UIDs, DSH mount reuse, old image and restore procedure without copying actual credentials or BasicAuth values. The exact applied full Git SHA remains unknown; stored original Compose is verified byte-identical to `main` by SHA-256.
 4. Rehearse rolling back in disposable CI; require an explicit future owner authorization before changing the existing Portainer stack 90. A separate authorization is required for the real ingress, OAuth, grant and ChatGPT canary.
