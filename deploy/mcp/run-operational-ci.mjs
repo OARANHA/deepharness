@@ -29,6 +29,7 @@ try{
   run('sudo',['chown','999:999',join(root,'admin')]);
   for(const file of ['runtime/backend-server-key.pem','runtime/backend-server-chain.pem','runtime/backend-ca.pem',
     'runtime/mcp-runtime-db-password','client/client.key','client/client.crt'])run('sudo',['chown','1000:999',join(root,file)]);
+  await chmod(join(root,'runtime/backend-server-key.pem'),0o400);
   phase='isolated networks and primary';
   docker(['network','create','--internal',edge]);docker(['network','create','--internal',backend]);docker(['volume','create',volume]);
   docker(['run','-d','--name',db,'--network',backend,'--network-alias','mcp-grants-db','--read-only','--cap-drop','ALL',
