@@ -1,3 +1,9 @@
+## UID 1000 synthetic key CI — GREEN (2026-10-16)
+
+At exact commit `4e754b8daf9631083b387a000e2b9f476f8aa8b8`, all 9/9 workflows passed. Bootstrap run [38853903352](https://github.com/OARANHA/deepharness/actions/runs/38853903352), `docker` job 116820979517 and `mcp-grants-primary` job 116820979803 both succeeded; the operational Web, restricted primary and mTLS integration step succeeded. `run-operational-ci.mjs` sets mode `0400` on a synthetic private key before changing its owner to UID 1000, tests read access with `--user 1000:1000` and no network, and runs the disposable Web host with `--user 1000:1000`. Stage C review Compose now explicitly fixes the Web service user `1000:1000`.
+
+The former RED was fixture setup order (chmod after chown), not proof of an application or production failure. **Still NO-GO:** actual production secret readability, enabled operator runtime and the exact verified Portainer 90 Git rollback reference are pending; test success is scoped to disposable fixtures and this exact SHA.
+
 ## Docker image inspect metadata readback (2026-10-16)
 
 Owner ran full JSON `docker image inspect` against the immutable original DSH, MCP Web and grants references. All three returned the expected image IDs, but `Config.User` and `ContainerConfig.User` were absent/null (`USER=None`). An earlier Go-template lookup of `.Config.User` failed with a nil pointer. **This is missing metadata, not proof that any image runs as root or UID 1000.** Do not modify key permissions. The Stage C Web image execution identity remains a **blocking unknown**.
