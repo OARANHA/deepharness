@@ -1,3 +1,9 @@
+## Disposable infrastructure rollback drill — added, awaiting CI evidence (2026-10-15)
+
+Added `deploy/mcp/stage-c-disposable-rollback.sh` and `.github/workflows/mcp-stage-c-disposable-rollback.yml` to draft PR #4. The CI-only, network-isolated rehearsal creates its own ephemeral network, **new disposable** workspace volume and Alpine placeholder Web candidate, checks zero published host ports, injects a simulated failure, replaces the placeholder with a prior-Web stand-in and verifies the exact same volume still carries a pre-cutover marker. All resources are named by GitHub run ID and removed in `trap` cleanup; invocation refuses outside `GITHUB_ACTIONS=true`. It **never mounts** `deepharness_dsh_data` or `deepharness_dsh_workspace`, opens a public MCP listener, or accesses the real Portainer stack.
+
+**Evidence status: script and workflow committed and read back, but workflow execution outcome NOT YET verified.** This is deliberately only an **infrastructure-level synthetic rollback**: Alpine placeholders are **not the real DeepHarness Web image** and do not prove restored DSH authentication, official Web session, Agent Teams or pinned production image. Separate actual-Web disposable rollback rehearsal and operator-reviewed Portainer restore remain mandatory before production authorization. Do not mark Stage C end-to-end GREEN on the basis of this drill.
+
 ## Native Compose and source-only rollback verification — 2026-10-15
 
 Operator-independent non-deploying commands were run on the isolated 28server ops workspace against `deploy/mcp/portainer-stack.stage-c.review.yml` using **fictitious** image refs and BasicAuth, never production credentials:
