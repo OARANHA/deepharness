@@ -154,6 +154,22 @@ jobs:
           assert 'DSH_PREFLIGHT_READ_ONLY_DONE' in p
           print('STAGE_C_OWNER_PREFLIGHT_STATIC_SAFE')
           PY
+      - name: Verify exact non-applied production deployment patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          patch=Path('deploy/mcp/STAGE_C_PORTAINER_DEPLOYMENT_PATH_REVIEW.diff').read_text().splitlines()
+          original=Path('deploy/portainer-stack.yml').read_text().splitlines()
+          proposed=Path('deploy/mcp/portainer-stack.stage-c.proposed.yml').read_text().splitlines()
+          assert patch[:2]==['--- a/deploy/portainer-stack.yml','+++ b/deploy/portainer-stack.yml']
+          assert patch[2]==f'@@ -1,{len(original)} +1,{len(proposed)} @@'
+          assert patch[3:3+len(original)]==['-'+line for line in original]
+          assert patch[3+len(original):]==['+'+line for line in proposed]
+          assert 'enabled: true' not in Path('deploy/mcp/runtime.review.json').read_text()
+          print('STAGE_C_EXACT_NON_APPLIED_DEPLOYMENT_DIFF_MATCH')
+          PY
       - name: Require review runtime disabled
         shell: bash
         run: |
