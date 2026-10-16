@@ -1,3 +1,9 @@
+## Official Web disposable rollback — verified GREEN (2026-10-16)
+
+On exact commit `2ea0282fc48263ce29ffcaf3b329c1a5eabcbef6`, GitHub Actions returned **8/8 workflows completed successfully**, including [MCP Stage C — official Web disposable rollback run 38844271194](https://github.com/OARANHA/deepharness/actions/runs/38844271194), job `official-web-rollback` ID `116791108741` conclusion `success`. The steps **Build pinned official DSH Web image only in CI** and **Simulate candidate failure and restore actual official DSH Web** both concluded `success`. Source: `deploy/mcp/stage-c-official-web-rollback.sh` and `.github/workflows/mcp-stage-c-official-web-rollback.yml`.
+
+The drill uses disposable data/workspace volumes, an isolated Docker network, no published host ports, the official pinned DSH Web build, checks Web HTTP before/after simulated candidate failure, original-command restoration, and persistent workspace marker. It does **not** use production data, assert real owner login/Agent Teams after rollback, run the complete new Stage C Compose under Portainer, or enable the MCP proxy. **GREEN is limited to this exact commit and this disposable recovery gate; production remains NO-GO until explicit deployment prerequisites and owner approval.**
+
 ## Verified Stage C synthetic CI — 2026-10-16
 
 GitHub readback confirmed all seven workflows on `c37291c8f91f678c1fa672e0cdf5c93cb7562c41` concluded `success`, including [Stage C infrastructure rollback run 38841308483](https://github.com/OARANHA/deepharness/actions/runs/38841308483), job `infra-rollback` ID `116781800096` success. **GREEN means infrastructure recovery using Alpine placeholders and disposable volume only** — it does not validate original DeepHarness image or Web, authenticating existing user sessions, or real Portainer rollback.
