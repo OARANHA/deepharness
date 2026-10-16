@@ -1,3 +1,13 @@
+## Native Compose and source-only rollback verification — 2026-10-15
+
+Operator-independent non-deploying commands were run on the isolated 28server ops workspace against `deploy/mcp/portainer-stack.stage-c.review.yml` using **fictitious** image refs and BasicAuth, never production credentials:
+
+- Native `docker compose config --services`: exit 0, precisely `mcp-grants-db` and `web`; `mcp-proxy` is absent by default.
+- Native `docker compose config --quiet`: exit 0, no output.
+- Committed `deploy/mcp/verify-stage-c-review.py` as deterministic read-only test; it parsed native `docker compose config --format json` of both the Stage C candidate and original `main` Compose. On 28server it returned `STAGE_C_NATIVE_RESOLVED_CONFIG_MATCH`, `STAGE_C_NO_PUBLIC_MCP_PROXY_MATCH` and `STAGE_C_SOURCE_ONLY_ROLLBACK_RESTORES_ORIGINAL_WEB_MATCH`. Tests compare original Web image/command to old source, candidate Web/DB selection, external immutable volume names, no published host ports, isolated private network and healthy DB dependency.
+
+**Scope:** this is a **source-only rollback definition check**, **not** a runtime rollback rehearsal: no disposable Docker host was started, stopped or restored; no image boot/actual Web HTTP behavior was tested by the new Stage C YAML. Previously green disposable integration CI was for an operational host fixture, not this Compose's rollback flow. Production cutover is still **NO-GO** until executable disposable cutover/rollback and full Web continuity are proven.
+
 ## Stage C implementation progress — structural review (2026-10-15)
 
 Prepared `deploy/mcp/portainer-stack.stage-c.review.yml` as a dedicated **non-deployed** review candidate derived from the prior inactive replacement: `web` and `mcp-grants-db` no longer have inactive profiles, while `mcp-proxy` retains `mcp-review-only` and `traefik.enable: 'false'`. This means an ordinary future Compose service selection would include `web` and `mcp-grants-db`, **not** the public proxy; production operator action remains forbidden without separate approval. Python/PyYAML read-only structural gate on isolated 28server workspace returned `STAGE_C_SINGLE_WEB_PRIVATE_DB_STATIC_MATCH` and `STAGE_C_PUBLIC_PROXY_PROFILED_DISABLED_MATCH`, confirming original DSH external volume names, internal network, healthy grants dependency, no host ports and proxy isolation. **Not yet native Docker Compose validated**, and the staged `runtime.review.json` remains `enabled:false`, so this YAML is **not deployable as-is**. Next verify native Compose with placeholder values and isolated disposable operational host/rollback test before asking for any production authorization.
