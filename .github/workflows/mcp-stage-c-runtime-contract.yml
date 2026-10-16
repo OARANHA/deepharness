@@ -1,0 +1,24 @@
+name: MCP Stage C - offline runtime contract
+on:
+  pull_request:
+    paths:
+      - 'deploy/mcp/stage-c-runtime-contract.test.mjs'
+      - 'deploy/mcp/operational-host.mjs'
+      - 'deploy/mcp/runtime.review.json'
+      - '.github/workflows/mcp-stage-c-runtime-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate disabled review and strict in-memory private runtime
+        run: node --test deploy/mcp/stage-c-runtime-contract.test.mjs
