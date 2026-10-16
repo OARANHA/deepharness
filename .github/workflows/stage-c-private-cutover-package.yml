@@ -37,6 +37,39 @@ jobs:
           echo 'STAGE_C_ORIGINAL_PRODUCTION_COMPOSE_PRESERVED'
       - name: Validate dummy-only Stage C effective Compose and isolation
         run: python3 deploy/mcp/verify-effective-compose-safe.py
+      - name: Verify tested MCP artifact provenance at GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api repos/OARANHA/deepharness/actions/artifacts/11939945181 > "$RUNNER_TEMP/mcp-tested-artifact.json"
+          python3 - "$RUNNER_TEMP/mcp-tested-artifact.json" <<'PY'
+          import json,sys
+          a=json.load(open(sys.argv[1]))
+          assert not a['expired']
+          assert a['name']=='mcp-tested-images-38661846023'
+          assert a['digest']=='sha256:059986453d877be47bd405b8aa8e05012890c17dcac8e01530f46ef2925e7cb8'
+          assert a['workflow_run']['id']==38661846023
+          print('STAGE_C_TESTED_ARTIFACT_IDENTITY_MATCH')
+          PY
+      - name: Verify pinned image manifest digest and operational launcher
+        shell: bash
+        run: |
+          set -euo pipefail
+          host='ghcr.io/oaranha/deepharness-mcp@sha256:2483c85cc3fbe6172bf284e67859572b8b6b5dc75bfea11ae160298f7202a62f'
+          grants='ghcr.io/oaranha/deepharness-grants@sha256:6279a36d7cd94b7309e38b2931de38dd4f07bb84a5440e1b6433203587725210'
+          proxy='ghcr.io/oaranha/wandora-envoy@sha256:9a24a2c5b3304936563440ab9b2274fb9e6fa45d3c95f5966fd498c235a8a877'
+          for image in "$host" "$grants" "$proxy"; do
+            docker manifest inspect "$image" > /dev/null
+          done
+          echo 'STAGE_C_ALL_PINNED_REGISTRY_MANIFESTS_RESOLVE'
+          docker pull "$host" > /dev/null
+          # No production DSH volumes, secret mounts, network or container startup.
+          cid="$(docker create --network none --entrypoint node "$host" --version)"
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+          test "$(docker cp "$cid":/opt/wandora-mcp-verifier/mcp/run-operational.mjs - | tar -tf - | grep -c 'run-operational.mjs')" -ge 1
+          echo 'STAGE_C_PINNED_HOST_LAUNCHER_EXISTS'
       - name: Require review runtime disabled
         shell: bash
         run: |
