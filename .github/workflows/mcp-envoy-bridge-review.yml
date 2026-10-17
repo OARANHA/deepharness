@@ -36,10 +36,10 @@ jobs:
           set -euo pipefail
           docker run --rm --network none --read-only --cap-drop ALL --user 1000:1000 \
             --tmpfs /tmp:rw,nosuid,nodev,noexec,size=16m \
-            -v "$PWD/deploy/mcp/envoy-public-bridge.review.yaml:/etc/wandora-mcp/envoy.json:ro" \
+            -v "$PWD/deploy/mcp/envoy-public-bridge.review.yaml:/etc/wandora-mcp/envoy.yaml:ro" \
             -v "$RUNNER_TEMP/mcp-bridge-tls:/run/secrets:ro" \
             --entrypoint envoy envoyproxy/envoy@sha256:d59f7f5fa10cff6d5892b6c5e7df5c9297ddfb2c3683e33fbfb82da24de4fa66 \
-            --mode validate -c /etc/wandora-mcp/envoy.json --log-level error
+            --mode validate -c /etc/wandora-mcp/envoy.yaml --log-level error
       - name: Compose syntax and defense-in-depth guards
         shell: bash
         run: |
