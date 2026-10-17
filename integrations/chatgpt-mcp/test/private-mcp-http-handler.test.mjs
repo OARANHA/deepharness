@@ -24,7 +24,9 @@ for(const [name,mutate,status] of [
  ['spoofed certificate header',r=>{r.socket.authorized=false;r.headers['x-client-cert']='trusted';},403],
  ['wrong Host',r=>{r.headers.host='evil.example';},421],
  ['evil Origin',r=>{r.headers.origin='https://evil.example';},403],
- ['missing Origin',r=>{delete r.headers.origin;},403],
+ ['empty Origin',r=>{r.headers.origin='';},403],
+ ['malformed Origin',r=>{r.headers.origin='null';},403],
+ ['non-string Origin',r=>{r.headers.origin=['https://client.example'];},403],
  ['invalid bearer',r=>{r.headers.authorization='Bearer bad';},401],
  ['session identity reuse',r=>{r.headers['mcp-session-id']='previous';},400],
  ['unsupported method',r=>{r.method='GET';},405],
@@ -36,6 +38,34 @@ for(const [name,mutate,status] of [
  mutate(r);await handler.handle(r,s);assert.equal(s.status,status);assert.equal(f.counts().dispatches,0);
  });
 }
+test('missing Origin permits anonymous protected-resource metadata only after verified mTLS',async()=>{
+ const f=fixture();let observed=0;
+ f.config.service.handleOAuthRequest=async(req,res,next)=>{observed++;res.writeHead(200).end('{\"resource\":\"https://mcp.example/mcp\"}');};
+ const h=createPrivateMcpHttpHandler(f.config),r=f.req(),s=f.res();
+ r.method='GET';r.url='/.well-known/oauth-protected-resource/mcp';
+ delete r.headers.origin;delete r.headers.authorization;
+ await h.handle(r,s);
+ assert.equal(s.status,200);assert.equal(observed,1);assert.equal(f.counts().dispatches,0);
+});
+test('missing Origin still requires mTLS for discovery',async()=>{
+ const f=fixture(),h=createPrivateMcpHttpHandler(f.config),r=f.req(),s=f.res();
+ r.method='GET';r.url='/.well-known/oauth-protected-resource/mcp';
+ delete r.headers.origin;r.socket.authorized=false;
+ await h.handle(r,s);
+ assert.equal(s.status,403);assert.equal(f.counts().dispatches,0);
+});
+test('missing Origin still demands Bearer authentication on MCP',async()=>{
+ const f=fixture(),h=createPrivateMcpHttpHandler(f.config),r=f.req(),s=f.res();
+ delete r.headers.origin;delete r.headers.authorization;
+ await h.handle(r,s);
+ assert.equal(s.status,401);assert.equal(f.counts().dispatches,0);
+});
+test('missing Origin with verified mTLS and valid Bearer permits scoped SDK dispatch',async()=>{
+ const f=fixture(),h=createPrivateMcpHttpHandler(f.config),r=f.req(),s=f.res();
+ delete r.headers.origin;
+ await h.handle(r,s);
+ assert.equal(s.status,200);assert.equal(f.counts().dispatches,1);
+});
 test('scoped tool dispatch and close',async()=>{
  const f=fixture(),h=createPrivateMcpHttpHandler(f.config),s=f.res();
  await h.handle(f.req({},JSON.stringify({method:'tools/call',params:{arguments:{workspaceId:'w',leadSessionId:'lead'}}})),s);
