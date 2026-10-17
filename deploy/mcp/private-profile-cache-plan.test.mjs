@@ -15,10 +15,14 @@ test('cache copy plan excludes project-registration symlinks and keeps offline p
     fs.writeFileSync(store+'/index.db','fixture package index');
     fs.symlinkSync('../../../../../../profiles/web',store+'/projects/project');
     fs.symlinkSync('/outside',path.join(root,'.local/share/pnpm/pnpm'));
+    const mirror=path.join(root,'.cache/pnpm/metadata-v1.3/registry.npmjs.org/@fixture');
+    fs.mkdirSync(mirror,{recursive:true});
+    fs.writeFileSync(path.join(mirror,'package.json'),'{"versions":{}}');
     assert.deepEqual(cacheCopyPlan(root),[
       '.local/share/pnpm/store/v11/file+opt+jev.tgz',
       '.local/share/pnpm/store/v11/files',
       '.local/share/pnpm/store/v11/index.db',
+      '.cache/pnpm/metadata-v1.3',
     ]);
     assert.equal(fs.readlinkSync(store+'/projects/project'),'../../../../../../profiles/web');
     const stdin=spawnSync(process.execPath,['-',root],{
@@ -27,6 +31,9 @@ test('cache copy plan excludes project-registration symlinks and keeps offline p
     assert.equal(stdin.status,0);
     assert.deepEqual(stdin.stdout.trim().split('\n'),cacheCopyPlan(root));
     fs.rmSync(store+'/files',{recursive:true});fs.symlinkSync('/outside',store+'/files');
+    assert.throws(()=>cacheCopyPlan(root));
+    fs.rmSync(store+'/files');fs.mkdirSync(store+'/files');
+    fs.symlinkSync('/outside',path.join(root,'.cache/pnpm/metadata-v9.0'));
     assert.throws(()=>cacheCopyPlan(root));
   }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
