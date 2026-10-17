@@ -102,27 +102,20 @@ test('tool-supplied principal cannot replace transport-authenticated principal',
 for (const mode of ['grant-revoked', 'identity-revoked', 'principal-switched', 'kind-switched', 'Lead-detached']) {
   test(mode + ' while awaiting projection denies before returning data', async () => {
     const h = harness();
-    let release, entered;
-    const started = new Promise(resolve => { entered = resolve; });
+    let release;
     const pending = new Promise(resolve => { release = resolve; });
     h.setProjection(pending);
-    const originalRead = h.read(target, h.request);
-    // Do not simulate revocation until the authorized projection is actually pending.
-    const monitoredRead = originalRead.then(value => ({ value }), error => { throw error; });
-    const readWithSignal = h.read;
-    // snapshot marks entry for the test without touching the actual adapter.
-    // Poll microtasks in a bounded way; do not sleep or access external services.
+    const attempt = h.read(target, h.request);
+    // Wait only for the in-memory projection boundary, never for external services.
     for (let i = 0; i < 30 && h.projectionReads() === 0; i++) await Promise.resolve();
     assert.equal(h.projectionReads(), 1, 'the first authorized read must reach the projection');
-    entered();
-    await started;
     if (mode === 'grant-revoked') h.grants.delete(grantHash);
     if (mode === 'identity-revoked') h.authenticated.delete(h.request);
     if (mode === 'principal-switched') h.authenticated.set(h.request, { principalId: 'other', kind: 'individual' });
     if (mode === 'kind-switched') h.authenticated.set(h.request, { principalId: exact.principalId, kind: 'service' });
     if (mode === 'Lead-detached') h.workspace.sessionIds = [];
     release({ values: { agentTeam: projection } });
-    await assert.rejects(monitoredRead, /Agent Teams read denied/);
+    await assert.rejects(attempt, /Agent Teams read denied/);
     assert.equal(h.projectionReads(), 1);
   });
 }
