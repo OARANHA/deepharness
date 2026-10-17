@@ -4,7 +4,6 @@ on:
     paths:
       - deploy/portainer-stack.yml
       - deploy/mcp/envoy-public-bridge.review.yaml
-      - deploy/mcp/prepare-proxy-client-cert.review.sh
       - deploy/mcp/STAGE_E_PUBLIC_ENVOY_BRIDGE_REVIEW_20261017.md
       - .github/workflows/mcp-envoy-bridge-review.yml
   workflow_dispatch:
@@ -41,48 +40,6 @@ jobs:
             -v "$RUNNER_TEMP/mcp-bridge-tls:/run/secrets:ro" \
             --entrypoint envoy envoyproxy/envoy@sha256:d59f7f5fa10cff6d5892b6c5e7df5c9297ddfb2c3683e33fbfb82da24de4fa66 \
             --mode validate -c /etc/wandora-mcp/envoy.json --log-level error
-      - name: Prove guarded mTLS client certificate issuance with synthetic CA (no production secrets)
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash -n deploy/mcp/prepare-proxy-client-cert.review.sh
-          dir='/opt/wandora/data/deepharness-mcp/tls'
-          sudo mkdir -p "$dir/backend"
-          openssl req -x509 -newkey rsa:2048 -nodes -days 45 \
-            -subj '/CN=CI stage E dummy CA' \
-            -addext 'basicConstraints=critical,CA:TRUE' \
-            -addext 'keyUsage=critical,keyCertSign,cRLSign' \
-            -keyout "$RUNNER_TEMP/mcp-test-ca.key" \
-            -out "$RUNNER_TEMP/mcp-test-ca.crt" >/dev/null 2>&1
-          sudo install -m 0644 "$RUNNER_TEMP/mcp-test-ca.crt" "$dir/backend/backend-ca.pem"
-          readonly helper='deploy/mcp/prepare-proxy-client-cert.review.sh'
-          sudo bash "$helper" --check | grep -qx 'MCP_PROXY_CLIENT_CERT_PRESENT_VALID=false' || exit 1
-          if sudo env MCP_PROXY_CI_FIXTURE=ephemeral-github-runner-only \
-            MCP_PROXY_CA_SIGNING_KEY="$RUNNER_TEMP/mcp-test-ca.key" \
-            bash "$helper" --issue >/dev/null 2>&1; then
-            echo 'MCP_UNAUTHORIZED_CERT_ISSUE_NOT_DENIED'; exit 1
-          fi
-          sudo env MCP_PROXY_CI_FIXTURE=ephemeral-github-runner-only \
-            MCP_PROXY_CA_SIGNING_KEY="$RUNNER_TEMP/mcp-test-ca.key" \
-            MCP_PROXY_CERT_ISSUE_ACK=APPROVE_NEW_PROXY_CLIENT_CERT_ONLY \
-            bash "$helper" --issue | grep -qx 'MCP_PROXY_CLIENT_MTLS_CERT_ISSUED_AND_VERIFIED'
-          sudo bash "$helper" --check | grep -qx 'MCP_PROXY_CLIENT_CERT_PRESENT_VALID=true'
-          if sudo env MCP_PROXY_CI_FIXTURE=ephemeral-github-runner-only \
-            MCP_PROXY_CA_SIGNING_KEY="$RUNNER_TEMP/mcp-test-ca.key" \
-            MCP_PROXY_CERT_ISSUE_ACK=APPROVE_NEW_PROXY_CLIENT_CERT_ONLY \
-            bash "$helper" --issue >/dev/null 2>&1; then
-            echo 'MCP_REISSUE_OVERWRITE_NOT_DENIED'; exit 1
-          fi
-          # Validate the actual operator bind layout, UID 1000 key access and full Envoy v3 parse.
-          docker run --rm --network none --read-only --cap-drop ALL --user 1000:1000 \
-            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=16m \
-            -v "$PWD/deploy/mcp/envoy-public-bridge.review.yaml:/etc/wandora-mcp/envoy.json:ro" \
-            -v "$dir/proxy-client-cert.pem:/run/secrets/backend-client-cert.pem:ro" \
-            -v "$dir/proxy-client-key.pem:/run/secrets/backend-client-key.pem:ro" \
-            -v "$dir/backend/backend-ca.pem:/run/secrets/backend-ca.pem:ro" \
-            --entrypoint envoy envoyproxy/envoy@sha256:d59f7f5fa10cff6d5892b6c5e7df5c9297ddfb2c3683e33fbfb82da24de4fa66 \
-            --mode validate -c /etc/wandora-mcp/envoy.json --log-level error
-          echo 'MCP_CERT_ISSUER_GUARDS_AND_NONROOT_ENVOY_MOUNTS_GREEN'
       - name: Compose syntax and defense-in-depth guards
         shell: bash
         run: |
@@ -110,7 +67,9 @@ jobs:
           assert 'dsh-mcp.wandora.com.br' in envoy
           assert 'path: /mcp' in envoy
           assert 'path: /.well-known/oauth-protected-resource/mcp' in envoy
-          assert 'proxy-client-key.pem' in stack
+          assert '/opt/wandora/data/deepharness-mcp/tls/proxy/proxy-backend-client-chain.pem' in stack
+          assert '/opt/wandora/data/deepharness-mcp/tls/proxy/proxy-backend-client-key.pem' in stack
+          assert '/opt/wandora/data/deepharness-mcp/tls/backend/backend-ca.pem' in stack
           assert 'docker.sock' not in stack
           assert 'ports:' not in stack.split('  mcp-proxy:\n',1)[1].split('  mcp-grants-db:\n',1)[0]
           print('MCP_ENVOY_REVIEW_STATIC_GUARDS_PASS')
