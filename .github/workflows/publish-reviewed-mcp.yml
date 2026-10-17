@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: "Type PUBLISH_MCP_38661846023 to publish the exact tested images"
+        description: "Type PUBLISH_STAGE_D_39004711244 (exact tested images; no deploy)"
         required: true
         type: string
 permissions:
@@ -11,67 +11,60 @@ permissions:
   actions: read
   packages: write
 concurrency:
-  group: publish-reviewed-mcp-38661846023
+  group: publish-reviewed-stage-d-39004711244
   cancel-in-progress: false
 jobs:
   publish:
-    if: github.repository == 'OARANHA/deepharness' && github.ref == 'refs/heads/main' && inputs.confirmation == 'PUBLISH_MCP_38661846023'
+    if: github.repository == 'OARANHA/deepharness' && github.ref == 'refs/heads/feat/stage-d-operational-host-bind-20261017' && inputs.confirmation == 'PUBLISH_STAGE_D_39004711244'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Verify all reviewed gates and exact immutable image artifact
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Verify reviewed runs, source and immutable saved artifact
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          for run in 38661846023 38661846148 38661846141 38661846214 38661846169 38661846212; do
-            gh api "repos/OARANHA/deepharness/actions/runs/$run" > /tmp/mcp-gate.json
-            python3 -c 'import json; d=json.load(open("/tmp/mcp-gate.json")); assert d["conclusion"]=="success"; assert d["head_sha"]=="a81a8a9b9fd614a1a2247c96528880a4c21d3234"; assert d["event"]=="pull_request"; assert d["repository"]["full_name"]=="OARANHA/deepharness"'
+          mkdir -p "$RUNNER_TEMP/stage-d-publication"
+          cd "$RUNNER_TEMP/stage-d-publication"
+          for run in 39004711244 39004711250; do
+            gh api "repos/OARANHA/deepharness/actions/runs/$run" > "run-$run.json"
           done
-          gh api repos/OARANHA/deepharness/actions/artifacts/11939945181 > /tmp/mcp-artifact.json
-          python3 -c 'import json; d=json.load(open("/tmp/mcp-artifact.json")); assert not d["expired"]; assert d["name"]=="mcp-tested-images-38661846023"; assert d["digest"]=="sha256:059986453d877be47bd405b8aa8e05012890c17dcac8e01530f46ef2925e7cb8"; assert d["workflow_run"]["id"]==38661846023; assert d["workflow_run"]["head_sha"]=="a81a8a9b9fd614a1a2247c96528880a4c21d3234"'
-          gh api repos/OARANHA/deepharness/actions/artifacts/11939945181/zip > /tmp/mcp-artifact.zip
-          echo '059986453d877be47bd405b8aa8e05012890c17dcac8e01530f46ef2925e7cb8  /tmp/mcp-artifact.zip' | sha256sum --check
-          mkdir /tmp/mcp-reviewed
-          unzip -q /tmp/mcp-artifact.zip -d /tmp/mcp-reviewed
-          cd /tmp/mcp-reviewed
-          sha256sum --check SHA256SUMS
-          # PR Actions checkout tests the synthetic merge, not the branch head.
-          test "$(cat source-head.txt)" = 3547934888277c9c262381655deec5ffae7e5509
-          gh api repos/OARANHA/deepharness/commits/3547934888277c9c262381655deec5ffae7e5509 > /tmp/mcp-tested-merge.json
-          python3 -c 'import json; d=json.load(open("/tmp/mcp-tested-merge.json")); assert d["sha"]=="3547934888277c9c262381655deec5ffae7e5509"; assert [p["sha"] for p in d["parents"]]==["9b27b000fe3e4aebcb5b33d611cba25c55dabe10","a81a8a9b9fd614a1a2247c96528880a4c21d3234"]'
-          test "$(cat deepharness-mcp-image-id.txt)" = sha256:3d0d025371a574c4e711e5c0e110ff003bf0f9a6c01e6d263d81fdad2f3e8476
-          test "$(cat deepharness-grants-image-id.txt)" = sha256:1eab01301f7cc9fa11321d1d2e2f8d2ad93d958f36771bf26cf069d374bc4a27
-          gzip -dc tested-images.tar.gz | docker load
-          for pair in 'deepharness-mcp:candidate deepharness-mcp' 'deepharness-grants:ci deepharness-grants' 'deepharness-envoy:ci deepharness-envoy'; do
-            read -r image record <<< "$pair"
-            test "$(docker image inspect --format '{{.Id}}' "local/$image")" = "$(cat "$record-image-id.txt")"
-          done
+          gh api repos/OARANHA/deepharness/actions/artifacts/12090193878 > artifact.json
+          gh api repos/OARANHA/deepharness/commits/f5a5a4f75b680fa1866d843014ea61e7a5e40506 > source.json
+          python3 "$GITHUB_WORKSPACE/.github/scripts/verify-reviewed-stage-d.py" metadata "$PWD"
+          gh api repos/OARANHA/deepharness/actions/artifacts/12090193878/zip > artifact.zip
+          python3 "$GITHUB_WORKSPACE/.github/scripts/verify-reviewed-stage-d.py" archive "$PWD"
+          gzip -dc verified/candidate-images.tar.gz | docker load
+          test "$(docker image inspect --format '{{.Id}}' local/stage-d-mcp:tested)" = sha256:cec5b1aaa1948170c2bc731815dda1db20b18f1b66096717a5ccb4e54ad3de51
+          test "$(docker image inspect --format '{{.Id}}' local/stage-d-grants:tested)" = sha256:55eb4164bb47c8aff900156d3540b85e40d18da71b8fede1e8301a52bc7b6041
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publish loaded images without rebuilding and record manifest digests
+      - name: Publish only the two loaded images without rebuilding
         shell: bash
         run: |
           set -euo pipefail
-          mkdir /tmp/mcp-publication
-          for pair in 'deepharness-mcp:candidate deepharness-mcp' 'deepharness-grants:ci deepharness-grants' 'deepharness-envoy:ci wandora-envoy'; do
+          out="$RUNNER_TEMP/stage-d-publication/digests"
+          mkdir "$out"
+          for pair in 'stage-d-mcp:tested deepharness-mcp' 'stage-d-grants:tested deepharness-grants'; do
             read -r image package <<< "$pair"
-            tag="ghcr.io/oaranha/$package:tested-a81a8a9b9fd614a1a2247c96528880a4c21d3234"
+            tag="ghcr.io/oaranha/$package:tested-f5a5a4f75b680fa1866d843014ea61e7a5e40506"
             docker tag "local/$image" "$tag"
-            docker push "$tag" > /tmp/mcp-push.txt
-            digest="$(python3 -c 'import re; s=open("/tmp/mcp-push.txt").read(); m=re.search(r"digest: (sha256:[a-f0-9]{64})",s); assert m; print(m.group(1))')"
-            reference="ghcr.io/oaranha/$package@$digest"
-            printf '%s\n' "$reference" > "/tmp/mcp-publication/$package.txt"
-            printf 'Published exact tested image: %s\n' "$reference"
-            printf 'Published exact tested image: `%s`\n' "$reference" >> "$GITHUB_STEP_SUMMARY"
+            docker push "$tag" > "$RUNNER_TEMP/stage-d-push.log"
+            digest="$(python3 -c 'import re,sys; d=re.findall(r"digest: (sha256:[a-f0-9]{64})",open(sys.argv[1]).read()); assert len(d)==1; print(d[0])' "$RUNNER_TEMP/stage-d-push.log")"
+            printf '%s\n' "ghcr.io/oaranha/$package@$digest" > "$out/$package.txt"
+            printf 'Published exact reviewed image: `%s`\n' "ghcr.io/oaranha/$package@$digest" >> "$GITHUB_STEP_SUMMARY"
           done
-          echo 'Source artifact:11939945181; GREEN run:38661846023; no rebuild; no deploy' >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' 'Source:f5a5a4f75b680fa1866d843014ea61e7a5e40506; artifact:12090193878; no rebuild; no deploy; no VPS access' >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
-          name: mcp-published-digests-${{ github.run_id }}
-          path: /tmp/mcp-publication/
+          name: stage-d-published-digests-${{ github.run_id }}
+          path: ${{ runner.temp }}/stage-d-publication/digests/
           retention-days: 30

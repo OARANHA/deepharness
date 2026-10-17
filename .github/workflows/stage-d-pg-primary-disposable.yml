@@ -40,6 +40,8 @@ jobs:
           node-version: '22'
       - name: Verify composition, package provenance and disabled listener with DI
         run: node --test integrations/chatgpt-mcp/test/*.test.mjs deploy/mcp/operational-host.test.mjs deploy/mcp/existing-profile-host.test.mjs deploy/mcp/upgrade-existing-profile-contract.test.mjs
+      - name: Verify manual publisher rejects changed source, artifacts and image identities
+        run: python3 .github/scripts/test_verify_reviewed_stage_d.py
       - name: Install exact pg@8.16.3 without lifecycle scripts
         working-directory: integrations/chatgpt-mcp/pg-disposable-probe
         run: npm ci --ignore-scripts --no-audit --no-fund
