@@ -71,7 +71,20 @@ jobs:
           # Disposable profile only, no secrets/production volumes/ports or model.
           fixture="$(mktemp -d "$RUNNER_TEMP/mcp-upgrade.XXXXXX")"
           chmod 0777 "$fixture"
-          trap 'rm -rf -- "$fixture"' EXIT
+          cleanup_fixture() {
+            # Node-created directories belong to UID1000; hosted runner may be
+            # UID1001. Remove disposable contents as their owner, never root.
+            docker run --rm --network none --read-only --user 1000:1000 \
+              --cap-drop ALL --security-opt no-new-privileges \
+              --mount "type=bind,source=$fixture,target=/fixture" \
+              local/stage-d-mcp:tested node --input-type=module -e '
+                import fs from "node:fs"; import path from "node:path";
+                for(const entry of fs.readdirSync("/fixture"))
+                  fs.rmSync(path.join("/fixture",entry),{recursive:true,force:true});
+              '
+            rmdir -- "$fixture"
+          }
+          trap cleanup_fixture EXIT
           docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges \
             --pids-limit 256 --memory 2g --tmpfs /tmp:rw,nosuid,nodev,uid=1000,gid=1000,mode=0700,size=1g \
             --mount "type=bind,source=$fixture,target=/fixture" \
@@ -117,7 +130,7 @@ jobs:
           # No running Web/MCP, no production mounts, no network or host ports.
           test "$(docker run --rm --network none --read-only local/stage-d-mcp:tested)" = MCP_CANDIDATE_DISABLED
           cid="$(docker create local/stage-d-mcp:tested)"
-          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true; rm -rf -- "$fixture"' EXIT
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true; cleanup_fixture' EXIT
           docker cp "$cid:/opt/wandora-mcp-artifacts/." .artifacts/stage-d/
           (cd .artifacts/stage-d && sha256sum -c SHA256SUMS)
           SOURCE_SHA="$sha" node --input-type=module -e '
