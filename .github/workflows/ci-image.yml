@@ -174,7 +174,7 @@ jobs:
           DSH_BASIC_AUTH_USERS: ci-placeholder-no-secret
           DSH_MCP_HOST_IMAGE: ghcr.io/oaranha/deepharness-mcp@sha256:2483c85cc3fbe6172bf284e67859572b8b6b5dc75bfea11ae160298f7202a62f
           DSH_MCP_GRANTS_IMAGE: ghcr.io/oaranha/deepharness-grants@sha256:6279a36d7cd94b7309e38b2931de38dd4f07bb84a5440e1b6433203587725210
-          DSH_MCP_PROXY_IMAGE: ghcr.io/oaranha/wandora-envoy@sha256:9a24a2c5b3304936563440ab9b2274fb9e6fa45d3c95f5966fd498c235a8a877
+          DSH_MCP_PROXY_IMAGE: envoyproxy/envoy@sha256:d59f7f5fa10cff6d5892b6c5e7df5c9297ddfb2c3683e33fbfb82da24de4fa66
           DSH_MCP_REVIEW_ROOT: /opt/wandora/data/deepharness-mcp/review
           DSH_MCP_SECRET_ROOT: /opt/wandora/data/deepharness-mcp/tls
         shell: bash
@@ -202,7 +202,7 @@ jobs:
               assert web["image"]==os.environ["DEEPHARNESS_IMAGE"]
               print("ORIGINAL_WEB_COMPOSE_SAFE")
           else:
-              assert set(services)=={"web","mcp-grants-db"}, "Unexpected enabled services"
+              assert set(services) in ({"web","mcp-grants-db"}, {"web","mcp-grants-db","mcp-proxy"}), "Unexpected enabled services"
               db=services["mcp-grants-db"]
               assert web["image"]==os.environ["DSH_MCP_HOST_IMAGE"]
               assert db["image"]==os.environ["DSH_MCP_GRANTS_IMAGE"]
@@ -222,8 +222,42 @@ jobs:
               for target in ["/etc/wandora-mcp/runtime.json","/run/secrets/backend-server-key.pem","/run/secrets/backend-server-chain.pem","/run/secrets/backend-ca.pem"]:
                   assert target in binds and binds[target]["read_only"] is True
               assert binds["/etc/wandora-mcp/runtime.json"]["source"]==os.environ["DSH_MCP_REVIEW_ROOT"]+"/runtime.json"
-              assert "mcp-proxy" not in services, "Public MCP proxy must stay disabled"
-              print("STAGE_C_PRIVATE_COMPOSE_SAFE")
+              if "mcp-proxy" in services:
+                  # Stage E opt-in: preserve the original Stage C Web/DB fences.
+                  proxy=services["mcp-proxy"]
+                  assert proxy["image"]==os.environ["DSH_MCP_PROXY_IMAGE"]
+                  assert str(proxy.get("user"))=="1000:1000"
+                  assert proxy.get("read_only") is True
+                  assert "ALL" in proxy.get("cap_drop",[])
+                  assert "no-new-privileges:true" in proxy.get("security_opt",[])
+                  assert set(proxy["networks"])=={"traefik-public","mcp-private"}
+                  assert not proxy.get("ports") and not proxy.get("profiles")
+                  assert proxy["command"]==["envoy","-c","/etc/wandora-mcp/envoy.yaml",
+                      "--concurrency","1","--disable-hot-restart","--log-level","error"]
+                  p=proxy["labels"]
+                  assert p.get("traefik.enable")=="true"
+                  assert p.get("traefik.docker.network")=="traefik-public"
+                  assert p.get("traefik.http.routers.deepharness-mcp.rule")=="Host(`dsh-mcp.wandora.com.br`)"
+                  assert p.get("traefik.http.routers.deepharness-mcp.entrypoints")=="websecure"
+                  assert p.get("traefik.http.routers.deepharness-mcp.tls")=="true"
+                  assert p.get("traefik.http.routers.deepharness-mcp.tls.certresolver")=="letsencrypt"
+                  assert p.get("traefik.http.routers.deepharness-mcp.service")=="deepharness-mcp-bridge"
+                  assert p.get("traefik.http.services.deepharness-mcp-bridge.loadbalancer.server.port")=="8080"
+                  assert not any(k.startswith("traefik.tcp.") for k in p)
+                  mounts={v["target"]:v for v in proxy["volumes"]}
+                  expected={
+                      "/etc/wandora-mcp/envoy.yaml": os.environ["DSH_MCP_REVIEW_ROOT"]+"/envoy.yaml",
+                      "/run/secrets/backend-client-cert.pem": "/opt/wandora/data/deepharness-mcp/tls/proxy/proxy-backend-client-chain.pem",
+                      "/run/secrets/backend-client-key.pem": "/opt/wandora/data/deepharness-mcp/tls/proxy/proxy-backend-client-key.pem",
+                      "/run/secrets/backend-ca.pem": "/opt/wandora/data/deepharness-mcp/tls/backend/backend-ca.pem",
+                  }
+                  for target, source in expected.items():
+                      assert mounts[target]["source"]==source
+                      assert mounts[target]["read_only"] is True
+                  assert set(mounts)==set(expected)
+                  print("STAGE_E_MCP_PROXY_COMPOSE_REVIEW_SAFE")
+              else:
+                  print("STAGE_C_PRIVATE_COMPOSE_SAFE")
           '
 
       - name: Log in to GHCR

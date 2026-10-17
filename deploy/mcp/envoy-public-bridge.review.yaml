@@ -1,0 +1,73 @@
+# REVIEW ONLY. Do not deploy before backend SAN/client-cert gate and explicit cutover approval.
+# Traefik handles public HTTPS/ACME; Envoy accepts cleartext HTTP ONLY on Docker traefik-public.
+# Envoy authenticates to the existing private MCP Node TLS listener with a dedicated client cert.
+# No host port; no auth bypass; user Bearer tokens forwarded unchanged to backend JWT/grant checks.
+static_resources:
+  listeners:
+    - name: mcp_bridge_listener
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 8080
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: dsh_mcp_bridge
+                normalize_path: true
+                use_remote_address: false
+                route_config:
+                  name: only_dsh_mcp
+                  virtual_hosts:
+                    - name: scoped_mcp_only
+                      domains:
+                        - dsh-mcp.wandora.com.br
+                      routes:
+                        - match:
+                            path: /mcp
+                          route:
+                            cluster: mcp_private_mtls
+                            timeout: 11s
+                        - match:
+                            path: /.well-known/oauth-protected-resource/mcp
+                          route:
+                            cluster: mcp_private_mtls
+                            timeout: 11s
+                http_filters:
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  clusters:
+    - name: mcp_private_mtls
+      type: STRICT_DNS
+      dns_lookup_family: V4_ONLY
+      connect_timeout: 2s
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: mcp_private_mtls
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: deepharness-mcp-backend
+                      port_value: 3443
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+          sni: deepharness-mcp-backend
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain:
+                  filename: /run/secrets/backend-client-cert.pem
+                private_key:
+                  filename: /run/secrets/backend-client-key.pem
+            validation_context:
+              trusted_ca:
+                filename: /run/secrets/backend-ca.pem
+              match_typed_subject_alt_names:
+                - san_type: DNS
+                  matcher:
+                    exact: deepharness-mcp-backend

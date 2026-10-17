@@ -1,4 +1,4 @@
-# STAGE C OWNER-APPROVAL PROPOSAL ONLY — operational Web and private grants primary; PUBLIC MCP PROXY DISABLED.
+# REVIEW-ONLY PROPOSAL — public MCP Envoy bridge requires explicit separate Portainer cutover approval.
 # Requires operator-owned runtime enabled:true at separately authorized cutover.
 # Approval proposal; do not substitute into Portainer stack 90 until approved and effective runtime ready.
 # REVIEW ONLY: full replacement for the existing deepharness stack, never a second stack.
@@ -71,14 +71,13 @@ services:
     secrets:
     - mcp-runtime-db-password
   mcp-proxy:
-    profiles:
-    - mcp-review-only
+    # Proposed only in this draft PR; do not merge/redeploy without TLS/mTLS gate.
     image: ${DSH_MCP_PROXY_IMAGE:?Provide reviewed immutable Envoy digest}
     user: 1000:1000
     command:
     - envoy
     - -c
-    - /etc/wandora-mcp/envoy.json
+    - /etc/wandora-mcp/envoy.yaml
     - --concurrency
     - '1'
     - --disable-hot-restart
@@ -98,24 +97,33 @@ services:
     - /tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777
     volumes:
     - type: bind
-      source: ${DSH_MCP_REVIEW_ROOT:?Provide reviewed configuration directory}/envoy.json
-      target: /etc/wandora-mcp/envoy.json
+      source: ${DSH_MCP_REVIEW_ROOT:?Provide reviewed configuration directory}/envoy.yaml
+      target: /etc/wandora-mcp/envoy.yaml
       read_only: true
     - type: bind
-      source: ${DSH_MCP_SECRET_ROOT:?Provide dedicated MCP certificate directory}
-      target: /run/secrets
+      source: /opt/wandora/data/deepharness-mcp/tls/proxy/proxy-backend-client-chain.pem
+      target: /run/secrets/backend-client-cert.pem
+      read_only: true
+    - type: bind
+      source: /opt/wandora/data/deepharness-mcp/tls/proxy/proxy-backend-client-key.pem
+      target: /run/secrets/backend-client-key.pem
+      read_only: true
+    - type: bind
+      source: /opt/wandora/data/deepharness-mcp/tls/backend/backend-ca.pem
+      target: /run/secrets/backend-ca.pem
       read_only: true
     networks:
     - traefik-public
     - mcp-private
     labels:
-      traefik.enable: 'false'
+      traefik.enable: 'true'
       traefik.docker.network: traefik-public
-      traefik.tcp.routers.deepharness-mcp.rule: HostSNI(`dsh-mcp.wandora.com.br`)
-      traefik.tcp.routers.deepharness-mcp.entrypoints: websecure
-      traefik.tcp.routers.deepharness-mcp.service: deepharness-mcp
-      traefik.tcp.routers.deepharness-mcp.tls.passthrough: 'true'
-      traefik.tcp.services.deepharness-mcp.loadbalancer.server.port: '8443'
+      traefik.http.routers.deepharness-mcp.rule: Host(`dsh-mcp.wandora.com.br`)
+      traefik.http.routers.deepharness-mcp.entrypoints: websecure
+      traefik.http.routers.deepharness-mcp.tls: 'true'
+      traefik.http.routers.deepharness-mcp.tls.certresolver: letsencrypt
+      traefik.http.routers.deepharness-mcp.service: deepharness-mcp-bridge
+      traefik.http.services.deepharness-mcp-bridge.loadbalancer.server.port: '8080'
     logging:
       driver: local
       options:
