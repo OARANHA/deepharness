@@ -79,9 +79,26 @@ jobs:
           (cd .artifacts/stage-d && sha256sum -c SHA256SUMS)
           SOURCE_SHA="$sha" node --input-type=module -e '
             import fs from "node:fs";
+            import {createHash} from "node:crypto";
             const m=JSON.parse(fs.readFileSync(".artifacts/stage-d/packed-files.json"));
             if(m.sourceSha!==process.env.SOURCE_SHA)throw Error("source provenance mismatch");
+            for(const file of m.files){
+              const bytes=fs.readFileSync("integrations/chatgpt-mcp/"+file.path);
+              if(createHash("sha256").update(bytes).digest("hex")!==file.sha256)throw Error("package source mismatch");
+            }
           '
+          docker run --rm --network none --read-only --tmpfs /tmp:rw,nosuid,nodev,uid=1000,gid=1000,mode=0700 \
+            local/stage-d-mcp:tested node --input-type=module -e '
+              import fs from "node:fs";
+              import {execFileSync} from "node:child_process";
+              import {verifyPackedInstall} from "/opt/wandora-mcp-verifier/mcp/verify-packed-install.mjs";
+              const root="/opt/wandora-mcp-artifacts";
+              const m=JSON.parse(fs.readFileSync(root+"/packed-files.json"));
+              execFileSync("tar",["-xzf",root+"/"+m.tarball,"-C","/tmp"]);
+              await verifyPackedInstall("/tmp/package",root+"/packed-files.json");
+              for(const file of m.files.filter(f=>f.path.endsWith(".mjs")))await import("/tmp/package/"+file.path);
+              console.log("CANDIDATE_PACKED_IMPORTS_MATCH");
+            '
           docker save local/stage-d-mcp:tested local/stage-d-grants:tested | gzip -n > .artifacts/stage-d/candidate-images.tar.gz
           (cd .artifacts/stage-d && sha256sum candidate-images.tar.gz images.json packed-files.json source-head.txt source-tree.txt > EVIDENCE_SHA256SUMS)
       - uses: actions/upload-artifact@v4
