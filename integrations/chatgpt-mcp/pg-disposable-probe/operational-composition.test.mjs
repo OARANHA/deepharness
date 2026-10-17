@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateKeyPairSync, sign, createHash, randomBytes} from 'node:crypto';
-import {mkdtemp, rm} from 'node:fs/promises';
+import {mkdtemp, rm, readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createRequire} from 'node:module';
@@ -174,6 +174,27 @@ test('operational host + official DSH services + signed individual + real primar
         await assert.rejects(assertAuthoritativePgReadPool({pool:unsafe}),/denied/);
         await assert.rejects(createAuthoritativePgReadQuery({pool:unsafe})(READ_GRANT_SQL,[hash],{readFromPrimary:true,signal:new AbortController().signal}),/denied/);
       }finally{await unsafe.end();}
+    });
+    await t.test('existing-role database-only timeout migration and paired rollback preserve global role/grants',async()=>{
+      const before=(await owner.query("SELECT rolconfig FROM pg_roles WHERE rolname='dsh_mcp_reader'")).rows;
+      const beforeGrants=(await owner.query('SELECT * FROM chatgpt_mcp_read_grants ORDER BY grant_hash')).rows;
+      const apply=await readFile(new URL('../../../deploy/mcp/migrate-reader-timeout.review.sql',import.meta.url),'utf8');
+      const rollback=await readFile(new URL('../../../deploy/mcp/rollback-reader-timeout.review.sql',import.meta.url),'utf8');
+      const migration=await owner.connect();
+      try{
+        await migration.query(apply);
+        await assert.rejects(migration.query(apply),/Preexisting database deadline denied/);
+        await migration.query('ROLLBACK');
+        const fresh=new Pool({...connection,user:'dsh_mcp_reader',password:readerPassword,database:'dsh_mcp_grants'});
+        try{await assertAuthoritativePgReadPool({pool:fresh});}finally{await fresh.end();}
+        assert.deepEqual((await owner.query("SELECT rolconfig FROM pg_roles WHERE rolname='dsh_mcp_reader'")).rows,before);
+        assert.deepEqual((await owner.query('SELECT * FROM chatgpt_mcp_read_grants ORDER BY grant_hash')).rows,beforeGrants);
+        await migration.query(rollback);
+        const reverted=new Pool({...connection,user:'dsh_mcp_reader',password:readerPassword,database:'dsh_mcp_grants'});
+        try{await assert.rejects(assertAuthoritativePgReadPool({pool:reverted}),/denied/);}finally{await reverted.end();}
+        await assert.rejects(migration.query(rollback),/Reader rollback baseline changed/);
+        await migration.query('ROLLBACK');
+      }finally{await migration.query('ROLLBACK');migration.release();}
     });
     await ctx.fiber.dispose();reader=undefined;
     await assert.rejects(read(),/denied/,'retained service fails after dispose');

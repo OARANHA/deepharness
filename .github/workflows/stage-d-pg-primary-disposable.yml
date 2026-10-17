@@ -39,7 +39,7 @@ jobs:
         with:
           node-version: '22'
       - name: Verify composition, package provenance and disabled listener with DI
-        run: node --test integrations/chatgpt-mcp/test/*.test.mjs deploy/mcp/operational-host.test.mjs deploy/mcp/existing-profile-host.test.mjs
+        run: node --test integrations/chatgpt-mcp/test/*.test.mjs deploy/mcp/operational-host.test.mjs deploy/mcp/existing-profile-host.test.mjs deploy/mcp/upgrade-existing-profile-contract.test.mjs
       - name: Install exact pg@8.16.3 without lifecycle scripts
         working-directory: integrations/chatgpt-mcp/pg-disposable-probe
         run: npm ci --ignore-scripts --no-audit --no-fund
@@ -66,6 +66,20 @@ jobs:
           epoch="$(git show -s --format=%ct HEAD)"
           docker build --build-arg SOURCE_SHA="$sha" --build-arg SOURCE_DATE_EPOCH="$epoch" -f deploy/Dockerfile.mcp-candidate -t local/stage-d-mcp:tested .
           docker build --build-arg SOURCE_DATE_EPOCH="$epoch" -f deploy/mcp/Dockerfile.grants -t local/stage-d-grants:tested .
+          # Disposable profile only, no secrets/production volumes/ports or model.
+          fixture="$(mktemp -d "$RUNNER_TEMP/mcp-upgrade.XXXXXX")"
+          chmod 0777 "$fixture"
+          trap 'rm -rf -- "$fixture"' EXIT
+          docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --pids-limit 256 --memory 2g --tmpfs /tmp:rw,nosuid,nodev,uid=1000,gid=1000,mode=0700,size=1g \
+            --mount "type=bind,source=$fixture,target=/fixture" \
+            -e DSH_MCP_UPGRADE_CI=disposable-official-cli-only \
+            local/stage-d-mcp:tested node /opt/wandora-mcp-verifier/mcp/existing-profile-upgrade-ci.mjs prepare
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --pids-limit 256 --memory 2g --tmpfs /tmp:rw,nosuid,nodev,uid=1000,gid=1000,mode=0700,size=1g \
+            --mount "type=bind,source=$fixture,target=/fixture" \
+            -e DSH_MCP_UPGRADE_CI=disposable-official-cli-only \
+            local/stage-d-mcp:tested node /opt/wandora-mcp-verifier/mcp/existing-profile-upgrade-ci.mjs upgrade
           mkdir -p .artifacts/stage-d
           printf '%s\n' "$sha" > .artifacts/stage-d/source-head.txt
           git rev-parse HEAD^{tree} > .artifacts/stage-d/source-tree.txt
@@ -74,7 +88,7 @@ jobs:
           # No running Web/MCP, no production mounts, no network or host ports.
           test "$(docker run --rm --network none --read-only local/stage-d-mcp:tested)" = MCP_CANDIDATE_DISABLED
           cid="$(docker create local/stage-d-mcp:tested)"
-          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true; rm -rf -- "$fixture"' EXIT
           docker cp "$cid:/opt/wandora-mcp-artifacts/." .artifacts/stage-d/
           (cd .artifacts/stage-d && sha256sum -c SHA256SUMS)
           SOURCE_SHA="$sha" node --input-type=module -e '

@@ -6,6 +6,8 @@ ARG SOURCE_DATE_EPOCH
 LABEL org.opencontainers.image.source="https://github.com/OARANHA/deepharness" \
       org.opencontainers.image.revision=$SOURCE_SHA
 USER root
+RUN mkdir -p /opt/wandora-mcp-previous \
+ && cp /opt/wandora-mcp-artifacts/*.tgz /opt/wandora-mcp-previous/
 COPY integrations/chatgpt-mcp/ /opt/wandora-mcp-source/
 COPY deploy/mcp/pack-candidate.mjs /opt/wandora-mcp-build/pack-candidate.mjs
 RUN test "$(node -p 'require("/opt/wandora-mcp-host/node_modules/pg/package.json").version')" = 8.16.3 \
@@ -13,6 +15,7 @@ RUN test "$(node -p 'require("/opt/wandora-mcp-host/node_modules/pg/package.json
  && NPM_CONFIG_CACHE=/tmp/mcp-pack node /opt/wandora-mcp-build/pack-candidate.mjs /opt/wandora-mcp-source /opt/wandora-mcp-artifacts "$SOURCE_SHA" \
  && rm -rf /opt/wandora-mcp-source /opt/wandora-mcp-build /tmp/mcp-pack
 COPY deploy/mcp/existing-profile-host.mjs deploy/mcp/private-read-listener.mjs deploy/mcp/operational-host.mjs deploy/mcp/run-operational.mjs deploy/mcp/verify-packed-install.mjs /opt/wandora-mcp-verifier/mcp/
+COPY deploy/mcp/upgrade-existing-profile-contract.mjs deploy/mcp/existing-profile-upgrade-ci.mjs /opt/wandora-mcp-verifier/mcp/
 COPY integrations/chatgpt-mcp/adapters/pinned-oidc-discovery.mjs integrations/chatgpt-mcp/adapters/pinned-oidc-metadata.mjs integrations/chatgpt-mcp/adapters/dns-pinned-oidc-fetcher.mjs integrations/chatgpt-mcp/adapters/oidc-egress-address-policy.mjs /opt/wandora-mcp-host/oidc/
 USER node
 # Default MUST NOT execute operational launcher or any Web/MCP listener.
