@@ -91,7 +91,7 @@ test('pg@8.16.3 actual disposable primary, authority, cancellation and grants', 
 
     const readerOptions = {
       ...adminOptions, user: readerRole, password,
-      max: 2, statement_timeout: 300,
+      max: 2, // PostgreSQL role default must supply the server-side deadline.
     };
     reader = new Pool(readerOptions);
     const query = createInspectedQuery(reader);
