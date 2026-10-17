@@ -32,3 +32,18 @@ Historical documents `KEYCLOAK_OAUTH_ADOPTION_GATE.md` and `SECURITY_PREPRODUCTI
 
 Current **GO**: source reconciliation, narrow tests and docs only.
 Current **NO-GO**: public route/proxy, Keycloak client activation, production grants, ChatGPT real connection, unreviewed token/grant migration, PR #4 wholesale merge. Each requires verified contract, narrow reviewed change and separate operator authorization.
+
+## Remote Docker read gate — verified 2026-10-17
+
+This is an independent read-only MCP Wandora runtime check, **not** proof of OAuth authentication from ChatGPT to DeepHarness:
+
+- Central `remote-ops-mcp` replied `status=ok`, `authMode=oauth`, `mockMode=false`. That OAuth setting authenticates the Wandora control-plane session, not a real DeepHarness OAuth user.
+- `target_status(detail=full)` confirmed enabled `deepharness-read` with `read-only` capability and exactly `deepharness-web-1`, `deepharness-mcp-grants-db-1` in `allowedDockerContainers`. Docker exec, Docker actions, writes and administrative programs remain disallowed.
+- Actual `docker_health` through that target returned Web `running` and grants PostgreSQL `running, healthy`. Thus the earlier host Docker proxy HTTP 403 read block is no longer present for these two containers.
+- A query for `supabase-db` using `deepharness-read` was correctly denied with `CONTAINER_NOT_ALLOWED` at the target policy. This is not evidence of an outage of the MedicsPro service or other independently governed targets.
+- Source reconciliation confirmed `main` at `c71c791d7e33084c67198643200764069c1c2668`; PR #4 remains Draft, contains a broad integration surface, and must not be merged wholesale. PR #7 remains review-only.
+- Neither container health nor the private mTLS tests establish deployed OAuth adapter compatibility, a real `issuer#sub` principal, persistent read grants, or an authorized `dsh_read_agent_team` call. No additional restart, deployment, new grants, runtime exposure or Keycloak change was performed in this check.
+
+**Next gate:** reconcile the actually deployed pinned image and host wiring with the narrowly reusable PR #4 adapters; prepare isolated strict OAuth/authorization tests against the current `main`. Release, public transport activation and production principal/grant setup remain NO-GO pending separate operator approval.
+
+JEV consulted as advisory for the next bounded task; it favored `deep_review`. This does not override the policy, operator approval, or runtime evidence.
