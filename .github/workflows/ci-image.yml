@@ -237,7 +237,7 @@ jobs:
                   p=proxy["labels"]
                   assert p.get("traefik.enable")=="true"
                   assert p.get("traefik.docker.network")=="traefik-public"
-                  assert p.get("traefik.http.routers.deepharness-mcp.rule")=="Host(\`dsh-mcp.wandora.com.br\`)"
+                  assert p.get("traefik.http.routers.deepharness-mcp.rule")=="Host(`dsh-mcp.wandora.com.br`)"
                   assert p.get("traefik.http.routers.deepharness-mcp.entrypoints")=="websecure"
                   assert p.get("traefik.http.routers.deepharness-mcp.tls")=="true"
                   assert p.get("traefik.http.routers.deepharness-mcp.tls.certresolver")=="letsencrypt"
