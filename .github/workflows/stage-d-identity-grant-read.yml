@@ -1,0 +1,32 @@
+name: Stage D — isolated identity and Agent Teams grant boundary
+
+on:
+  pull_request:
+    paths:
+      - 'integrations/chatgpt-mcp/adapters/dsh-agent-teams-host-reader.mjs'
+      - 'integrations/chatgpt-mcp/adapters/scoped-mcp-read-identity.mjs'
+      - 'integrations/chatgpt-mcp/test/stage-d-identity-grant-read.test.mjs'
+      - '.github/workflows/stage-d-identity-grant-read.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  identity-grant-read:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify isolated trusted identity, exact grants and async revocation
+        run: >-
+          node --test
+          integrations/chatgpt-mcp/test/agent-teams-read-model.test.mjs
+          integrations/chatgpt-mcp/test/agent-teams-read-authorization.test.mjs
+          integrations/chatgpt-mcp/test/stage-d-grants-contract.test.mjs
+          integrations/chatgpt-mcp/test/stage-d-identity-grant-read.test.mjs
