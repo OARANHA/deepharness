@@ -1,0 +1,28 @@
+name: Stage D — isolated PostgreSQL grants contract
+on:
+  pull_request:
+    paths:
+      - 'integrations/chatgpt-mcp/adapters/postgres-read-grants.mjs'
+      - 'integrations/chatgpt-mcp/adapters/scoped-read-grants.mjs'
+      - 'integrations/chatgpt-mcp/test/stage-d-grants-contract.test.mjs'
+      - '.github/workflows/stage-d-grants-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  grants-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify isolated Agent Teams grants and existing read core
+        run: >-
+          node --test
+          integrations/chatgpt-mcp/test/agent-teams-read-model.test.mjs
+          integrations/chatgpt-mcp/test/agent-teams-read-authorization.test.mjs
+          integrations/chatgpt-mcp/test/stage-d-grants-contract.test.mjs
