@@ -223,7 +223,7 @@ jobs:
                   assert target in binds and binds[target]["read_only"] is True
               assert binds["/etc/wandora-mcp/runtime.json"]["source"]==os.environ["DSH_MCP_REVIEW_ROOT"]+"/runtime.json"
               if "mcp-proxy" in services:
-                  # Stage E opt-in: don't weaken the original Stage C Web/DB fences.
+                  # Stage E opt-in: preserve the original Stage C Web/DB fences.
                   proxy=services["mcp-proxy"]
                   assert proxy["image"]==os.environ["DSH_MCP_PROXY_IMAGE"]
                   assert str(proxy.get("user"))=="1000:1000"
