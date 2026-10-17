@@ -90,3 +90,35 @@ test('JWT expiring while authoritative revocation is awaited must be denied',asy
     now:()=>now,isRevoked:async()=>{now=1002;return false;}});
   await assert.rejects(authenticate({headers:{authorization:'Bearer '+jwt}}),/denied/);
 });
+
+for(const key of ['sessions','workspaceRegistry','sessionProjections','chatgptMcpReadPolicy'])
+test('plugin denies owning context '+key+' replacement during pending projection',async()=>{
+  const plugin=await import('../plugin.mjs');
+  const f=setup();let service,release,started;
+  const began=new Promise(resolve=>{started=resolve;});
+  const projection={values:{agentTeam:{members:[{id:'lead',name:'Lead',role:'lead',phase:'active'}],tasks:[]}}};
+  const pending=new Promise(resolve=>{release=()=>resolve(projection);});
+  f.host.sessionProjections.snapshot=()=>{started();return pending;};
+  const ctx={...f.host,chatgptMcpReadPolicy:f.config,provide:(_name,value)=>{service=value;},effect:()=>{}};
+  plugin.apply(ctx,{endpointEnabled:false});
+  const attempt=service.runHttpRequest({headers:{authorization:'Bearer '+signed(),origin:'https://client.example'}},
+    ()=>service.readTeam({workspaceId:'ws',leadSessionId:'lead'}));
+  const denied=assert.rejects(attempt,/denied/);
+  await began;
+  ctx[key]={...ctx[key]};
+  release();await denied;
+});
+
+test('plugin permits fresh Cordis trace facades for unchanged implementations',async()=>{
+  const plugin=await import('../plugin.mjs');
+  const f=setup();let service;
+  const implementations={...f.host,chatgptMcpReadPolicy:f.config};
+  const ctx={provide:(_name,value)=>{service=value;},effect:()=>{}};
+  for(const [key,value] of Object.entries(implementations))Object.defineProperty(ctx,key,{get:()=>new Proxy(value,{
+    get:(object,property)=>property===Symbol.for('cordis.original')?object:Reflect.get(object,property),
+  })});
+  plugin.apply(ctx,{endpointEnabled:false});
+  const view=await service.runHttpRequest({headers:{authorization:'Bearer '+signed(),origin:'https://client.example'}},
+    ()=>service.readTeam({workspaceId:'ws',leadSessionId:'lead'}));
+  assert.equal(view.leadSessionId,'lead');
+});

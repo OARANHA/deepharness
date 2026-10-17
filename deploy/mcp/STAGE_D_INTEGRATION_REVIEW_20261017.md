@@ -13,6 +13,9 @@ No PR4 deployment Compose, provisioner, installer, TLS helper or canary was adop
 The PR8–12 read/identity/grants adapters remain, with an added startup inspection export
 in the strict PostgreSQL seam. `pinned-jwt-transport-authenticator` additionally rejects
 tokens expiring while its asynchronous revocation query is pending (RED reproduced).
+Independent review also reproduced owning-context provider/policy replacement during
+a pending projection. The plugin now compares live original implementations before
+and after asynchronous operations, accepting unchanged Cordis trace facades.
 The read-only revocation backend exports only `isRevoked`; no INSERT/revoke operation.
 
 `operational-host` now passes the actual `(sql, params, opts)` function returned by

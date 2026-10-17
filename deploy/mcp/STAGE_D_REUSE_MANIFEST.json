@@ -208,8 +208,8 @@
     {
       "path": "integrations/chatgpt-mcp/plugin.mjs",
       "sourceBlob": "f58acc72383ec0a307da57f0578cdbe177d59555",
-      "unchanged": true,
-      "candidateSha256": "202dd754c9da30b47454ac29337ea9ac8933039763c2e6b3269c5b50872c3cba"
+      "unchanged": false,
+      "candidateSha256": "f587318599cde72d99f36003799fb7096ba5f1a286ecf542e7c16c2e49d237f1"
     },
     {
       "path": "integrations/chatgpt-mcp/policy.mjs",
@@ -269,7 +269,7 @@
       "path": "integrations/chatgpt-mcp/test/runtime-package.test.mjs",
       "sourceBlob": "1b45a26ab45e40077d34a73550ec51bd236699b0",
       "unchanged": false,
-      "candidateSha256": "e3bafce8b4383846acc8003e204a972677a03e28589ad727d11aec7fc24eec43"
+      "candidateSha256": "ae61decea6e0a0187139db9fb02d552a04335e97048d3a0d5aa0e585d7d0ba05"
     }
   ]
 }

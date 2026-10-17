@@ -20,13 +20,22 @@ export function apply(ctx,config={}) {
     sessions:ctx.sessions,
     sessionProjections:ctx.sessionProjections,
   };
+  // Cordis can replace a service implementation without disposing dependents.
+  // Compare live implementations, not ephemeral trace-proxy identities.
+  const implementation=value=>value?.[Symbol.for('cordis.original')]??value;
+  const expected={...host,chatgptMcpReadPolicy:policy};
+  const checkHost=()=>{
+    if(Object.entries(expected).some(([key,value])=>implementation(ctx[key])!==implementation(value)))deny();
+  };
   const runtime=createOfficialDshMcpReadRuntime(host,policy);
   const resource=policy.resource,allowedOrigins=[...policy.allowedOrigins];
   let active=true,transport;
   const guarded=fn=>async(...args)=>{
     if(!active)deny();
+    checkHost();
     const result=await fn(...args);
     if(!active)deny();
+    checkHost();
     return result;
   };
   ctx.effect(()=>()=>{active=false;transport?.dispose();});
@@ -37,6 +46,7 @@ export function apply(ctx,config={}) {
     // Trusted embedding API only. Never called from YAML or MCP tool arguments.
     // The host owns TLS/listening; this factory cannot open a port.
     createPrivateTransport(options={}) {
+      checkHost();
       const keys=['enabled','McpServer','StreamableHTTPServerTransport','inputSchema','maxBodyBytes','timeoutMs'];
       if(!active||transport||!options||typeof options!=='object'||Array.isArray(options)||
         Object.keys(options).some(key=>!keys.includes(key))) deny();
