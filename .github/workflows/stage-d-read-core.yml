@@ -1,0 +1,28 @@
+name: Stage D — isolated Agent Teams read core
+on:
+  pull_request:
+    paths:
+      - 'integrations/chatgpt-mcp/adapters/agent-teams-read-model.mjs'
+      - 'integrations/chatgpt-mcp/adapters/agent-teams-read-authorization.mjs'
+      - 'integrations/chatgpt-mcp/test/agent-teams-read-model.test.mjs'
+      - 'integrations/chatgpt-mcp/test/agent-teams-read-authorization.test.mjs'
+      - '.github/workflows/stage-d-read-core.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  read-core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Isolated fail-closed authorization and projection tests
+        run: >-
+          node --test
+          integrations/chatgpt-mcp/test/agent-teams-read-model.test.mjs
+          integrations/chatgpt-mcp/test/agent-teams-read-authorization.test.mjs
