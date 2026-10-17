@@ -1,0 +1,8 @@
+**
+!integrations/
+!integrations/chatgpt-mcp/
+!integrations/chatgpt-mcp/**
+integrations/chatgpt-mcp/**/node_modules
+!deploy/
+!deploy/mcp/
+!deploy/mcp/*.mjs

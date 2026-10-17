@@ -1,0 +1,275 @@
+{
+  "sourceCommit": "afcd31418bd6d8cf7d747824cbb29b58a1c8ff75",
+  "files": [
+    {
+      "path": "deploy/mcp/Dockerfile.grants",
+      "sourceBlob": "ea029f16064d9711ae27bdda580336ee152aaf8e",
+      "unchanged": true,
+      "candidateSha256": "48e2bf2606a86bc877754d528e3dd0c8d1f9c7089da1ea4572cc0cdd024e72b1"
+    },
+    {
+      "path": "deploy/mcp/existing-profile-host.mjs",
+      "sourceBlob": "7994b23a2c19363e5663686663f75cff94f84c3f",
+      "unchanged": true,
+      "candidateSha256": "eb4fdbdd4a6a2601483dbb15ec51d8d4c6f5dc87d2d8b33f59d7315d96724fab"
+    },
+    {
+      "path": "deploy/mcp/existing-profile-host.test.mjs",
+      "sourceBlob": "4d5a777ce0518cb3a87c16fb980349b5744220f0",
+      "unchanged": true,
+      "candidateSha256": "c449ba12990974b730a7bf7f5139e9464acc7bb44fbe26044cd900782e6b398d"
+    },
+    {
+      "path": "deploy/mcp/init-read-role.sh",
+      "sourceBlob": "ef4a5db7faa82a2faa9cc313351f4ee56de00a2f",
+      "unchanged": false,
+      "candidateSha256": "f1e7d5f6f210b1f78853fd52098f93ce6bdf5e0f9d673a2a4e3de301896606a2"
+    },
+    {
+      "path": "deploy/mcp/operational-host.mjs",
+      "sourceBlob": "d24f03e54df7447ba9af0e782e1972316ecf155a",
+      "unchanged": false,
+      "candidateSha256": "dda19057f477914e0ed3b8235d63cab0fd652400f260953faf020c92142e731d"
+    },
+    {
+      "path": "deploy/mcp/operational-host.test.mjs",
+      "sourceBlob": "a664814c45cb0180e35c2594da06869ccef87ad6",
+      "unchanged": false,
+      "candidateSha256": "86e16a308d4b903d4c5d57df7cfde38b5768f8e9395a8474f8499b96f9baf52a"
+    },
+    {
+      "path": "deploy/mcp/private-read-listener.mjs",
+      "sourceBlob": "7b005411c22033d6b58f52770a7f15ca77772a9c",
+      "unchanged": true,
+      "candidateSha256": "2bc92bf41c75678e352188e3e91d1ca435c197b0f6c44b0cff1fd0ce6abf3c24"
+    },
+    {
+      "path": "deploy/mcp/run-operational.mjs",
+      "sourceBlob": "0702420c6710da1bc885f6411f92cea7d408aafe",
+      "unchanged": false,
+      "candidateSha256": "92a5b6fbf16c79cb01dff3a4f0f3f56247dea6bb02fc42a1566b2a6c4f1a21b9"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/LICENSE",
+      "sourceBlob": "c1f7a78e89e4e4dc7b86664c3b3c76eb5eee1785",
+      "unchanged": true,
+      "candidateSha256": "ebb4f09972aee8608be255debaf78451a68e95c290f55c240dec2ecfa16ea6be"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/PACKAGE_README.md",
+      "sourceBlob": "c6bb2126808e493fe88055f770cdaf0be142fbbc",
+      "unchanged": false,
+      "candidateSha256": "f5716aaa15b2691b916e0634be9c33c18e0f187288138d553ace143857f1bc0f"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/README.md",
+      "sourceBlob": "639f772e7d6c598817e814f4bad354da60e47564",
+      "unchanged": false,
+      "candidateSha256": "5d90f3a19412633dcb7f6699c03e9a6063b4f8ffb2d6c81e296ce7e6dbd36722"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/adapters/agent-teams-read-authorization.mjs",
+      "sourceBlob": "f94522580adcfa82c117c7616b8a3e81f4b38a11",
+      "unchanged": true,
+      "candidateSha256": "41304525312e74475609b02b5b6e106b013620399e7a90d1cc21f0866b2f9d1a"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/adapters/agent-teams-read-model.mjs",
+      "sourceBlob": "d0c16018a513943934ec457a243d13e49971a3d9",
+      "unchanged": true,
+      "candidateSha256": "c489ee0e601207c73eb1421c2f2b2a56e5b49f1197bf20479c49c92dc2b8afba"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/adapters/authoritative-revocation-check.mjs",
+      "sourceBlob": "68fc81fcdbb2361263d402034d69336d5140dcab",
+      "unchanged": true,
+      "candidateSha256": "4d6893b61a3681aced2987c18f01ea21c107d77a6247877f544edddc61aea08f"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/adapters/bearer-scoped-team-reader.mjs",
+      "sourceBlob": "6265d2eb4c3b257a6eeb686f0a37d4e83659e615",
+      "unchanged": true,
+      "candidateSha256": "4368de102d2d5d0e56e903302254cfbb6cecca8049f3dc12a28d791303f8286a"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/adapters/dns-pinned-oidc-fetcher.mjs",
+      "sourceBlob": "e017e116c98c0561d69865c5bb72f290f2a2e91d",
+      "unchanged": true,
+      "candidateSha256": "63c4112b418536f2b4a675eccc4a3a498d031adb3823347a137baab5ee330045"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/adapters/dsh-agent-teams-host-reader.mjs",
+      "sourceBlob": "b225e676b4fd756cb88904039f45f6e537ea1a51",
+      "unchanged": false,
+      "candidateSha256": "249ccf56c9ace09db42d8da5c80204f4dd2106f21a4cfd9d59eb7359a47b169d"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/adapters/dsh-host-read-binding.mjs",
+      "sourceBlob": "cbbd75ea0515e10f616983cd923f05ba79e0caa6",
+      "unchanged": true,
+      "candidateSha256": "9a25aab0775e61371c5decf1132641d2f7e25960aa67454c581a942f6008fecf"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/adapters/mcp-oauth-http-gate.mjs",
+      "sourceBlob": "94601beb76242239f414f28928b0f2324d27be78",
+      "unchanged": true,
+      "candidateSha256": "a389c4a0fd0fcfa3eba0b515fd6a069e9ccb59ea08dc1509d4f016bc22e0fcab"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/adapters/mcp-oauth-resource-metadata.mjs",
+      "sourceBlob": "90022559eb3749a6607c6181b3e681ad2c442a59",
+      "unchanged": true,
+      "candidateSha256": "3ba8d7e2596ec9f88f7e5182f2aac789eb6a87ade983afae83223feaf1d1d393"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/adapters/mcp-read-request-context.mjs",
+      "sourceBlob": "3224c91fdcac6370704db4cb938ffdf0656c7c9a",
+      "unchanged": true,
+      "candidateSha256": "19fc97e7c6ba948ac53a860747a9b8f51a689049dde28e7f3da7e62ec205588c"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/adapters/oidc-egress-address-policy.mjs",
+      "sourceBlob": "81d6ef39f44556806e86639b3ffecc9601c2d84d",
+      "unchanged": true,
+      "candidateSha256": "020403aca8856044fcdfbe706f8b6510083c5ca07c883863f4b2c5b882cf7f0f"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/adapters/pinned-jwt-transport-authenticator.mjs",
+      "sourceBlob": "78cbd1b1df45a969a96b3e02dfff853196ed4d7d",
+      "unchanged": false,
+      "candidateSha256": "dc5e47e3eaee4c3244a3a1a50391c3544a2313acc037c2fd61082736055726d4"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/adapters/pinned-oidc-discovery.mjs",
+      "sourceBlob": "5bb432fc92e8a9df8e3b87e3ec6209f91e10a54b",
+      "unchanged": true,
+      "candidateSha256": "f3c88e18f2b341c92dea9987da560572e7f1c8df85b65070d51c2f10ca3a9530"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/adapters/pinned-oidc-metadata.mjs",
+      "sourceBlob": "628e3b7e66f1b5ba7f90d9f76871aa64cd21f16e",
+      "unchanged": true,
+      "candidateSha256": "e29999747b46cd4b263a0a9ab1a660290ec83a2648d50e70f97caeb7b575724d"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/adapters/postgres-read-grants.mjs",
+      "sourceBlob": "c73d12be08398dc09754f508e30885ac8e74e11e",
+      "unchanged": true,
+      "candidateSha256": "8043e0ffacf7aa9669aa0f1b7b228a49e0e63cc8f693eda32ce30e6c10294cc2"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/adapters/postgres-token-revocation.mjs",
+      "sourceBlob": "3eee28944f35315bced7856f704e42ad372cdf29",
+      "unchanged": false,
+      "candidateSha256": "14ff46e46a09a949a6f5be98cc056d1b01c4eb7cae633f85143a1d5ec3a29ca9"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/adapters/private-mcp-http-handler.mjs",
+      "sourceBlob": "7b19d33431ccd0d24af09556e55fc773f2b888a5",
+      "unchanged": true,
+      "candidateSha256": "dc4091300a89495c0e2c604dedda1fbe8856c035c4903ab43a3926096c36ffcf"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/adapters/register-scoped-team-read-tool.mjs",
+      "sourceBlob": "1c51a67383a0d7f41474c708ba7c9d8727b56b95",
+      "unchanged": true,
+      "candidateSha256": "de301365fd71394e4c441bc061994335cf362b1e2937d39cea2dead94fe32c88"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/adapters/rotating-jwks-transport-authenticator.mjs",
+      "sourceBlob": "956369b78a5283ba4ca9b7d088809005e3026ad8",
+      "unchanged": true,
+      "candidateSha256": "5418287bc4860110a68719cb4645a2e6cf454f42cb955aa2f36eb4a08a9d4d73"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/adapters/scoped-mcp-read-identity.mjs",
+      "sourceBlob": "651986d046fa57af56f0dbeec09bbf0f6f96d4af",
+      "unchanged": false,
+      "candidateSha256": "020f7feb363a37e4313e8b2b667ab291509e2d83ff5e2d04aba8aaab84d2a625"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/adapters/scoped-read-grants.mjs",
+      "sourceBlob": "1b287c58952f9a73d7360418d9b933ef01e90003",
+      "unchanged": true,
+      "candidateSha256": "4a29f0c9504dfb34a506b3361f89fa98ad8a7cb48ec47f618ae92f644181d25a"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/cordis.patch.yml",
+      "sourceBlob": "86f8780d66164866a85d620ca93683a81c54d216",
+      "unchanged": true,
+      "candidateSha256": "502f8cfb9885c7b0741194f1bf2b279432181c584583f7dc505d36c87c81a9f8"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/package.json",
+      "sourceBlob": "3b84682274cccf1a230c4c3a78ded57de6df389c",
+      "unchanged": false,
+      "candidateSha256": "52c66bdb3044f0372ffee36aaac688c677f26c51bae2890d3ece959fe53808db"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/plugin.mjs",
+      "sourceBlob": "f58acc72383ec0a307da57f0578cdbe177d59555",
+      "unchanged": false,
+      "candidateSha256": "f587318599cde72d99f36003799fb7096ba5f1a286ecf542e7c16c2e49d237f1"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/policy.mjs",
+      "sourceBlob": "53faacd2b0ea4ef4197cb78641f528c681edfaaa",
+      "unchanged": true,
+      "candidateSha256": "86c5141bc5838cf8ac50482131368627aaad8cafee11aa9c568c8d78f3715689"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/runtime.mjs",
+      "sourceBlob": "574d7ddc23ac88604ff894e669d047614332d531",
+      "unchanged": true,
+      "candidateSha256": "0ed54d2acf5cf6ee8db7e03885f73c9fa608f7e61c44d48310df2aff62591b50"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/sql/001_token_revocations.sql",
+      "sourceBlob": "608141f2c73251e91aa55452b860aaaec6931f76",
+      "unchanged": true,
+      "candidateSha256": "42938aa6ef73b56aff51060d29444d2015af6e0eb523d56f13264c4213be5701"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/sql/002_read_grants.sql",
+      "sourceBlob": "ca4c203d725621bce2c7446c4ab7a5756fab0178",
+      "unchanged": true,
+      "candidateSha256": "e709b33ea6e3e5f80ea1097a096c94539773b63d429ec17f4231bcb6c538929b"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/test/agent-teams-read-authorization.test.mjs",
+      "sourceBlob": "9f44367ab144f11687ba20895c22825ae28a78da",
+      "unchanged": true,
+      "candidateSha256": "caf4ef4a93b601297e6946466123fb620c9a7e30fff8178dd7ae01bba9b8369d"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/test/agent-teams-read-model.test.mjs",
+      "sourceBlob": "a25a45219e99966b019cc3dd09e71d4cb9f69889",
+      "unchanged": true,
+      "candidateSha256": "4759e3d168190d699753c93a61c2208cbae06e8d15d0303ba9fac616e24c90cf"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/test/plugin-entry.test.mjs",
+      "sourceBlob": "08cb498f2f6767a1411d2f8da072ee001bcab290",
+      "unchanged": true,
+      "candidateSha256": "99c858651a307e7b7bd021ee7382200c531765ea71d1bd4b1ae3b98555bc134c"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/test/private-mcp-http-handler.test.mjs",
+      "sourceBlob": "b67f6af4225579b7f63bfcb43fb331e15e92e244",
+      "unchanged": true,
+      "candidateSha256": "fcb399817737bca1dc3a82b1b353c4e48c7ae3263c0aa2156524b22ba83c11b1"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/test/projection-fixture.mjs",
+      "sourceBlob": "7c3928d45bf529bfb3496118bef3aa79109ef10c",
+      "unchanged": true,
+      "candidateSha256": "8e6ba8eeed96a87e051e4c865671cf0089ebcc7f9968742af9af7ef145c44fac"
+    },
+    {
+      "path": "integrations/chatgpt-mcp/test/runtime-package.test.mjs",
+      "sourceBlob": "1b45a26ab45e40077d34a73550ec51bd236699b0",
+      "unchanged": false,
+      "candidateSha256": "ae61decea6e0a0187139db9fb02d552a04335e97048d3a0d5aa0e585d7d0ba05"
+    }
+  ]
+}

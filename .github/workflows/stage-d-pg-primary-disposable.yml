@@ -3,11 +3,9 @@ name: Stage D — disposable PostgreSQL primary and pg 8.16.3
 on:
   pull_request:
     paths:
-      - 'integrations/chatgpt-mcp/pg-disposable-probe/**'
-      - 'integrations/chatgpt-mcp/adapters/postgres-read-grants.mjs'
-      - 'integrations/chatgpt-mcp/adapters/authoritative-pg-read-query.mjs'
-      - 'integrations/chatgpt-mcp/test/stage-d-authoritative-pg-read-query.test.mjs'
-      - 'integrations/chatgpt-mcp/adapters/scoped-mcp-read-identity.mjs'
+      - 'integrations/chatgpt-mcp/**'
+      - 'deploy/mcp/**'
+      - 'deploy/Dockerfile.mcp-candidate*'
       - '.github/workflows/stage-d-pg-primary-disposable.yml'
   workflow_dispatch:
 
@@ -36,16 +34,136 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Verify strict read seam denies stale grants and unsafe clients
-        run: node --test integrations/chatgpt-mcp/test/stage-d-authoritative-pg-read-query.test.mjs
+      - name: Verify composition, package provenance and disabled listener with DI
+        run: node --test integrations/chatgpt-mcp/test/*.test.mjs deploy/mcp/operational-host.test.mjs deploy/mcp/existing-profile-host.test.mjs deploy/mcp/upgrade-existing-profile-contract.test.mjs deploy/mcp/private-profile*.test.mjs
+      - name: Verify manual publisher rejects changed source, artifacts and image identities
+        run: |
+          python3 .github/scripts/test_verify_reviewed_stage_d.py
+          python3 deploy/mcp/verify-candidate-image.test.py
       - name: Install exact pg@8.16.3 without lifecycle scripts
         working-directory: integrations/chatgpt-mcp/pg-disposable-probe
-        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Verify disposable primary, per-connection role, server deadline and grant revocation
         working-directory: integrations/chatgpt-mcp/pg-disposable-probe
         env:
           TEST_POSTGRES_PASSWORD: ${{ github.run_id }}
         run: npm test
+
+  candidate:
+    needs: pg-primary
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Build immutable candidates without running their launchers
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha="$(git rev-parse HEAD)"
+          epoch="$(git show -s --format=%ct HEAD)"
+          docker build --build-arg SOURCE_SHA="$sha" --build-arg SOURCE_DATE_EPOCH="$epoch" -f deploy/Dockerfile.mcp-candidate -t local/stage-d-mcp:tested .
+          docker build --build-arg SOURCE_DATE_EPOCH="$epoch" -f deploy/mcp/Dockerfile.grants -t local/stage-d-grants:tested .
+          # Disposable profile only, no secrets/production volumes/ports or model.
+          fixture="$(mktemp -d "$RUNNER_TEMP/mcp-upgrade.XXXXXX")"
+          chmod 0777 "$fixture"
+          cleanup_fixture() {
+            # Node-created directories belong to UID1000; hosted runner may be
+            # UID1001. Remove disposable contents as their owner, never root.
+            docker run --rm --network none --read-only --user 1000:1000 \
+              --cap-drop ALL --security-opt no-new-privileges \
+              --mount "type=bind,source=$fixture,target=/fixture" \
+              local/stage-d-mcp:tested node --input-type=module -e '
+                import fs from "node:fs"; import path from "node:path";
+                for(const entry of fs.readdirSync("/fixture"))
+                  fs.rmSync(path.join("/fixture",entry),{recursive:true,force:true});
+              '
+            rmdir -- "$fixture"
+          }
+          trap cleanup_fixture EXIT
+          docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --pids-limit 256 --memory 2g --tmpfs /tmp:rw,nosuid,nodev,uid=1000,gid=1000,mode=0700,size=1g \
+            --mount "type=bind,source=$fixture,target=/fixture" \
+            -e DSH_MCP_UPGRADE_CI=disposable-official-cli-only \
+            local/stage-d-mcp:tested node /opt/wandora-mcp-verifier/mcp/existing-profile-upgrade-ci.mjs prepare
+          # Exercise the actual private-copy rehearsal helper against a synthetic
+          # profile. Its runtime is the ALREADY PUBLISHED f5 image, never this rebuild.
+          docker run --rm --network none --read-only \
+            --mount "type=bind,source=$fixture,target=/fixture" \
+            local/stage-d-mcp:tested node --input-type=module -e '
+              import fs from "node:fs"; import {deserialize} from "node:v8";
+              const state=deserialize(fs.readFileSync("/fixture/state.bin"));
+              fs.cpSync(state.home,"/fixture/private-clone",{recursive:true,verbatimSymlinks:true});
+              // Synthetic fixture changes its mount path; relocate only pnpm
+              // installation metadata, not package/lock/patch/composition inputs.
+              // Real server snapshots keep /data/dsh and need no relocation.
+              const metadata="/fixture/private-clone/profiles/web/node_modules/.modules.yaml";
+              if(fs.existsSync(metadata))fs.writeFileSync(metadata,fs.readFileSync(metadata,"utf8").replaceAll(state.home,"/data/dsh"));
+              fs.rmSync("/fixture/private-clone/cordis.patch.yml");
+              fs.writeFileSync("/fixture/CLONE_ONLY","private-profile-copy-only\n");
+            '
+          frozen=ghcr.io/oaranha/deepharness-mcp@sha256:89879cc358ad557dfc151f401a3f796afda7e3bc19d865c99949d9f00d302fc6
+          docker pull "$frozen"
+          docker image inspect "$frozen" > "$RUNNER_TEMP/candidate-local.json"
+          docker manifest inspect "$frozen" > "$RUNNER_TEMP/candidate-registry.json"
+          python3 deploy/mcp/verify-candidate-image.py "$RUNNER_TEMP/candidate-local.json" "$RUNNER_TEMP/candidate-registry.json"
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --user 1000:1000 --pids-limit 256 --memory 2g --no-healthcheck \
+            --tmpfs /tmp:rw,nosuid,nodev,uid=1000,gid=1000,mode=0700,size=1g \
+            --mount "type=bind,source=$fixture/private-clone,target=/data/dsh" \
+            --mount "type=bind,source=$fixture,target=/review,readonly" \
+            --mount "type=bind,source=$PWD/deploy/mcp,target=/review-tools,readonly" \
+            -e HOME=/data/dsh -e DSH_HOME=/data/dsh -e DSH_MCP_PRIVATE_REHEARSAL=offline-copy-only \
+            -e XDG_CACHE_HOME=/data/dsh/cache -e NPM_CONFIG_CACHE=/data/dsh/cache -e NPM_CONFIG_PREFIX=/data/dsh/prefix \
+            --entrypoint node "$frozen" /review-tools/private-profile-rehearsal.mjs
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --pids-limit 256 --memory 2g --tmpfs /tmp:rw,nosuid,nodev,uid=1000,gid=1000,mode=0700,size=1g \
+            --mount "type=bind,source=$fixture,target=/fixture" \
+            -e DSH_MCP_UPGRADE_CI=disposable-official-cli-only \
+            local/stage-d-mcp:tested node /opt/wandora-mcp-verifier/mcp/existing-profile-upgrade-ci.mjs upgrade
+          mkdir -p .artifacts/stage-d
+          printf '%s\n' "$sha" > .artifacts/stage-d/source-head.txt
+          git rev-parse HEAD^{tree} > .artifacts/stage-d/source-tree.txt
+          docker image inspect local/stage-d-mcp:tested local/stage-d-grants:tested > .artifacts/stage-d/images.json
+          test "$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' local/stage-d-mcp:tested)" = "$sha"
+          # No running Web/MCP, no production mounts, no network or host ports.
+          test "$(docker run --rm --network none --read-only local/stage-d-mcp:tested)" = MCP_CANDIDATE_DISABLED
+          cid="$(docker create local/stage-d-mcp:tested)"
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true; cleanup_fixture' EXIT
+          docker cp "$cid:/opt/wandora-mcp-artifacts/." .artifacts/stage-d/
+          (cd .artifacts/stage-d && sha256sum -c SHA256SUMS)
+          SOURCE_SHA="$sha" node --input-type=module -e '
+            import fs from "node:fs";
+            import {createHash} from "node:crypto";
+            const m=JSON.parse(fs.readFileSync(".artifacts/stage-d/packed-files.json"));
+            if(m.sourceSha!==process.env.SOURCE_SHA)throw Error("source provenance mismatch");
+            for(const file of m.files){
+              const bytes=fs.readFileSync("integrations/chatgpt-mcp/"+file.path);
+              if(createHash("sha256").update(bytes).digest("hex")!==file.sha256)throw Error("package source mismatch");
+            }
+          '
+          docker run --rm --network none --read-only --tmpfs /tmp:rw,nosuid,nodev,uid=1000,gid=1000,mode=0700 \
+            local/stage-d-mcp:tested node --input-type=module -e '
+              import fs from "node:fs";
+              import {execFileSync} from "node:child_process";
+              import {verifyPackedInstall} from "/opt/wandora-mcp-verifier/mcp/verify-packed-install.mjs";
+              const root="/opt/wandora-mcp-artifacts";
+              const m=JSON.parse(fs.readFileSync(root+"/packed-files.json"));
+              execFileSync("tar",["-xzf",root+"/"+m.tarball,"-C","/tmp"]);
+              await verifyPackedInstall("/tmp/package",root+"/packed-files.json");
+              for(const file of m.files.filter(f=>f.path.endsWith(".mjs")))await import("/tmp/package/"+file.path);
+              console.log("CANDIDATE_PACKED_IMPORTS_MATCH");
+            '
+          docker save local/stage-d-mcp:tested local/stage-d-grants:tested | gzip -n > .artifacts/stage-d/candidate-images.tar.gz
+          (cd .artifacts/stage-d && sha256sum candidate-images.tar.gz images.json packed-files.json source-head.txt source-tree.txt > EVIDENCE_SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stage-d-integrated-candidates-${{ github.event.pull_request.head.sha || github.sha }}
+          path: .artifacts/stage-d/
+          retention-days: 7

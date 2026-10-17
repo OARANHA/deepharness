@@ -89,3 +89,18 @@ export function createAuthoritativePgReadQuery({
     }
   };
 }
+
+/** Startup inspection uses its own checkout; never bypasses per-read checks. */
+export async function assertAuthoritativePgReadPool({ pool } = {}) {
+  if (typeof pool?.connect !== 'function') deny();
+  let client;
+  let discard = true;
+  try {
+    client = await pool.connect();
+    const result = await client.query(AUTHORITY_SQL);
+    if (!Array.isArray(result?.rows) || result.rows.length !== 1 ||
+        !correctAuthority(result.rows[0], 'dsh_mcp_reader', 'dsh_mcp_grants', 750)) deny();
+    discard = false;
+  } catch { deny(); }
+  finally { if (client) client.release(discard); }
+}

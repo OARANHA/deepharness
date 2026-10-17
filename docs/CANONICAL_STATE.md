@@ -46,3 +46,12 @@ C. Inventory existing DeepSeek-specific Docker container/image/volumes/config an
 D. Deploy exactly one Portainer Stack using already-built image.
 E. Validate origin TLS and authenticated Web UI; integrate Chutes.ai.
 F. Design least-privilege MCP plugin; no unrestricted host execution.
+
+## Stage D integration candidate — 2026-10-17 (review only)
+
+The preceding historical deployment notes do not describe the latest integration.
+See `deploy/mcp/STAGE_D_INTEGRATION_REVIEW_20261017.md` for the narrow PR12-based
+composition, reuse provenance, tests and packaging gates. The operational host
+uses the strict PostgreSQL query and candidate role timeout750ms. Package and
+image candidates remain disabled; real production deployment/login is unverified
+by this change. CI must be checked on the exact integration SHA before readiness.
