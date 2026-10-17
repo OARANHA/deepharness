@@ -247,8 +247,8 @@ jobs:
                   mounts={v["target"]:v for v in proxy["volumes"]}
                   expected={
                       "/etc/wandora-mcp/envoy.json": os.environ["DSH_MCP_REVIEW_ROOT"]+"/envoy.json",
-                      "/run/secrets/backend-client-cert.pem": os.environ["DSH_MCP_SECRET_ROOT"]+"/proxy-client-cert.pem",
-                      "/run/secrets/backend-client-key.pem": os.environ["DSH_MCP_SECRET_ROOT"]+"/proxy-client-key.pem",
+                      "/run/secrets/backend-client-cert.pem": "/opt/wandora/data/deepharness-mcp/tls/proxy/proxy-backend-client-chain.pem",
+                      "/run/secrets/backend-client-key.pem": "/opt/wandora/data/deepharness-mcp/tls/proxy/proxy-backend-client-key.pem",
                       "/run/secrets/backend-ca.pem": "/opt/wandora/data/deepharness-mcp/tls/backend/backend-ca.pem",
                   }
                   for target, source in expected.items():
