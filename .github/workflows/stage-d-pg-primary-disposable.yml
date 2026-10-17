@@ -41,7 +41,9 @@ jobs:
       - name: Verify composition, package provenance and disabled listener with DI
         run: node --test integrations/chatgpt-mcp/test/*.test.mjs deploy/mcp/operational-host.test.mjs deploy/mcp/existing-profile-host.test.mjs deploy/mcp/upgrade-existing-profile-contract.test.mjs deploy/mcp/private-profile*.test.mjs
       - name: Verify manual publisher rejects changed source, artifacts and image identities
-        run: python3 .github/scripts/test_verify_reviewed_stage_d.py
+        run: |
+          python3 .github/scripts/test_verify_reviewed_stage_d.py
+          python3 deploy/mcp/verify-candidate-image.test.py
       - name: Install exact pg@8.16.3 without lifecycle scripts
         working-directory: integrations/chatgpt-mcp/pg-disposable-probe
         run: npm ci --ignore-scripts --no-audit --no-fund
@@ -108,6 +110,9 @@ jobs:
             '
           frozen=ghcr.io/oaranha/deepharness-mcp@sha256:89879cc358ad557dfc151f401a3f796afda7e3bc19d865c99949d9f00d302fc6
           docker pull "$frozen"
+          docker image inspect "$frozen" > "$RUNNER_TEMP/candidate-local.json"
+          docker manifest inspect "$frozen" > "$RUNNER_TEMP/candidate-registry.json"
+          python3 deploy/mcp/verify-candidate-image.py "$RUNNER_TEMP/candidate-local.json" "$RUNNER_TEMP/candidate-registry.json"
           docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
             --user 1000:1000 --pids-limit 256 --memory 2g --no-healthcheck \
             --tmpfs /tmp:rw,nosuid,nodev,uid=1000,gid=1000,mode=0700,size=1g \

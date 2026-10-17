@@ -21,6 +21,19 @@ indexes, local-tarball cache entries and registry metadata. It never requests
 source links or disables Docker's extraction checks. Unexpected selected symlinks
 are denied. Partial prior snapshot is retained; reruns create a fresh directory.
 
+Docker29 owner readback exposed a separate identity-gate incompatibility:
+containerd reports the manifest digest as `.Id`, while classic Docker reports the
+config digest. `verify-candidate-image.py` checks these independently: pinned
+repository/descriptor manifest89879cc..., registry configcec5b1..., and complete
+local linux/amd64 metadata with revisionf5. Empty Config/platform remains DENIED.
+Owner registry config was confirmed linux/amd64/sourcef5, but the local candidate
+has empty platform/config even after explicit platform pull. Do not skip that gate.
+One owner-executed refresh may remove only this exact unused candidate reference,
+WITHOUT force, after confirming no containers use it, then repull the same digest.
+Never remove production images/containers, prune shared cache or restart Docker.
+Stop if refresh is refused or metadata remains incomplete. Existing private copy
+7zr3Vx is retained; no real-profile rehearsal has run as of that readback.
+
 The runner pulls the exact published MCP digest
 `sha256:89879cc358ad557dfc151f401a3f796afda7e3bc19d865c99949d9f00d302fc6`,
 checks configID/sourcef5, and starts a disposable non-root container with no
