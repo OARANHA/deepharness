@@ -1,0 +1,19 @@
+# Reviewed parent already contains official DSH alpha.2 + pg8.16.3/SDK1.30.0.
+# Reuse it immutably; no dependency resolution, production build, or deployment.
+FROM ghcr.io/oaranha/deepharness-mcp@sha256:2483c85cc3fbe6172bf284e67859572b8b6b5dc75bfea11ae160298f7202a62f
+ARG SOURCE_SHA
+ARG SOURCE_DATE_EPOCH
+LABEL org.opencontainers.image.source="https://github.com/OARANHA/deepharness" \
+      org.opencontainers.image.revision=$SOURCE_SHA
+USER root
+COPY integrations/chatgpt-mcp/ /opt/wandora-mcp-source/
+COPY deploy/mcp/pack-candidate.mjs /opt/wandora-mcp-build/pack-candidate.mjs
+RUN test "$(node -p 'require("/opt/wandora-mcp-host/node_modules/pg/package.json").version')" = 8.16.3 \
+ && rm -f /opt/wandora-mcp-artifacts/*.tgz \
+ && NPM_CONFIG_CACHE=/tmp/mcp-pack node /opt/wandora-mcp-build/pack-candidate.mjs /opt/wandora-mcp-source /opt/wandora-mcp-artifacts "$SOURCE_SHA" \
+ && rm -rf /opt/wandora-mcp-source /opt/wandora-mcp-build /tmp/mcp-pack
+COPY deploy/mcp/existing-profile-host.mjs deploy/mcp/private-read-listener.mjs deploy/mcp/operational-host.mjs deploy/mcp/run-operational.mjs deploy/mcp/verify-packed-install.mjs /opt/wandora-mcp-verifier/mcp/
+COPY integrations/chatgpt-mcp/adapters/pinned-oidc-discovery.mjs integrations/chatgpt-mcp/adapters/pinned-oidc-metadata.mjs integrations/chatgpt-mcp/adapters/dns-pinned-oidc-fetcher.mjs integrations/chatgpt-mcp/adapters/oidc-egress-address-policy.mjs /opt/wandora-mcp-host/oidc/
+USER node
+# Default MUST NOT execute operational launcher or any Web/MCP listener.
+CMD ["node", "--input-type=module", "-e", "console.log('MCP_CANDIDATE_DISABLED');"]

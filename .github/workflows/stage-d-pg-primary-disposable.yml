@@ -3,11 +3,9 @@ name: Stage D — disposable PostgreSQL primary and pg 8.16.3
 on:
   pull_request:
     paths:
-      - 'integrations/chatgpt-mcp/pg-disposable-probe/**'
-      - 'integrations/chatgpt-mcp/adapters/postgres-read-grants.mjs'
-      - 'integrations/chatgpt-mcp/adapters/authoritative-pg-read-query.mjs'
-      - 'integrations/chatgpt-mcp/test/stage-d-authoritative-pg-read-query.test.mjs'
-      - 'integrations/chatgpt-mcp/adapters/scoped-mcp-read-identity.mjs'
+      - 'integrations/chatgpt-mcp/**'
+      - 'deploy/mcp/**'
+      - 'deploy/Dockerfile.mcp-candidate*'
       - '.github/workflows/stage-d-pg-primary-disposable.yml'
   workflow_dispatch:
 
@@ -36,16 +34,58 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Verify strict read seam denies stale grants and unsafe clients
-        run: node --test integrations/chatgpt-mcp/test/stage-d-authoritative-pg-read-query.test.mjs
+      - name: Verify composition, package provenance and disabled listener with DI
+        run: node --test integrations/chatgpt-mcp/test/*.test.mjs deploy/mcp/operational-host.test.mjs deploy/mcp/existing-profile-host.test.mjs
       - name: Install exact pg@8.16.3 without lifecycle scripts
         working-directory: integrations/chatgpt-mcp/pg-disposable-probe
-        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Verify disposable primary, per-connection role, server deadline and grant revocation
         working-directory: integrations/chatgpt-mcp/pg-disposable-probe
         env:
           TEST_POSTGRES_PASSWORD: ${{ github.run_id }}
         run: npm test
+
+  candidate:
+    needs: pg-primary
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Build immutable candidates without running their launchers
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha="$(git rev-parse HEAD)"
+          epoch="$(git show -s --format=%ct HEAD)"
+          docker build --build-arg SOURCE_SHA="$sha" --build-arg SOURCE_DATE_EPOCH="$epoch" -f deploy/Dockerfile.mcp-candidate -t local/stage-d-mcp:tested .
+          docker build --build-arg SOURCE_DATE_EPOCH="$epoch" -f deploy/mcp/Dockerfile.grants -t local/stage-d-grants:tested .
+          mkdir -p .artifacts/stage-d
+          printf '%s\n' "$sha" > .artifacts/stage-d/source-head.txt
+          git rev-parse HEAD^{tree} > .artifacts/stage-d/source-tree.txt
+          docker image inspect local/stage-d-mcp:tested local/stage-d-grants:tested > .artifacts/stage-d/images.json
+          test "$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' local/stage-d-mcp:tested)" = "$sha"
+          # No running Web/MCP, no production mounts, no network or host ports.
+          test "$(docker run --rm --network none --read-only local/stage-d-mcp:tested)" = MCP_CANDIDATE_DISABLED
+          cid="$(docker create local/stage-d-mcp:tested)"
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+          docker cp "$cid:/opt/wandora-mcp-artifacts/." .artifacts/stage-d/
+          (cd .artifacts/stage-d && sha256sum -c SHA256SUMS)
+          SOURCE_SHA="$sha" node --input-type=module -e '
+            import fs from "node:fs";
+            const m=JSON.parse(fs.readFileSync(".artifacts/stage-d/packed-files.json"));
+            if(m.sourceSha!==process.env.SOURCE_SHA)throw Error("source provenance mismatch");
+          '
+          docker save local/stage-d-mcp:tested local/stage-d-grants:tested | gzip -n > .artifacts/stage-d/candidate-images.tar.gz
+          (cd .artifacts/stage-d && sha256sum candidate-images.tar.gz images.json packed-files.json source-head.txt source-tree.txt > EVIDENCE_SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stage-d-integrated-candidates-${{ github.event.pull_request.head.sha || github.sha }}
+          path: .artifacts/stage-d/
+          retention-days: 7

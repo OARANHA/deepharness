@@ -1,0 +1,8 @@
+**
+!integrations/
+!integrations/chatgpt-mcp/
+!integrations/chatgpt-mcp/sql/
+!integrations/chatgpt-mcp/sql/*.sql
+!deploy/
+!deploy/mcp/
+!deploy/mcp/init-read-role.sh
