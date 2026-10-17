@@ -38,8 +38,10 @@ remains a non-root, read-only-rootfs, cap-drop service. If this Docker trust bou
 unacceptable, STOP and review a separately protected Traefik-to-Envoy link.
 
 Envoy config: `deploy/mcp/envoy-public-bridge.review.yaml`.
+Envoy parses configuration according to the file extension: the reviewed YAML must be
+mounted as `envoy.yaml`, NOT `envoy.json`. Isolated CI reproduces the true bind path.
 Operator-owned runtime bind remains
-`/opt/wandora/data/deepharness-mcp/review/envoy.json` (create only after
+`/opt/wandora/data/deepharness-mcp/review/envoy.yaml` (create only after
 deployment approval, from the **frozen reviewed file**).
 Public route is HTTP router + ACME with `Host(dsh-mcp.wandora.com.br)`, no TCP
 passthrough and no BasicAuth on MCP (the backend still requires OAuth and explicit grants).
@@ -72,7 +74,7 @@ certificate requirement is a fresh, non-secret read-only presence/trust check.
    `tls/backend/backend-ca.pem`, and can be read by container UID 1000. The existing
    backend CA remains mounted independently; never print or commit private keys.
    Do not alter key ownership/permissions broadly to force a PASS.
-6. Verify `/opt/wandora/data/deepharness-mcp/review/envoy.json` is populated from
+6. Verify `/opt/wandora/data/deepharness-mcp/review/envoy.yaml` is populated from
    exactly this reviewed file (currently **absent**), owned appropriately for UID 1000;
    ensure no symlinks that escape reviewed directories. Do not edit runtime DSH credentials.
 7. Validate actual Envoy config with the selected immutable image using
