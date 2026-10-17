@@ -6,8 +6,7 @@ import { createRequire } from 'node:module';
 import pg from 'pg';
 import { createPostgresReadGrantStore } from '../adapters/postgres-read-grants.mjs';
 import { createScopedMcpReadIdentity } from '../adapters/scoped-mcp-read-identity.mjs';
-import { createPostgresRevocationBackend } from '../adapters/postgres-token-revocation.mjs';
-import { createAuthoritativePgReadQuery, READ_GRANT_SQL } from '../adapters/authoritative-pg-read-query.mjs';
+import { createAuthoritativePgReadQuery, READ_GRANT_SQL, READ_REVOCATION_SQL } from '../adapters/authoritative-pg-read-query.mjs';
 
 const { Pool } = pg;
 if (process.env.GITHUB_ACTIONS !== 'true' ||
@@ -158,17 +157,20 @@ test('pg@8.16.3 actual disposable primary, authority, cancellation and grants', 
       }), /Agent Teams read denied/);
     });
 
-    await t.test('revocation backend only SELECTs; INSERT/revoke is denied on read-only bridge', async () => {
-      const identity = { issuer: 'https://id.example.test', subject: 'human-1', tokenId: 'jti-1' };
-      const tokenHash = createHash('sha256')
-        .update(JSON.stringify([identity.issuer, identity.subject, identity.tokenId]))
-        .digest('hex');
-      const tokens = createPostgresRevocationBackend({ query, timeoutMs: 1000 });
-      assert.equal(await tokens.isRevoked(identity), false);
+    await t.test('token revocations are primary-only SELECT; an INSERT is never accepted', async () => {
+      const tokenHash = createHash('sha256').update(JSON.stringify([
+        'https://id.example.test', 'human-1', 'jti-1',
+      ])).digest('hex');
+      const options = () => ({
+        readFromPrimary: true, signal: new AbortController().signal,
+      });
+      assert.deepEqual((await query(READ_REVOCATION_SQL, [tokenHash], options())).rows, []);
       await admin.query('INSERT INTO public.chatgpt_mcp_token_revocations VALUES ($1,TRUE)', [tokenHash]);
-      await assert.rejects(tokens.isRevoked(identity), /Agent Teams read denied/);
-      await assert.rejects(tokens.revoke({ ...identity, tokenId: 'new-jti' }),
-        /Agent Teams read denied/);
+      assert.deepEqual((await query(READ_REVOCATION_SQL, [tokenHash], options())).rows,
+        [{ revoked: true }]);
+      await assert.rejects(query(
+        'INSERT INTO chatgpt_mcp_token_revocations (token_hash,revoked) VALUES ($1,TRUE)',
+        [tokenHash], options()), /Agent Teams read denied/);
     });
 
     await t.test('pool reconnect rechecks grants, role and unsafe timeout settings', async () => {
