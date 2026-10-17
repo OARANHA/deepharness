@@ -39,7 +39,7 @@ jobs:
         with:
           node-version: '22'
       - name: Verify composition, package provenance and disabled listener with DI
-        run: node --test integrations/chatgpt-mcp/test/*.test.mjs deploy/mcp/operational-host.test.mjs deploy/mcp/existing-profile-host.test.mjs deploy/mcp/upgrade-existing-profile-contract.test.mjs
+        run: node --test integrations/chatgpt-mcp/test/*.test.mjs deploy/mcp/operational-host.test.mjs deploy/mcp/existing-profile-host.test.mjs deploy/mcp/upgrade-existing-profile-contract.test.mjs deploy/mcp/private-profile-rehearsal.test.mjs
       - name: Verify manual publisher rejects changed source, artifacts and image identities
         run: python3 .github/scripts/test_verify_reviewed_stage_d.py
       - name: Install exact pg@8.16.3 without lifecycle scripts
@@ -77,6 +77,33 @@ jobs:
             --mount "type=bind,source=$fixture,target=/fixture" \
             -e DSH_MCP_UPGRADE_CI=disposable-official-cli-only \
             local/stage-d-mcp:tested node /opt/wandora-mcp-verifier/mcp/existing-profile-upgrade-ci.mjs prepare
+          # Exercise the actual private-copy rehearsal helper against a synthetic
+          # profile. Its runtime is the ALREADY PUBLISHED f5 image, never this rebuild.
+          docker run --rm --network none --read-only \
+            --mount "type=bind,source=$fixture,target=/fixture" \
+            local/stage-d-mcp:tested node --input-type=module -e '
+              import fs from "node:fs"; import {deserialize} from "node:v8";
+              const state=deserialize(fs.readFileSync("/fixture/state.bin"));
+              fs.cpSync(state.home,"/fixture/private-clone",{recursive:true,verbatimSymlinks:true});
+              // Synthetic fixture changes its mount path; relocate only pnpm
+              // installation metadata, not package/lock/patch/composition inputs.
+              // Real server snapshots keep /data/dsh and need no relocation.
+              const metadata="/fixture/private-clone/profiles/web/node_modules/.modules.yaml";
+              if(fs.existsSync(metadata))fs.writeFileSync(metadata,fs.readFileSync(metadata,"utf8").replaceAll(state.home,"/data/dsh"));
+              fs.rmSync("/fixture/private-clone/cordis.patch.yml");
+              fs.writeFileSync("/fixture/CLONE_ONLY","private-profile-copy-only\n");
+            '
+          frozen=ghcr.io/oaranha/deepharness-mcp@sha256:89879cc358ad557dfc151f401a3f796afda7e3bc19d865c99949d9f00d302fc6
+          docker pull "$frozen"
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --user 1000:1000 --pids-limit 256 --memory 2g --no-healthcheck \
+            --tmpfs /tmp:rw,nosuid,nodev,uid=1000,gid=1000,mode=0700,size=1g \
+            --mount "type=bind,source=$fixture/private-clone,target=/data/dsh" \
+            --mount "type=bind,source=$fixture,target=/review,readonly" \
+            --mount "type=bind,source=$PWD/deploy/mcp,target=/review-tools,readonly" \
+            -e HOME=/data/dsh -e DSH_HOME=/data/dsh -e DSH_MCP_PRIVATE_REHEARSAL=offline-copy-only \
+            -e XDG_CACHE_HOME=/data/dsh/cache -e NPM_CONFIG_CACHE=/data/dsh/cache -e NPM_CONFIG_PREFIX=/data/dsh/prefix \
+            --entrypoint node "$frozen" /review-tools/private-profile-rehearsal.mjs
           docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
             --pids-limit 256 --memory 2g --tmpfs /tmp:rw,nosuid,nodev,uid=1000,gid=1000,mode=0700,size=1g \
             --mount "type=bind,source=$fixture,target=/fixture" \

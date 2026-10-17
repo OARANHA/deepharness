@@ -1,0 +1,43 @@
+# Private profile rehearsal — no deployment
+
+Owner readback confirms HOME=DSH_HOME=/data/dsh, real profile at
+`/data/dsh/profiles/web`, package/lock/node_modules/.pnpm/user patch present,
+and no global `cordis.patch.yml`. The `.modules.yaml` diagnostic returned no
+store paths; do not assume that a particular pnpm cache is populated.
+
+`rehearse-private-profile.sh` is a narrowly scoped owner-executed preparation
+for 28server. It creates a new0700 directory under `/root`, copies the existing
+Web profile plus present fixed pnpm cache paths, retains that private snapshot,
+and works on a separate copy. It never mounts production volumes into the
+rehearsal, starts Web, connects to PostgreSQL, stops/restarts anything or cleans
+Docker. Profile/cache content stays on the server; do not upload these copies.
+This is a profile snapshot, NOT an application/database-consistent backup.
+
+The runner pulls the exact published MCP digest
+`sha256:89879cc358ad557dfc151f401a3f796afda7e3bc19d865c99949d9f00d302fc6`,
+checks configID/sourcef5, and starts a disposable non-root container with no
+network, no host ports, read-only root and no capabilities. Only the copy is
+writable. It invokes the official offline installer with scripts disabled and
+`web --dump-config`, never the operational launcher. It uses the already tested
+preservation contract from the frozen image and checks every packaged file.
+The helper accepts an absent home patch, requires installed lab4/Teams and the
+exact disabled composition, and refuses unexpected state before installation.
+Captured CLI/config output is never printed. A denied phase is not success.
+
+Expected success markers:
+```
+PRIVATE_PROFILE_SNAPSHOT_READY /root/deepharness-stage-d-rehearsal.<suffix>
+PRIVATE_PROFILE_OFFLINE_UPGRADE_MATCH
+PRODUCTION_PROFILE_CONTROL_FILES_AND_WEB_UNCHANGED
+```
+The last marker verifies control-file hashes and containerID/start/restarts/image,
+not all application data. The running application's normal writes may continue.
+Copies are retained even on failure, with no automatic deletion or live mutation.
+If offline dependencies/symlinks are missing, reconcile only the private copy;
+never switch the rehearsal to live mounts or network just to obtain GREEN.
+
+CI tests the helper using a copied synthetic profile with absent home patch and
+the same published digest. This does not certify the actual private profile.
+After a GREEN owner rehearsal, still prepare the same-stack maintenance plan,
+consistent application/database backup and paired rollback before seeking the
+separate approval for profile/SQL/redeploy. OAuth/ChatGPT canary remains later.
