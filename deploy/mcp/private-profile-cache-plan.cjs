@@ -29,8 +29,11 @@ function cacheCopyPlan(root){
   for(const base of ['.cache/pnpm','cache/pnpm']){
     if(!directory(base))continue;
     for(const entry of ['metadata','lockfile-verified.jsonl'])add(base+'/'+entry);
-    for(const version of fs.readdirSync(path.join(root,base)).sort()){
-      if(/^v[0-9]+$/.test(version)&&directory(base+'/'+version))add(base+'/'+version+'/metadata');
+    for(const entry of fs.readdirSync(path.join(root,base)).sort()){
+      // pnpm 9/10 stores registry mirrors under metadata-v1.3, not metadata.
+      // Use only narrowly named local cache directories; reject symlinks via add().
+      if(/^metadata-v[0-9]+(?:\.[0-9]+)*$/.test(entry))add(base+'/'+entry);
+      if(/^v[0-9]+$/.test(entry)&&directory(base+'/'+entry))add(base+'/'+entry+'/metadata');
     }
   }
   return result;
