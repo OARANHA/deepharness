@@ -77,7 +77,7 @@ services:
     command:
     - envoy
     - -c
-    - /etc/wandora-mcp/envoy.json
+    - /etc/wandora-mcp/envoy.yaml
     - --concurrency
     - '1'
     - --disable-hot-restart
@@ -97,8 +97,8 @@ services:
     - /tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777
     volumes:
     - type: bind
-      source: ${DSH_MCP_REVIEW_ROOT:?Provide reviewed configuration directory}/envoy.json
-      target: /etc/wandora-mcp/envoy.json
+      source: ${DSH_MCP_REVIEW_ROOT:?Provide reviewed configuration directory}/envoy.yaml
+      target: /etc/wandora-mcp/envoy.yaml
       read_only: true
     - type: bind
       source: /opt/wandora/data/deepharness-mcp/tls/proxy/proxy-backend-client-chain.pem
