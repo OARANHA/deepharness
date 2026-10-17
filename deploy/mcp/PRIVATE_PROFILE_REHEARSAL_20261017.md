@@ -13,6 +13,14 @@ rehearsal, starts Web, connects to PostgreSQL, stops/restarts anything or cleans
 Docker. Profile/cache content stays on the server; do not upload these copies.
 This is a profile snapshot, NOT an application/database-consistent backup.
 
+Owner attempt using e080 stopped during Docker copy of the full pnpm store:
+Docker rejected a relative symlink under `v11/projects`. Respect that refusal.
+The revised wrapper uses a read-only cache plan and copies only package content,
+indexes, local-tarball cache entries and registry metadata. It never requests
+`projects`, copies a project-registration link through another transport, changes
+source links or disables Docker's extraction checks. Unexpected selected symlinks
+are denied. Partial prior snapshot is retained; reruns create a fresh directory.
+
 The runner pulls the exact published MCP digest
 `sha256:89879cc358ad557dfc151f401a3f796afda7e3bc19d865c99949d9f00d302fc6`,
 checks configID/sourcef5, and starts a disposable non-root container with no

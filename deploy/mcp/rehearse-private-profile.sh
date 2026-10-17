@@ -7,6 +7,7 @@ test "$(id -u)" = 0
 test "$(hostname)" = 28server
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 test -f "$script_dir/private-profile-rehearsal.mjs"
+test -f "$script_dir/private-profile-cache-plan.cjs"
 web=deepharness-web-1
 image=ghcr.io/oaranha/deepharness-mcp@sha256:89879cc358ad557dfc151f401a3f796afda7e3bc19d865c99949d9f00d302fc6
 test "$(docker inspect --format '{{.State.Running}}' "$web")" = true
@@ -29,13 +30,20 @@ fingerprint(){
 }
 fingerprint > "$root/source-before.json"
 docker cp "$web:/data/dsh/profiles/web" "$backup/profiles/" >/dev/null
-# Fixed pnpm-only paths; never copy sessions, workspace or global credentials.
-for path in cordis.patch.yml .local/share/pnpm .cache/pnpm .pnpm-store; do
+# Copy the optional patch separately. pnpm project-registration links are NOT
+# package cache data and Docker correctly refuses their extraction; never copy
+# or follow them, and never change the source links to get past that refusal.
+for path in cordis.patch.yml; do
   if docker exec --user node "$web" node -e 'process.exit(require("node:fs").existsSync("/data/dsh/"+process.argv[1])?0:1)' "$path"; then
     mkdir -p "$backup/$(dirname -- "$path")"
     docker cp "$web:/data/dsh/$path" "$backup/$path" >/dev/null
   fi
 done
+docker exec -i --user node "$web" node - < "$script_dir/private-profile-cache-plan.cjs" > "$root/cache-paths.txt"
+while IFS= read -r path; do
+  mkdir -p "$backup/$(dirname -- "$path")"
+  docker cp "$web:/data/dsh/$path" "$backup/$path" >/dev/null
+done < "$root/cache-paths.txt"
 fingerprint > "$root/source-after-copy.json"
 cmp --silent "$root/source-before.json" "$root/source-after-copy.json"
 cp -a -- "$backup/." "$clone/"
