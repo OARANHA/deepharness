@@ -6,9 +6,9 @@ import { createRequire } from 'node:module';
 import pg from 'pg';
 import { createPostgresReadGrantStore } from '../adapters/postgres-read-grants.mjs';
 import { createScopedMcpReadIdentity } from '../adapters/scoped-mcp-read-identity.mjs';
+import { createAuthoritativePgReadQuery, READ_GRANT_SQL, READ_REVOCATION_SQL } from '../adapters/authoritative-pg-read-query.mjs';
 
 const { Pool } = pg;
-const deny = () => { throw Error('Agent Teams read denied'); };
 if (process.env.GITHUB_ACTIONS !== 'true' ||
     process.env.GITHUB_REPOSITORY !== 'OARANHA/deepharness' ||
     !/^[0-9]{1,20}$/.test(process.env.TEST_POSTGRES_PASSWORD ?? '')) {
@@ -29,7 +29,7 @@ const scope = Object.freeze({
   leadSessionId: 'lead-1',
 });
 const hash = createHash('sha256').update(JSON.stringify(Object.values(scope))).digest('hex');
-const grantSQL = 'SELECT allowed FROM chatgpt_mcp_read_grants WHERE grant_hash = $1';
+const grantSQL = READ_GRANT_SQL;
 const projection = {
   members: [{ id: 'lead-1', name: 'Lead', role: 'lead', phase: 'active' }],
   tasks: [],
@@ -53,24 +53,12 @@ async function verifyClient(client) {
   });
 }
 
-// Test-only host bridge: the real deploy/mcp/operational-host.mjs bridge remains
-// unmodified and is NOT validated by this positive integration seam.
-function createInspectedQuery(pool) {
-  return async (sql, params, options) => {
-    if (sql !== grantSQL || !Array.isArray(params) || params.length !== 1 ||
-        !/^[0-9a-f]{64}$/.test(params[0]) ||
-        options?.readFromPrimary !== true ||
-        !(options.signal instanceof AbortSignal) || options.signal.aborted) deny();
-    const client = await pool.connect();
-    try {
-      await verifyClient(client); // Authority and deadline on THIS checkout.
-      if (options.signal.aborted) deny();
-      return await client.query(sql, params);
-    } finally {
-      client.release();
-    }
-  };
-}
+// Use the NEW, production-intended read-only seam. The broad PR #4
+// operational host must still be wired explicitly in a later reviewed gate.
+const createInspectedQuery = pool => createAuthoritativePgReadQuery({
+  pool, expectedRole: readerRole, expectedDatabase: dbName,
+  maxStatementTimeoutMs: 500,
+});
 
 test('pg@8.16.3 actual disposable primary, authority, cancellation and grants', async t => {
   const admin = new Pool(adminOptions);
@@ -79,12 +67,14 @@ test('pg@8.16.3 actual disposable primary, authority, cancellation and grants', 
   try {
     await admin.query(`CREATE TABLE public.chatgpt_mcp_read_grants
       (grant_hash CHAR(64) PRIMARY KEY, allowed BOOLEAN NOT NULL)`);
+    await admin.query(`CREATE TABLE public.chatgpt_mcp_token_revocations
+      (token_hash CHAR(64) PRIMARY KEY, revoked BOOLEAN NOT NULL)`);
     await admin.query(`REVOKE CREATE ON SCHEMA public FROM PUBLIC`);
     await admin.query(`CREATE ROLE ${readerRole} LOGIN PASSWORD '${password}'
       NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`);
     await admin.query(`GRANT CONNECT ON DATABASE ${dbName} TO ${readerRole}`);
     await admin.query(`GRANT USAGE ON SCHEMA public TO ${readerRole}`);
-    await admin.query(`GRANT SELECT ON public.chatgpt_mcp_read_grants TO ${readerRole}`);
+    await admin.query(`GRANT SELECT ON public.chatgpt_mcp_read_grants, public.chatgpt_mcp_token_revocations TO ${readerRole}`);
     await admin.query(`ALTER ROLE ${readerRole} SET default_transaction_read_only=on`);
     await admin.query(`ALTER ROLE ${readerRole} SET statement_timeout='300ms'`);
     await admin.query('INSERT INTO public.chatgpt_mcp_read_grants VALUES ($1, TRUE)', [hash]);
@@ -167,7 +157,23 @@ test('pg@8.16.3 actual disposable primary, authority, cancellation and grants', 
       }), /Agent Teams read denied/);
     });
 
-    await t.test('pool reconnect re-establishes authority and cannot return a stale grant', async () => {
+    await t.test('token revocations are primary-only SELECT; an INSERT is never accepted', async () => {
+      const tokenHash = createHash('sha256').update(JSON.stringify([
+        'https://id.example.test', 'human-1', 'jti-1',
+      ])).digest('hex');
+      const options = () => ({
+        readFromPrimary: true, signal: new AbortController().signal,
+      });
+      assert.deepEqual((await query(READ_REVOCATION_SQL, [tokenHash], options())).rows, []);
+      await admin.query('INSERT INTO public.chatgpt_mcp_token_revocations VALUES ($1,TRUE)', [tokenHash]);
+      assert.deepEqual((await query(READ_REVOCATION_SQL, [tokenHash], options())).rows,
+        [{ revoked: true }]);
+      await assert.rejects(query(
+        'INSERT INTO chatgpt_mcp_token_revocations (token_hash,revoked) VALUES ($1,TRUE)',
+        [tokenHash], options()), /Agent Teams read denied/);
+    });
+
+    await t.test('pool reconnect rechecks grants, role and unsafe timeout settings', async () => {
       await reader.end();
       reader = null;
       const next = new Pool(readerOptions);
@@ -176,6 +182,16 @@ test('pg@8.16.3 actual disposable primary, authority, cancellation and grants', 
         query: createInspectedQuery(next), timeoutMs: 1200,
       });
       assert.equal(await second.hasReadGrant(scope), false);
+      await reader.end();
+      reader = null;
+      await admin.query('UPDATE public.chatgpt_mcp_read_grants SET allowed=TRUE WHERE grant_hash=$1', [hash]);
+      await admin.query(`ALTER ROLE ${readerRole} SET statement_timeout='1500ms'`);
+      const unsafe = new Pool(readerOptions);
+      reader = unsafe;
+      const unsafeGrants = createPostgresReadGrantStore({
+        query: createInspectedQuery(unsafe), timeoutMs: 1200,
+      });
+      await assert.rejects(unsafeGrants.hasReadGrant(scope), /Agent Teams read denied/);
     });
   } finally {
     if (reader) await reader.end();

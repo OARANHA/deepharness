@@ -5,6 +5,8 @@ on:
     paths:
       - 'integrations/chatgpt-mcp/pg-disposable-probe/**'
       - 'integrations/chatgpt-mcp/adapters/postgres-read-grants.mjs'
+      - 'integrations/chatgpt-mcp/adapters/authoritative-pg-read-query.mjs'
+      - 'integrations/chatgpt-mcp/test/stage-d-authoritative-pg-read-query.test.mjs'
       - 'integrations/chatgpt-mcp/adapters/scoped-mcp-read-identity.mjs'
       - '.github/workflows/stage-d-pg-primary-disposable.yml'
   workflow_dispatch:
@@ -37,6 +39,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Verify strict read seam denies stale grants and unsafe clients
+        run: node --test integrations/chatgpt-mcp/test/stage-d-authoritative-pg-read-query.test.mjs
       - name: Install exact pg@8.16.3 without lifecycle scripts
         working-directory: integrations/chatgpt-mcp/pg-disposable-probe
         run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
