@@ -46,26 +46,32 @@ passthrough and no BasicAuth on MCP (the backend still requires OAuth and explic
 
 ## Fail-closed operator inputs BEFORE any Portainer redeploy
 
+**Stage C certificate reuse correction (2026-10-17):** Prior work already prepared
+an Envoy client mTLS certificate; this PR reuses it. The earlier suggestion to
+issue a new certificate was unnecessary and is superseded. The only current
+certificate requirement is a fresh, non-secret read-only presence/trust check.
+
 1. Verify that the currently running Portainer `deepharness` stack, original Web image,
    named volumes and credentials map to the reviewed Compose source. **Do not create a second stack**.
    Keep the source and original image reference recoverable privately.
 2. Confirm Traefik's existing `websecure` entrypoint and `letsencrypt` certresolver
    actually work for a new hostname. DNS points to 28server, but that alone does not
    prove certificate issuance. Never disable public TLS verification.
-3. Freeze `DSH_MCP_PROXY_IMAGE` to a reviewed, locally available **immutable digest** for
-   an Envoy build with the required v3 API (not the tag-only `envoyproxy/envoy:v1.39.0`
-   without digest proof). The owner's image inventory showed the public Envoy tag and a
-   dangling Wandora image, not a verified selected image.
-4. Confirm the private server's certificate SAN contains **DNS:deepharness-mcp-backend**.
-   This exact SAN is required by the reviewed Envoy config. If it differs, STOP and
-   reconcile the proper server identity, DNS alias and certificate **without relaxing verification**.
-5. Provide two **new, operator-held** files under the existing configured
-   `DSH_MCP_SECRET_ROOT`, with readable permissions for container UID 1000:
-   `proxy-client-cert.pem` and `proxy-client-key.pem`; client cert must be issued by the
-   backend CA, have clientAuth usage and be authorized by the Node mTLS listener.
-   Mount these individually, **not** the entire secrets directory. The backend CA is
-   read from the existing `tls/backend/backend-ca.pem`, and the Envoy private key is never
-   committed, logged, pasted or printed. Missing or mismatched material is a blocker.
+3. Owner verified the locally cached Envoy v1.39.0 immutable digest:
+   `envoyproxy/envoy@sha256:d59f7f5fa10cff6d5892b6c5e7df5c9297ddfb2c3683e33fbfb82da24de4fa66`.
+   Use this exact reviewed reference for `DSH_MCP_PROXY_IMAGE`; do not use a mutable tag.
+4. Owner verified live backend server certificate SAN **DNS:deepharness-mcp-backend**,
+   exactly matching the reviewed Envoy backend TLS validation. Reconfirm if rotated.
+5. **REUSE the existing Stage C certificate pair**; do NOT generate another client certificate:
+   `/opt/wandora/data/deepharness-mcp/tls/proxy/proxy-backend-client-chain.pem` and
+   `/opt/wandora/data/deepharness-mcp/tls/proxy/proxy-backend-client-key.pem`.
+   Earlier operator records reported `MCP_MTLS_MUTUAL_AUTH_GREEN`, confirming the
+   prepared client was accepted by the backend in Stage C. This historical check is
+   not proof those files still exist or are readable today. Before deployment,
+   owner must verify the **live** pair is present, matches, verifies against
+   `tls/backend/backend-ca.pem`, and can be read by container UID 1000. The existing
+   backend CA remains mounted independently; never print or commit private keys.
+   Do not alter key ownership/permissions broadly to force a PASS.
 6. Verify `/opt/wandora/data/deepharness-mcp/review/envoy.json` is populated from
    exactly this reviewed file (currently **absent**), owned appropriately for UID 1000;
    ensure no symlinks that escape reviewed directories. Do not edit runtime DSH credentials.
@@ -78,8 +84,8 @@ passthrough and no BasicAuth on MCP (the backend still requires OAuth and explic
 
 ## Authorized later cutover (not performed by this PR)
 
-- Copy only the reviewed Envoy config to the operator-owned bind path, prepare the
-  dedicated mTLS client certificate/key and pin the Envoy image digest.
+- Copy only the reviewed Envoy config to the operator-owned bind path, reuse and
+  verify the existing Stage C proxy mTLS certificate pair, and pin the verified Envoy digest.
 - Apply the exact reviewed Compose update to the existing Git-backed Portainer stack
   after confirming its live ref; one owner-approved Pull/redeploy of the *same* stack.
 - Require Traefik present a publicly trusted cert for `dsh-mcp.wandora.com.br`.
