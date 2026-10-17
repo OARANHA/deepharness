@@ -1,0 +1,47 @@
+name: Stage D — disposable PostgreSQL primary and pg 8.16.3
+
+on:
+  pull_request:
+    paths:
+      - 'integrations/chatgpt-mcp/pg-disposable-probe/**'
+      - 'integrations/chatgpt-mcp/adapters/postgres-read-grants.mjs'
+      - 'integrations/chatgpt-mcp/adapters/scoped-mcp-read-identity.mjs'
+      - '.github/workflows/stage-d-pg-primary-disposable.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pg-primary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16.6
+        env:
+          POSTGRES_USER: integration
+          POSTGRES_PASSWORD: ${{ github.run_id }}
+          POSTGRES_DB: stage_d_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U integration -d stage_d_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install exact pg@8.16.3 without lifecycle scripts
+        working-directory: integrations/chatgpt-mcp/pg-disposable-probe
+        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+      - name: Verify disposable primary, per-connection role, server deadline and grant revocation
+        working-directory: integrations/chatgpt-mcp/pg-disposable-probe
+        env:
+          TEST_POSTGRES_PASSWORD: ${{ github.run_id }}
+        run: npm test
