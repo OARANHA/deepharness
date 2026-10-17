@@ -72,3 +72,30 @@ References:
 - https://github.com/brianc/node-postgres/issues/2774
 - https://www.postgresql.org/docs/16/runtime-config-client.html
 - https://www.postgresql.org/docs/16/sql-alterrole.html
+
+### Pinned pg@8.16.3 implementation audit and executable acceptance matrix
+
+**Exact dependency source inspected (2026-10-16):** published `pg@8.16.3` lists npm `gitHead=8f8e7315e8f7c1bb01e98fdb41c8c92585510782`. At that upstream source, `packages/pg/lib/client.js` lines 520-580 read `config.query_timeout || this.connectionParameters.query_timeout`; on timeout the client invokes the query error callback, discards a queued query, and does **not** invoke its separate `cancel()` method in that timer branch. Therefore, **a query read timeout is not evidence of PostgreSQL server cancellation**. The matching `packages/pg-pool/index.js` `query(text, values, cb)` forwards those arguments to a checked-out `client.query`. To apply a per-query driver timeout, review the `{text,values,query_timeout}` QueryConfig shape supported by this pinned implementation, **not** a third `opts` argument to `pool.query(sql,params,opts)`. Keep parameterized SQL, never splice user input into SQL. The upstream docs do not currently list this optional field in the general QueryConfig type; pinned-source behavior must be protected by tests before reliance.
+
+**PostgreSQL-side control:** unlike the `pg` callback timer, `statement_timeout` terminates an over-budget command on the backend. It can be configured through the pinned `pg` Client/Pool startup config or an operator-set role default. A role setting declared in an initialization script is *not* verification of effective settings on later pool connections: verify `current_setting('statement_timeout')`, `current_setting('default_transaction_read_only')`, `current_user`, `pg_is_in_recovery()`, and effective table SELECT/no-write privileges on the **same checked-out client** used for the protected query, or establish an equally verified per-connection invariant. The existing one-time startup check only proves the initial connection. Use fixed, reviewed deadlines with a fail-closed policy; no automatic privilege elevation, primary fallback, or in-memory grant cache.
+
+**Required staged tests on a disposable PostgreSQL primary and actual `pg@8.16.3`, NOT production:**
+
+| Test | Passing result |
+| --- | --- |
+| Binding / SQL | Exact parameterized grant and revocation hash predicates; `opts` intent cannot silently disappear at the host bridge; unexpected query shape denied |
+| Server deadline | Disposable `SELECT pg_sleep(...)` exceeds enforced `statement_timeout`; server yields SQLSTATE `57014`; app denies, connection is safely reused or discarded |
+| Client deadline | Driver timeout alone returns a denied result, but test independently whether backend work actually stopped; never infer cancellation solely from the callback error |
+| Pool recycling | After a simulated timeout/network interruption, prove no old query or queued response can be returned as a new authorized read; pool bounded and healthy or fail-closed |
+| Per-connection authority | Each independently created/reconnected client is confirmed against current primary, reader-only role, effective GUCs and expected DB; stale/replica/misconfigured client cannot return grant success |
+| Revocation race | A granted read suspended during official session/projection resolution is revoked; subsequent grant/token checks deny output and do not expose projection |
+| Image lineage | Match source SHA / archived tested image ID / immutable GHCR manifest digest to the image on `28server` before treating review source as deployed |
+
+**Implementation boundary:** this section is a review specification, not a code patch. The prior GitHub adapter write was blocked by security settings; do not route the same source change through another tool or branch. No CI/prod action, merge, Keycloak client change, grants write, proxy activation, listener or redeploy is authorized by these tests.
+
+Sources checked:
+- https://github.com/brianc/node-postgres/blob/8f8e7315e8f7c1bb01e98fdb41c8c92585510782/packages/pg/lib/client.js
+- https://github.com/brianc/node-postgres/blob/8f8e7315e8f7c1bb01e98fdb41c8c92585510782/packages/pg-pool/index.js
+- https://node-postgres.com/apis/client
+- https://node-postgres.com/apis/pool
+- https://www.postgresql.org/docs/16/runtime-config-client.html
