@@ -1,0 +1,30 @@
+name: MCP Origin optional - isolated compatibility gate
+on:
+  pull_request:
+    paths:
+      - 'integrations/chatgpt-mcp/adapters/private-mcp-http-handler.mjs'
+      - 'integrations/chatgpt-mcp/test/private-mcp-http-handler.test.mjs'
+      - '.github/workflows/mcp-origin-optional-review.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  origin-compat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax and isolated MCP Origin/mTLS/OAuth guard tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check integrations/chatgpt-mcp/adapters/private-mcp-http-handler.mjs
+          node --check integrations/chatgpt-mcp/test/private-mcp-http-handler.test.mjs
+          node --test integrations/chatgpt-mcp/test/private-mcp-http-handler.test.mjs
