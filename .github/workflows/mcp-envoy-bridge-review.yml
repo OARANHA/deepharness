@@ -1,0 +1,74 @@
+name: MCP Envoy bridge review (isolated)
+on:
+  pull_request:
+    paths:
+      - deploy/portainer-stack.yml
+      - deploy/mcp/envoy-public-bridge.review.yaml
+      - deploy/mcp/STAGE_E_PUBLIC_ENVOY_BRIDGE_REVIEW_20261017.md
+      - .github/workflows/mcp-envoy-bridge-review.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  envoy-config:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare disposable TLS fixture (no production secrets)
+        shell: bash
+        run: |
+          set -euo pipefail
+          d="$RUNNER_TEMP/mcp-bridge-tls"
+          mkdir -p "$d"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=CI dummy CA' \
+            -keyout "$d/ca.key" -out "$d/backend-ca.pem" >/dev/null 2>&1
+          openssl req -newkey rsa:2048 -nodes -subj '/CN=CI dummy client' \
+            -keyout "$d/backend-client-key.pem" -out "$d/client.csr" >/dev/null 2>&1
+          openssl x509 -req -days 1 -in "$d/client.csr" -CA "$d/backend-ca.pem" \
+            -CAkey "$d/ca.key" -CAcreateserial -out "$d/backend-client-cert.pem" >/dev/null 2>&1
+          chmod 0644 "$d/backend-client-cert.pem" "$d/backend-client-key.pem" "$d/backend-ca.pem"
+      - name: Verify Envoy v3 bootstrap with no network or listeners
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --read-only --cap-drop ALL --user 1000:1000 \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=16m \
+            -v "$PWD/deploy/mcp/envoy-public-bridge.review.yaml:/etc/envoy/envoy.yaml:ro" \
+            -v "$RUNNER_TEMP/mcp-bridge-tls:/run/secrets:ro" \
+            --entrypoint envoy envoyproxy/envoy:v1.39.0 \
+            --mode validate -c /etc/envoy/envoy.yaml --log-level error
+      - name: Compose syntax and defense-in-depth guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DSH_MCP_HOST_IMAGE='local/mcp-host:review'
+          export DSH_MCP_GRANTS_IMAGE='local/mcp-grants:review'
+          export DSH_MCP_PROXY_IMAGE='local/envoy:review'
+          export DSH_MCP_REVIEW_ROOT='/tmp/mcp-review'
+          export DSH_MCP_SECRET_ROOT='/tmp/mcp-secret'
+          export DSH_BASIC_AUTH_USERS='review-placeholder'
+          docker compose -f deploy/portainer-stack.yml config --quiet
+          python3 - <<'PY'
+          from pathlib import Path
+          stack = Path('deploy/portainer-stack.yml').read_text()
+          envoy = Path('deploy/mcp/envoy-public-bridge.review.yaml').read_text()
+          assert 'traefik.http.routers.deepharness-mcp.tls.certresolver: letsencrypt' in stack
+          assert 'traefik.http.services.deepharness-mcp-bridge.loadbalancer.server.port: \'8080\'' in stack
+          assert "traefik.enable: 'true'" in stack
+          assert 'traefik.tcp.routers.deepharness-mcp.' not in stack
+          assert 'traefik.http.routers.deepharness.rule=Host(`deep.wandora.com.br`)' in stack
+          assert 'deepharness_dsh_data' in stack and 'deepharness_dsh_workspace' in stack
+          assert '3443' in envoy and 'mcp_private_mtls' in envoy
+          assert '/run/secrets/backend-client-key.pem' in envoy
+          assert 'match_typed_subject_alt_names:' in envoy
+          assert 'dsh-mcp.wandora.com.br' in envoy
+          assert 'path: /mcp' in envoy
+          assert 'path: /.well-known/oauth-protected-resource/mcp' in envoy
+          assert 'proxy-client-key.pem' in stack
+          assert 'docker.sock' not in stack
+          assert 'ports:' not in stack.split('  mcp-proxy:\n',1)[1].split('  mcp-grants-db:\n',1)[0]
+          print('MCP_ENVOY_REVIEW_STATIC_GUARDS_PASS')
+          PY
