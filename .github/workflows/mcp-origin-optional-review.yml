@@ -4,6 +4,7 @@ on:
     paths:
       - 'integrations/chatgpt-mcp/adapters/private-mcp-http-handler.mjs'
       - 'integrations/chatgpt-mcp/test/private-mcp-http-handler.test.mjs'
+      - '.github/scripts/mcp-origin-lab4-rehearsal.mjs'
       - '.github/workflows/mcp-origin-optional-review.yml'
   workflow_dispatch:
 
@@ -27,6 +28,7 @@ jobs:
           set -euo pipefail
           node --check integrations/chatgpt-mcp/adapters/private-mcp-http-handler.mjs
           node --check integrations/chatgpt-mcp/test/private-mcp-http-handler.test.mjs
+          node --check .github/scripts/mcp-origin-lab4-rehearsal.mjs
           node --test integrations/chatgpt-mcp/test/private-mcp-http-handler.test.mjs
       - name: Package pinned lab.4 Origin-only review candidate
         shell: bash
@@ -55,3 +57,53 @@ jobs:
           path: ${{ runner.temp }}/mcp-origin-review/*.tgz
           if-no-files-found: error
           retention-days: 7
+
+  origin-lab4-offline:
+    needs: origin-compat
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Download only the reviewed lab4 tarball
+        uses: actions/download-artifact@v4
+        with:
+          name: mcp-lab4-origin-review
+          path: ${{ runner.temp }}/mcp-origin-tarball
+      - name: Exercise official DSH CLI in disposable profile and disconnected replacement
+        shell: bash
+        run: |
+          set -euo pipefail
+          image=ghcr.io/oaranha/deepharness-mcp@sha256:2483c85cc3fbe6172bf284e67859572b8b6b5dc75bfea11ae160298f7202a62f
+          archive="$RUNNER_TEMP/mcp-origin-tarball/wandora-deepharness-chatgpt-mcp-read-0.1.0-lab.4.tgz"
+          test -f "$archive"
+          echo "73756d0bbe9f6fa90aafdcb00fb05b459e4e9db380c0e2d64ea78578b63f04d6  $archive" | sha256sum -c -
+          docker pull "$image"
+          fixture="$(mktemp -d "$RUNNER_TEMP/origin-same-version.XXXXXX")"
+          chmod 0777 "$fixture"
+          mkdir -p "$fixture/review"
+          cp -- "$archive" "$fixture/review/hotfix.tgz"
+          chmod 0755 "$fixture/review"
+          chmod 0644 "$fixture/review/hotfix.tgz"
+          # Preparation may download only public fixture dependencies; no production state.
+          docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --user 1000:1000 --pids-limit 256 --memory 2g --cpus 2 \
+            --tmpfs /tmp:rw,nosuid,nodev,uid=1000,gid=1000,mode=0700,size=1g \
+            --mount "type=bind,source=$fixture,target=/fixture" \
+            --mount "type=bind,source=$PWD/.github/scripts,target=/review,readonly" \
+            -e HOME=/fixture/home -e DSH_HOME=/fixture/home \
+            -e DSH_MCP_ORIGIN_CI=isolated-fixture-only \
+            --entrypoint node "$image" /review/mcp-origin-lab4-rehearsal.mjs prepare
+          # The SAME-VERSION replacement has no network and uses only the copy.
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --user 1000:1000 --pids-limit 256 --memory 2g --cpus 2 \
+            --tmpfs /tmp:rw,nosuid,nodev,uid=1000,gid=1000,mode=0700,size=1g \
+            --mount "type=bind,source=$fixture,target=/fixture" \
+            --mount "type=bind,source=$PWD/.github/scripts,target=/review,readonly" \
+            -e HOME=/fixture/home -e DSH_HOME=/fixture/home \
+            -e DSH_MCP_ORIGIN_CI=isolated-fixture-only \
+            --entrypoint node "$image" /review/mcp-origin-lab4-rehearsal.mjs verify
