@@ -28,3 +28,31 @@ jobs:
           node --check integrations/chatgpt-mcp/adapters/private-mcp-http-handler.mjs
           node --check integrations/chatgpt-mcp/test/private-mcp-http-handler.test.mjs
           node --test integrations/chatgpt-mcp/test/private-mcp-http-handler.test.mjs
+      - name: Package pinned lab.4 Origin-only review candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A review artifact only. Never run dsh install, change a profile, or publish a container.
+          test "$(node -p "require('./integrations/chatgpt-mcp/package.json').version")" = "0.1.0-lab.4"
+          out="$RUNNER_TEMP/mcp-origin-review"
+          mkdir -p "$out"
+          npm pack ./integrations/chatgpt-mcp --ignore-scripts --pack-destination "$out" --json > "$out/npm-pack.json"
+          archive="$(find "$out" -maxdepth 1 -type f -name '*.tgz' -print -quit)"
+          test -n "$archive"
+          tar -tzf "$archive" | grep -Fxq 'package/adapters/private-mcp-http-handler.mjs'
+          packed_blob="$(tar -xOzf "$archive" package/adapters/private-mcp-http-handler.mjs | git hash-object --stdin)"
+          test "$packed_blob" = '1e98882f9d78a765a2b267425c298cfdcbce0393'
+          # Tests, credentials, deploy scripts, and workflows do not belong in this plugin tarball.
+          if tar -tzf "$archive" | grep -Eq '(^|/)(test|deploy|secrets|\.github)(/|$)'; then
+            echo 'Unexpected files in MCP review tarball' >&2
+            exit 1
+          fi
+          echo "MCP_LAB4_ORIGIN_PACKED_BLOB=$packed_blob"
+          sha256sum "$archive"
+      - name: Retain offline-review package (not deployment)
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcp-lab4-origin-review
+          path: ${{ runner.temp }}/mcp-origin-review/*.tgz
+          if-no-files-found: error
+          retention-days: 7
