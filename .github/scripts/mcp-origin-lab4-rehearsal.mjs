@@ -72,7 +72,7 @@ function checkDisabled(composition){
   const visit=v=>{
     if(!v||typeof v!=='object'||visited.has(v))return;
     visited.add(v);
-    if(v.id==='user-patch-preservation-fixture'){
+    if(v.id==='wandora-chatgpt-mcp-read'){
       assert.equal(v.name,name+'/plugin');
       assert.equal(v.disabled,true);
       assert.equal(v.config?.endpointEnabled,false);
