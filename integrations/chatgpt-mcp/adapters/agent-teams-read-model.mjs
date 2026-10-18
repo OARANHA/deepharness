@@ -1,0 +1,97 @@
+/**
+ * Read-only, detached projection of an existing Agent Teams Lead Session.
+ * This module has no MCP transport, authorization decision, or write operation.
+ * The caller MUST authorize the exact Lead session before passing its data.
+ */
+const MAX_MEMBERS = 128;
+const MAX_TASKS = 512;
+
+function record(v) {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+function str(v, name) {
+  if (typeof v !== 'string') throw new TypeError(`invalid ${name}`);
+  return v;
+}
+function choice(v, values, name) {
+  if (!values.includes(v)) throw new TypeError(`invalid ${name}`);
+  return v;
+}
+function strings(v, name) {
+  if (!Array.isArray(v) || v.length > 512) throw new TypeError(`invalid ${name}`);
+  return v.map((x, i) => str(x, `${name}[${i}]`));
+}
+function member(m) {
+  if (!record(m)) throw new TypeError('invalid member');
+  return {
+    id: str(m.id, 'member.id'),
+    name: str(m.name, 'member.name'),
+    role: choice(m.role, ['lead', 'teammate'], 'member.role'),
+    phase: choice(m.phase, ['provisioning', 'active', 'failed'], 'member.phase'),
+    ...(m.error === undefined ? {} : { error: str(m.error, 'member.error') }),
+  };
+}
+function task(t) {
+  if (!record(t)) throw new TypeError('invalid task');
+  if (!Number.isSafeInteger(t.revision) || t.revision < 1) throw new TypeError('invalid task.revision');
+  if (typeof t.ready !== 'boolean') throw new TypeError('invalid task.ready');
+  return {
+    id: str(t.id, 'task.id'),
+    revision: t.revision,
+    subject: str(t.subject, 'task.subject'),
+    description: str(t.description, 'task.description'),
+    status: choice(t.status, ['pending', 'in_progress', 'completed'], 'task.status'),
+    blockedBy: strings(t.blockedBy, 'task.blockedBy'),
+    writeScopes: strings(t.writeScopes, 'task.writeScopes'),
+    ...(t.ownerName === undefined ? {} : { ownerName: str(t.ownerName, 'task.ownerName') }),
+    ready: t.ready,
+    writeScopeWarnings: strings(t.writeScopeWarnings, 'task.writeScopeWarnings'),
+  };
+}
+export function projectAgentTeam(leadSessionId, projection) {
+  const id = str(leadSessionId, 'leadSessionId');
+  if (!id) throw new TypeError('empty Lead id');
+  if (!record(projection) || !Array.isArray(projection.members) ||
+      !Array.isArray(projection.tasks) ||
+      projection.members.length > MAX_MEMBERS || projection.tasks.length > MAX_TASKS) {
+    throw new TypeError('invalid Agent Teams projection');
+  }
+  if (projection.failure !== undefined) {
+    // Rejected persisted Team data must not silently appear as current.
+    throw new Error('Agent Teams projection reports a replay failure');
+  }
+  const members = projection.members.map(member);
+  const memberIds = new Set(members.map(m => m.id));
+  if (memberIds.size !== members.length) throw new TypeError('duplicate Team member id');
+  if (members.filter(m => m.role === 'lead').length !== 1 ||
+      members.some(m => m.role === 'lead' && (m.id !== id || m.phase !== 'active'))) {
+    throw new TypeError('projection does not identify the requested Lead');
+  }
+  const tasks = projection.tasks.map(task);
+  const taskIds = new Set(tasks.map(t => t.id));
+  if (taskIds.size !== tasks.length) throw new TypeError('duplicate Team task id');
+  for (const item of tasks) {
+    if (new Set(item.blockedBy).size !== item.blockedBy.length ||
+        item.blockedBy.some(dep => dep === item.id || !taskIds.has(dep))) {
+      throw new TypeError('invalid Team task dependency');
+    }
+  }
+  // The canonical shared task board is a DAG. Reject forged cyclic views.
+  const byId = new Map(tasks.map(t => [t.id, t]));
+  const active = new Set();
+  const visited = new Set();
+  function visit(taskId) {
+    if (active.has(taskId)) throw new TypeError('cyclic Team task dependency');
+    if (visited.has(taskId)) return;
+    active.add(taskId);
+    for (const dep of byId.get(taskId).blockedBy) visit(dep);
+    active.delete(taskId);
+    visited.add(taskId);
+  }
+  for (const item of tasks) visit(item.id);
+  return {
+    leadSessionId: id,
+    members,
+    tasks,
+  };
+}
