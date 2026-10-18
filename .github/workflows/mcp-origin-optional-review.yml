@@ -39,7 +39,6 @@ jobs:
           npm pack ./integrations/chatgpt-mcp --ignore-scripts --pack-destination "$out" --json > "$out/npm-pack.json"
           archive="$(find "$out" -maxdepth 1 -type f -name '*.tgz' -print -quit)"
           test -n "$archive"
-          tar -tzf "$archive" | grep -Fxq 'package/adapters/private-mcp-http-handler.mjs'
           packed_blob="$(tar -xOzf "$archive" package/adapters/private-mcp-http-handler.mjs | git hash-object --stdin)"
           test "$packed_blob" = '1e98882f9d78a765a2b267425c298cfdcbce0393'
           # Tests, credentials, deploy scripts, and workflows do not belong in this plugin tarball.
