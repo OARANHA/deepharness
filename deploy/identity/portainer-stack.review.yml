@@ -36,7 +36,6 @@ services:
       KC_DB_POOL_MIN_SIZE: "2"
       KC_DB_POOL_MAX_SIZE: "10"
       KC_CACHE: local
-      KC_BOOTSTRAP_ADMIN_USERNAME: ${WANDORA_ID_BOOTSTRAP_USER:-initial-owner}
     depends_on:
       identity-db:
         condition: service_healthy
