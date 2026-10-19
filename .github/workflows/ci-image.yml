@@ -30,6 +30,37 @@ jobs:
       - name: Build pinned image in CI (never on 28server)
         if: steps.state.outputs.ready == 'true'
         run: docker build --pull -f deploy/Dockerfile -t local/deepharness:ci .
+      - name: Verify the exact npm release and collect candidate dependency lock
+        if: steps.state.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          image=local/deepharness:ci
+          cid="$(docker create "$image")"
+          trap 'docker rm "$cid" >/dev/null 2>&1 || true' EXIT
+          docker cp "$cid:/opt/dsh/package-lock.json" ./dsh-bootstrap-lockfile.candidate.json
+          node -e '
+            const lock=require("./dsh-bootstrap-lockfile.candidate.json");
+            const expected="0.2.1-rc.2";
+            const actual=lock.packages?.["node_modules/@deepseek-ai/dsh"]?.version;
+            if(actual!==expected)throw Error("DSH candidate version mismatch");
+            if(!lock.packages?.["node_modules/@deepseek-ai/dsh"]?.integrity)
+              throw Error("DSH candidate package integrity missing");
+            if(!lock.packages?.["node_modules/node-addon-require-builtin"]?.version)
+              throw Error("Native addon lock missing");
+            console.log("Exact candidate version/integrity locked:",expected);
+          '
+          sha256sum dsh-bootstrap-lockfile.candidate.json
+
+      - name: Retain candidate lockfile for review (not an approved release)
+        if: steps.state.outputs.ready == 'true' && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsh-bootstrap-lockfile-candidate
+          path: dsh-bootstrap-lockfile.candidate.json
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Native addon probe under container runtime restrictions
         if: steps.state.outputs.ready == 'true'
         run: |
