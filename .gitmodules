@@ -1,0 +1,3 @@
+[submodule "integrations/chatgpt-mcp/upstream"]
+	path = integrations/chatgpt-mcp/upstream
+	url = https://github.com/jiezeng2004-design/dsh-chatgpt-bridge.git
