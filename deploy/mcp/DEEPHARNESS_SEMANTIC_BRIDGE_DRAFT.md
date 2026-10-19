@@ -101,3 +101,36 @@ scoped inter-VPS private route or relay that preserves end-to-end mTLS and
 the existing DSH private host allowlist. Test the route from the **actual**
 Remote-Ops runtime and ensure no public DSH listener or broad Docker
 capability is created. No route, credentials or runtime config were changed.
+
+## Published runtime peer-version gate — verified 2026-10-19
+
+Bootstrap #484 and Stage D #28 completed successfully on PR #17 commit
+`3afdbf9d8764d49a1e975f76ad9690b9b4ad75d3`. Bootstrap installs the
+official `@deepseek-ai/dsh@0.2.1-rc.2` **candidate** and checks the
+published SessionController/WorkspaceRegistry/TeamService exports. Stage D
+independently packages the private `@wandora/deepharness-chatgpt-mcp-read`
+lab.7 connector. These are **different gates**, not proof of a single
+combined running version.
+
+The lab.7 package manifest still pins optional exact peers
+`@deepseek-ai/dsh-session@0.2.1-alpha.2`,
+`@deepseek-ai/dsh-session-projection@0.2.1-alpha.2`, and
+`@deepseek-ai/dsh-workspace@0.2.1-alpha.2`. The official rc.2 tag declares
+version `0.2.1-rc.2` for all three; the peer ranges therefore **do not
+match** the candidate image. The Cordis peer also needs exact reconciliation.
+The runtime profile on 28server must not be silently switched to rc.2 or
+silently duplicated with two incompatible versions of DSH services.
+
+Promotion requires a **separately verified integration gate** that installs
+the reviewed packed lab bundle into a disposable official rc.2 profile,
+validates one consistent service graph and real SessionController semantics
+(inbox acceptance, durable replay/reopen and synthetic response recovery),
+and only then revises peer requirements/provenance as supported by evidence.
+An already-green isolated Docker bootstrap or synthetic Stage D test cannot
+replace this proof. In particular, `accepted:true` is only an admission
+receipt, never proof of Lead completion.
+
+The cross-VPS private mTLS path, operator grants and production enablement
+remain distinct NO-GO gates. Do not merge, publish or deploy the candidate,
+change the operator profile, or send a production Lead instruction based on
+these isolated GREEN runs.
