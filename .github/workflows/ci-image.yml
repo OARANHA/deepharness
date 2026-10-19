@@ -210,7 +210,7 @@ jobs:
               import {pathToFileURL} from "node:url";
               const installed=createRequire("/opt/dsh/node_modules/@deepseek-ai/dsh/package.json");
               const load=name=>import(pathToFileURL(installed.resolve(name)).href);
-              const [{Context},{SessionStore},{default:JsonlSessionPersistence},{createUserMessage}]=
+              const [{Context},{SessionStore},JsonlSessionPersistence,{createUserMessage}]=
                 await Promise.all([
                   load("@deepseek-ai/cordis"),load("@deepseek-ai/dsh-session"),
                   load("@deepseek-ai/dsh-session-persistence-jsonl"),load("@deepseek-ai/dsh-llm"),
