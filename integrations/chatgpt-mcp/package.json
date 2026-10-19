@@ -1,6 +1,6 @@
 {
   "name": "@wandora/deepharness-chatgpt-mcp-read",
-  "version": "0.1.0-lab.6",
+  "version": "0.1.0-lab.7",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -12,6 +12,8 @@
     "./plugin": "./plugin.mjs",
     "./package.json": "./package.json",
     "./policy": "./policy.mjs",
+    "./semantic-bridge": "./adapters/dsh-semantic-bridge.mjs",
+    "./private-semantic-http-handler": "./adapters/private-semantic-http-handler.mjs",
     "./pg-read-query": "./adapters/authoritative-pg-read-query.mjs"
   },
   "files": [

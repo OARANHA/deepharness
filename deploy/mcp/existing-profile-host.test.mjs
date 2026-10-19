@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {bootExistingProfileReadHost} from './existing-profile-host.mjs';
+import {createDshSemanticBridge} from '../../integrations/chatgpt-mcp/adapters/dsh-semantic-bridge.mjs';
 function setup(){
   const map=new Map(),events=[],service={createPrivateTransport(){throw Error('must stay closed');}};
   const ctx={workspaceRegistry:{get(){}},sessions:{},sessionProjections:{},
@@ -9,7 +10,8 @@ function setup(){
     fiber:{dispose:async()=>events.push('disposed')},
     plugin:async(plugin,config)=>{events.push(config);map.set('chatgptMcpRead',service);}};
   const opts={runProfile:async value=>{events.push(value);return {ctx,shutdown:{}};},
-    environment:{},args:['--no-open','--host','127.0.0.1'],plugin:{apply(){}},createPolicy:async host=>{assert.equal(host,ctx);return {};}};
+    environment:{},args:['--no-open','--host','127.0.0.1'],plugin:{apply(){}},createSemanticBridge:createDshSemanticBridge,
+    createPolicy:async host=>{assert.equal(host,ctx);return {};}};
   return {ctx,opts,events,map,service};
 }
 test('boots Web once, forwards arguments and mounts on the identical context without transport',async()=>{

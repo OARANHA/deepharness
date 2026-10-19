@@ -1,6 +1,6 @@
 # Private Agent Teams connector and internal bridge
 
-Engineering package `@wandora/deepharness-chatgpt-mcp-read`, lab.6.
+Engineering package `@wandora/deepharness-chatgpt-mcp-read`, lab.7.
 The installed MCP OAuth path remains read-only and exposes only
 `dsh_read_agent_team`, authenticated through signed individual JWT identity
 and explicit PostgreSQL principal/workspace/Lead grants. A separate opt-in

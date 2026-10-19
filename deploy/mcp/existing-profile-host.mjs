@@ -3,10 +3,10 @@
  */
 // Cordis 4 trace wrappers expose their implementation with this shared symbol.
 // Use it solely for identity comparison; all calls retain their traced facade.
-import {createDshSemanticBridge} from '../../integrations/chatgpt-mcp/adapters/dsh-semantic-bridge.mjs';
 const implementation=value=>value?.[Symbol.for('cordis.original')]??value;
-export async function bootExistingProfileReadHost({runProfile,environment,args,patchFiles=[],plugin,createPolicy}={}) {
+export async function bootExistingProfileReadHost({runProfile,environment,args,patchFiles=[],plugin,createPolicy,createSemanticBridge}={}) {
   if(typeof runProfile!=='function'||typeof createPolicy!=='function'||typeof plugin?.apply!=='function'||
+      typeof createSemanticBridge!=='function'||
       !environment||typeof environment!=='object'||!Array.isArray(args)||!args.every(x=>typeof x==='string')||
       !Array.isArray(patchFiles)||!patchFiles.every(x=>typeof x==='string'))throw Error('Existing DSH host configuration denied');
   const booted=await runProfile({environment,profile:'web',args:[...args],patchFiles:[...patchFiles]});
@@ -33,7 +33,7 @@ export async function bootExistingProfileReadHost({runProfile,environment,args,p
     phase='read-service';
     const service=ctx.get('chatgptMcpRead');
     if(!unchanged()||typeof service?.createPrivateTransport!=='function')throw Error('Existing DSH read service unavailable');
-    const semanticBridge=createDshSemanticBridge({
+    const semanticBridge=createSemanticBridge({
       workspaceRegistry:ctx.workspaceRegistry,sessionController,checkHost:unchanged,
     });
     return Object.freeze({...booted,service,semanticBridge});

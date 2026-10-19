@@ -2,8 +2,8 @@
 import {createServer} from 'node:https';
 import {isIP} from 'node:net';
 import {networkInterfaces} from 'node:os';
-import {createPrivateSemanticHttpHandler,PRIVATE_DSH_SEMANTIC_PATH} from '../../integrations/chatgpt-mcp/adapters/private-semantic-http-handler.mjs';
-export async function attachPrivateReadListener({enabled=false,ctx,service,host,port,tls,sdk,semanticBridge}={}) {
+const PRIVATE_DSH_SEMANTIC_PATH='/wandora/dsh-bridge/v1';
+export async function attachPrivateReadListener({enabled=false,ctx,service,host,port,tls,sdk,semanticBridge,createSemanticHttpHandler}={}) {
   if(enabled!==true)throw Error('Private MCP listener disabled');
   if(isIP(host)!==4||host==='0.0.0.0'||!Number.isInteger(port)||port<1024||port>65535||
       typeof ctx?.effect!=='function'||typeof ctx?.get!=='function'||ctx.get('chatgptMcpRead')!==service||
@@ -24,6 +24,7 @@ export async function attachPrivateReadListener({enabled=false,ctx,service,host,
   if(semanticOptions!==undefined&&(!semanticOptions||typeof semanticOptions!=='object'||
       Object.keys(semanticOptions).some(key=>!['bridge','clientFingerprintSha256','audit'].includes(key))||
       typeof semanticOptions.bridge!=='object'||typeof semanticOptions.clientFingerprintSha256!=='string'||
+      typeof createSemanticHttpHandler!=='function'||
       (semanticOptions.audit!==undefined&&typeof semanticOptions.audit!=='function'))) {
     throw Error('Private DSH semantic configuration denied');
   }
@@ -37,7 +38,7 @@ export async function attachPrivateReadListener({enabled=false,ctx,service,host,
   })();
   try {
     handler=service.createPrivateTransport({enabled:true,...sdk});
-    if(semanticOptions)semanticHandler=createPrivateSemanticHttpHandler(semanticOptions);
+    if(semanticOptions)semanticHandler=createSemanticHttpHandler(semanticOptions);
     server=createServer({...tls,minVersion:'TLSv1.2',requestCert:true,rejectUnauthorized:true},(req,res)=>{
       if(closed||ctx.get('chatgptMcpRead')!==service){res.writeHead(503).end();return;}
       const selected=semanticHandler&&req.url===PRIVATE_DSH_SEMANTIC_PATH?semanticHandler:handler;

@@ -17,6 +17,8 @@ try{
   const {runProfile}=await imported(official,'@deepseek-ai/dsh/profile-boot');
   const {loadLayeredEnv}=await imported(official,'@deepseek-ai/dsh-app-boot');
   const plugin=await imported(installed,'@wandora/deepharness-chatgpt-mcp-read/plugin');
+  const {createDshSemanticBridge:createSemanticBridge}=await imported(installed,'@wandora/deepharness-chatgpt-mcp-read/semantic-bridge');
+  const {createPrivateSemanticHttpHandler:createSemanticHttpHandler}=await imported(installed,'@wandora/deepharness-chatgpt-mcp-read/private-semantic-http-handler');
   const {createPersistentDshMcpReadPolicy:createPolicy}=await imported(installed,'@wandora/deepharness-chatgpt-mcp-read/policy');
   const {createAuthoritativePgReadQuery,assertAuthoritativePgReadPool}=await imported(installed,'@wandora/deepharness-chatgpt-mcp-read/pg-read-query');
   // require.resolve selects pg's CommonJS entry; read its actual module.exports.
@@ -25,7 +27,7 @@ try{
   const {StreamableHTTPServerTransport}=await imported(dependencies,'@modelcontextprotocol/sdk/server/streamableHttp.js');
   const {z}=await imported(dependencies,'zod');
   const {createPinnedOidcDiscovery:createDiscovery}=await import('/opt/wandora-mcp-host/oidc/pinned-oidc-discovery.mjs');
-  await startOperationalReadHost(config,{runProfile,loadLayeredEnv,plugin,createPolicy,Pool,createDiscovery,createAuthoritativePgReadQuery,assertAuthoritativePgReadPool,
+  await startOperationalReadHost(config,{runProfile,loadLayeredEnv,plugin,createSemanticBridge,createSemanticHttpHandler,createPolicy,Pool,createDiscovery,createAuthoritativePgReadQuery,assertAuthoritativePgReadPool,
     sdk:{McpServer,StreamableHTTPServerTransport,inputSchema:z.object({
       workspaceId:z.string().min(1).max(256),leadSessionId:z.string().min(1).max(256)}).strict()}});
   console.log('OPERATIONAL_MCP_HOST_READY');

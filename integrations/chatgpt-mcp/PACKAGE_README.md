@@ -19,8 +19,10 @@ Read backend accepts only exact hash-parameterized grant/revocation SELECTs. It
 never exposes a revocation INSERT method. Default bundle/endpoint are disabled;
 this package is not an operational ChatGPT connection or deployment authorization.
 
-The lab.6 source additionally contains a separate internal semantic bridge
-adapter and fixed mTLS HTTP handler. The existing OAuth MCP route remains
+The lab.7 source additionally contains separate internal semantic bridge and
+fixed mTLS HTTP handler exports. The operational launcher imports both through
+the installed package exports so the deployment image does not depend on
+repository-relative source paths. The existing OAuth MCP route remains
 read-only; the semantic route is disabled unless a trusted operator config
 pins one client certificate fingerprint. The route accepts only Team listing,
 Team status/tasks, bounded text chat, and queued text instruction operations.

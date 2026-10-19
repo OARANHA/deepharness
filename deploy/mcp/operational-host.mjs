@@ -55,7 +55,7 @@ export async function startOperationalReadHost(config,deps,{readFile=systemReadF
     await discovery.get();
     host=await boot({runProfile:deps.runProfile,environment:deps.loadLayeredEnv('dsh'),
       args:['--no-open','--port','3080','--host',webAddress,'--public-url','https://deep.wandora.com.br/',
-        '--trusted-host','deep.wandora.com.br'],plugin:deps.plugin,
+        '--trusted-host','deep.wandora.com.br'],plugin:deps.plugin,createSemanticBridge:deps.createSemanticBridge,
       createPolicy:async ctx=>{
         ctx.effect(()=>closePool);
         return deps.createPolicy({issuer,resource,discovery,query,allowedOrigins:settings.allowedOrigins,
@@ -68,7 +68,7 @@ export async function startOperationalReadHost(config,deps,{readFile=systemReadF
       ...(settings.semanticBridge?.enabled===true?{semanticBridge:{
         bridge:host.semanticBridge,clientFingerprintSha256:settings.semanticBridge.clientFingerprintSha256,
         audit:event=>host.ctx.logger?.info?.('private DSH semantic request',event),
-      }}:{})});
+      },createSemanticHttpHandler:deps.createSemanticHttpHandler}:{})});
     return Object.freeze({...host,listener});
   }catch{
     await host?.ctx.fiber.dispose().catch(()=>{});

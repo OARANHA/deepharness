@@ -17,6 +17,8 @@ function setup(){
     async connect(){return {query:async sql=>{state.queries.push(sql);return {rows:sql.startsWith('SELECT\n')?[state.role]:[]};},release:discard=>{state.discard=discard;}};}
     async end(){state.ended++;}
   },createAuthoritativePgReadQuery,assertAuthoritativePgReadPool,loadLayeredEnv:()=>({}),runProfile(){},plugin:{apply(){}},
+    createSemanticBridge:()=>({}),
+    createSemanticHttpHandler:()=>({handle(){},dispose(){}}),
     createPolicy:options=>{state.policy=options;return options;},
     createDiscovery:options=>({get:async()=>{state.discovery=options;}}),sdk:{}};
   const seams={
@@ -61,6 +63,7 @@ test('separate semantic route requires operator pin and binds the official host 
   const host=await startOperationalReadHost({...config,semanticBridge:{enabled:true,clientFingerprintSha256:fingerprint}},x.deps,x.seams);
   assert.equal(x.state.listener.semanticBridge.bridge,semanticBridge);
   assert.equal(x.state.listener.semanticBridge.clientFingerprintSha256,fingerprint);
+  assert.equal(typeof x.state.listener.createSemanticHttpHandler,'function');
   assert.equal(typeof x.state.listener.semanticBridge.audit,'function');
   await host.ctx.fiber.dispose();
 });

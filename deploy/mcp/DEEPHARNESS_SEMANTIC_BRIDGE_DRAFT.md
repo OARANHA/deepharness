@@ -2,6 +2,11 @@
 
 Status 2026-10-19: Draft engineering on top of DeepHarness PR #13; not merged, deployed, or enabled.
 
+The bridge package is now `0.1.0-lab.7`. The operational image loads both bridge
+factories through explicit installed-package exports; no copied launcher imports
+adapter source by a repository-relative path. The disposable PostgreSQL probe
+also supplies the API-shaped SessionController fixture required by this host.
+
 ## Implemented in this branch
 
 - `createDshSemanticBridge` uses the official `workspaceRegistry.get`, `sessionController.projections`, `sessionController.page`, and `sessionController.prompt` APIs.
@@ -21,7 +26,7 @@ These are adapter and handler tests with official service-shaped fixtures. They 
 
 - Wire the Remote-Ops semantic tools to this endpoint using a fixed mTLS client and the existing persistent grant/idempotency gate.
 - Add disposable-host tests that admit a message through the real DSH SessionController, restart/reopen the session, and verify the durable human message and subsequent Lead response.
-- Reconcile the dependency on DSH PR #13 and the read package artifact/version; do not merge this branch independently of its required runtime source.
+- Reconcile the dependency on DSH PR #13 and publish/verify the `lab.7` package artifact before runtime image construction; do not merge this branch independently of its required runtime source.
 - Prepare separately reviewed certificate provisioning and runtime enablement, then a lab-only canary. No production Lead message is authorized by this draft.
 
 ## Rollback

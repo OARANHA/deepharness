@@ -17,6 +17,7 @@ import {WorkspaceRegistry} from '@deepseek-ai/dsh-workspace';
 import TeamService from '@deepseek-ai/dsh-experimental-agent-team';
 import pg from 'pg';
 import * as plugin from '../plugin.mjs';
+import {createDshSemanticBridge} from '../adapters/dsh-semantic-bridge.mjs';
 import {createPersistentDshMcpReadPolicy} from '../policy.mjs';
 import {createAuthoritativePgReadQuery, assertAuthoritativePgReadPool, READ_GRANT_SQL} from '../adapters/authoritative-pg-read-query.mjs';
 import {startOperationalReadHost} from '../../../deploy/mcp/operational-host.mjs';
@@ -59,6 +60,12 @@ test('operational host + official DSH services + signed individual + real primar
     ctx.storage.mount('domain',facility);ctx.provide('storageDomain',facility);
     await ctx.plugin(JsonlSessionPersistence,{root:join(root,'sessions'),compression:'none'});
     await ctx.plugin(SessionStore);await ctx.plugin(SessionProjectionRegistry);
+    // This disposable composition probe does not boot DSH's model-facing API
+    // controller. Preserve the official method surface for host composition;
+    // the semantic adapter itself is exercised against method-shaped fixtures.
+    ctx.provide('sessionController',{
+      projections:async()=>null,page:async()=>({records:[],hasMore:false}),prompt:async()=>({accepted:true}),
+    });
     const lead=ctx.sessions.create('composition-fixture-lead',{meta:{cwd:root}});
     const other=ctx.sessions.create('composition-fixture-other',{meta:{cwd:root}});
     await ctx.plugin(WorkspaceRegistry);
@@ -81,6 +88,7 @@ test('operational host + official DSH services + signed individual + real primar
       constructor(options){reader=new Pool({...options,host:'127.0.0.1'});return reader;}
     },runProfile:async options=>{boots++;assert.equal(options.profile,'web');return {ctx};},
     loadLayeredEnv:()=>({}),plugin,createPolicy:createPersistentDshMcpReadPolicy,
+    createSemanticBridge:createDshSemanticBridge,
     createAuthoritativePgReadQuery,assertAuthoritativePgReadPool,
     createDiscovery:()=>({get:async()=>({issuer:config.issuer,publicKeys:{lab:{...publicKey.export({format:'jwk'}),alg:'RS256'}}})}),sdk:{}};
     const result=await startOperationalReadHost(config,deps,{
