@@ -61,3 +61,28 @@ bootstrap gate.
 ## Rollback
 
 The bridge defaults off. Rollback is to remove the `semanticBridge` operator setting and revert this source change. No persistent schema, existing profile data, Docker privileges, OAuth client, or production target configuration is changed.
+
+## Bootstrap release qualification — 2026-10-19 (Draft PR only)
+
+Bootstrap run #477 (39306680929) fails installing the alpha.2 npm tree:
+`@aws-sdk/credential-provider-http@3.972.77` tarball is not published (HTTP 404).
+Stage D run #21 (39306680747) completed SUCCESS; this does not repair bootstrap.
+
+Instead of fabricating an AWS SDK override, this Draft branch now tries the
+official `@deepseek-ai/dsh@0.2.1-rc.2` distribution **only as a CI candidate**.
+The upstream rc.2 source still declares SessionController `prompt`,
+`page`, and `projections` on its public source interface; this is a
+preliminary contract check, **not** a compatibility certification. Upstream
+`d743267388641bc76f17c45ce8b4c231aed1d32c` and the actual deployed
+alpha.2 DSH profile remain unchanged.
+
+CI must pass the full image build, native addon, Web 401/403, isolated
+ingress 401/403 and stack syntax gates. The CI collects and hashes the exact
+resolved `package-lock.json` artifact for review, verifying the chosen
+distribution version and npm integrity metadata. On a successful CI the lock
+must still be reviewed and formally pinned before release; a new unpinned
+`npm install` is not reproducible across time.
+
+**Status: candidate submitted for CI, not yet GREEN.** Do not merge, publish,
+deploy, enable the semantic bridge, alter credentials, or message Leads on
+the basis of this candidate alone.
