@@ -140,6 +140,63 @@ jobs:
               console.log("Private semantic bundle loads with exact rc.2 host peer metadata");
             '
 
+      - name: Exercise official SessionController methods through private bridge (synthetic only)
+        if: steps.state.outputs.ready == 'true'
+        shell: bash
+        run: |
+          docker run --rm --network none --read-only \
+            --security-opt no-new-privileges --cap-drop ALL \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=64m \
+            --mount "type=bind,source=${GITHUB_WORKSPACE}/integrations/chatgpt-mcp,target=/candidate,readonly" \
+            local/deepharness:ci node --input-type=module -e '
+              import assert from "node:assert/strict";
+              import {createRequire} from "node:module";
+              import {pathToFileURL} from "node:url";
+              const installed=createRequire("/opt/dsh/node_modules/@deepseek-ai/dsh/package.json");
+              const official=await import(pathToFileURL(installed.resolve("@deepseek-ai/dsh-api-session-controller")).href);
+              const {createDshSemanticBridge}=await import("/candidate/adapters/dsh-semantic-bridge.mjs");
+              const leadId="lead-disposable",workspaceId="workspace-disposable";
+              const requestId="4db3b83c-5abc-4aa3-9270-9715e3d34e38";
+              const projection={kind:"sequenced",asOfSeq:1,values:{agentTeam:{
+                members:[{id:leadId,name:"Lead",role:"lead",phase:"active"}],tasks:[]}}};
+              const workspace={id:workspaceId,sessionIds:[leadId]};
+              let admitted,read;
+              const controller=Object.create(official.SessionController.prototype);
+              Object.assign(controller,{
+                ctx:{invocation:undefined},
+                liveProjections:()=>projection,
+                commands:{prompt:async(request,source)=>{
+                  admitted={request,source};return {accepted:true};
+                }},
+                history:{page:async(request)=>{
+                  read=request;
+                  return {records:[{type:"event",event:{type:"user/message",seq:1,time:0,
+                    data:{role:"user",content:[{type:"text",text:"synthetic lab record"}]}}}],hasMore:false};
+                }},
+              });
+              const bridge=createDshSemanticBridge({
+                workspaceRegistry:{get:id=>id===workspaceId?workspace:undefined},
+                sessionController:controller,
+              });
+              const receipt=await bridge.sendLeadInstruction({
+                workspaceId,leadSessionId:leadId,requestId,text:"synthetic lab instruction",
+              });
+              assert.deepEqual(receipt,{accepted:true,requestId});
+              assert.equal(admitted.request.sessionId,leadId);
+              assert.equal(admitted.request.mode,"queue");
+              assert.equal(admitted.request.requestId,requestId);
+              assert.deepEqual(admitted.request.content,[{type:"text",text:"synthetic lab instruction"}]);
+              assert.equal(admitted.source.kind,"user");
+              assert.equal(admitted.source.rpcId,requestId);
+              const history=await bridge.readLeadChat({workspaceId,leadSessionId:leadId,maxMessages:5});
+              assert.deepEqual(read,{address:{kind:"session",sessionId:leadId},throughSeq:1,maxMessages:5});
+              assert.deepEqual(history,{messages:[{role:"user",text:"synthetic lab record"}],hasMore:false});
+              await assert.rejects(controller.prompt({
+                sessionId:leadId,requestId,mode:"queue",content:[{type:"text",text:"   "}]
+              },new AbortController().signal),/prompt content must include/);
+              console.log("Official rc.2 controller prompt/page/projections methods accepted synthetic bridge contract; no Agent/session persistence or model");
+            '
+
       - name: Native addon probe under container runtime restrictions
         if: steps.state.outputs.ready == 'true'
         run: |
