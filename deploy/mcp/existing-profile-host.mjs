@@ -15,11 +15,12 @@ export async function bootExistingProfileReadHost({runProfile,environment,args,p
   try {
     if(typeof ctx?.provide!=='function'||typeof ctx?.plugin!=='function'||typeof ctx?.get!=='function'||
         typeof ctx?.fiber?.dispose!=='function')throw Error('Existing DSH host unavailable');
-    const services=['workspaceRegistry','sessions','sessionProjections','sessionController'];
+    const services=['workspaceRegistry','sessions','sessionProjections'];
     const original=services.map(key=>implementation(ctx[key]));
+    const sessionController=ctx.sessionController;
     phase='services-'+original.map(value=>value?'present':'absent').join('-');
-    if(original.slice(0,3).some(value=>!value)||typeof original[3]?.projections!=='function'||
-        typeof original[3]?.page!=='function'||typeof original[3]?.prompt!=='function'||ctx.get('chatgptMcpRead')!==undefined||
+    if(original.some(value=>!value)||typeof sessionController?.projections!=='function'||
+        typeof sessionController?.page!=='function'||typeof sessionController?.prompt!=='function'||ctx.get('chatgptMcpRead')!==undefined||
         ctx.get('chatgptMcpReadPolicy')!==undefined)throw Error('Existing DSH host unavailable');
     const unchanged=()=>services.every((key,i)=>implementation(ctx[key])===original[i]);
     phase='policy';
@@ -33,7 +34,7 @@ export async function bootExistingProfileReadHost({runProfile,environment,args,p
     const service=ctx.get('chatgptMcpRead');
     if(!unchanged()||typeof service?.createPrivateTransport!=='function')throw Error('Existing DSH read service unavailable');
     const semanticBridge=createDshSemanticBridge({
-      workspaceRegistry:ctx.workspaceRegistry,sessionController:ctx.sessionController,checkHost:unchanged,
+      workspaceRegistry:ctx.workspaceRegistry,sessionController,checkHost:unchanged,
     });
     return Object.freeze({...booted,service,semanticBridge});
   } catch {
