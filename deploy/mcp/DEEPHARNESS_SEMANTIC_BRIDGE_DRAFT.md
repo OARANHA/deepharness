@@ -6,10 +6,14 @@ The bridge package is `0.1.0-lab.7`. The operational image loads both bridge
 factories through explicit installed-package exports; no copied launcher imports
 adapter source by a repository-relative path. The disposable PostgreSQL probe
 supplies the API-shaped SessionController fixture required by this host. At
-head `96a550f3fa5d4883c426b28799745fbb45b857ff`, bootstrap CI #474 and Stage D
-#18 both passed. The profile-preservation verifier now reads the exact package
-version from the packed artifact manifest. GHCR publication was skipped for
-this Draft; the package was not deployed or enabled.
+head `16b2787c562f68dcdb2d7425c39168cb043c2bf0`, Stage D #19 passed both the
+PostgreSQL authorization/revocation job and immutable candidate build/upload.
+Bootstrap CI #475 failed twice at Dockerfile npm install with
+`ETARGET No matching version found for @aws-sdk/core@^3.978.4`; subsequent
+native-addon, startup/ingress smoke, stack wiring and GHCR publication steps
+were skipped. No image was published. The profile-preservation verifier reads
+the exact package version from the packed artifact manifest. The package was
+not deployed or enabled.
 
 ## Implemented in this branch
 
@@ -35,6 +39,12 @@ The HTTPS test exercises the real DSH handler over a local TLS socket, but its
 bridge service remains a fixture. It does not establish actual DSH Session
 persistence, agent response completion, the production private route, or
 production readiness.
+
+Bootstrap remains RED after retry: the pinned `@deepseek-ai/dsh@0.2.1-alpha.2`
+install resolves a transitive `@aws-sdk/core@^3.978.4` range that npm reported
+as unavailable in two CI attempts. No compatibility override has been applied;
+resolve this through a reviewed upstream runtime/package change, then rerun the
+full bootstrap gate.
 
 ## Remaining gates
 
