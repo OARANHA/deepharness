@@ -35,18 +35,19 @@ try{
   assert.ok(original.dsh.profile.bundles.includes('@deepseek-ai/dsh-experimental-agent-team-profile'));
   assert.equal(JSON.parse(await readFile(profile+'/node_modules/'+name+'/package.json','utf8')).version,'0.1.0-lab.4');
   const before=await snapshot();
-  // Exercise the original disabled composition gate BEFORE installing anything.
-  const expected=structuredClone(before);expected.version='0.1.0-lab.5';
-  expected.manifest.dependencies[name]='file:/review/expected-new-package.tgz';
-  verifyExistingProfileUpgrade(before,expected);
   const artifacts='/opt/wandora-mcp-artifacts';
   const proof=JSON.parse(await readFile(artifacts+'/packed-files.json','utf8'));
+  const expectedVersion=proof.packageVersion??'0.1.0-lab.5';
+  // Exercise the original disabled composition gate BEFORE installing anything.
+  const expected=structuredClone(before);expected.version=expectedVersion;
+  expected.manifest.dependencies[name]='file:/review/expected-new-package.tgz';
+  verifyExistingProfileUpgrade(before,expected,expectedVersion);
   assert.equal(proof.sourceSha,'f5a5a4f75b680fa1866d843014ea61e7a5e40506');
   assert.match(proof.tarball,/^[a-zA-Z0-9_.-]+\.tgz$/);
   phase='offline-install';
   await run(['plugin','--profile','web','add','--offline','--ignore-scripts',artifacts+'/'+proof.tarball]);
   phase='preservation';
-  verifyExistingProfileUpgrade(before,await snapshot());
+  verifyExistingProfileUpgrade(before,await snapshot(),expectedVersion);
   await verifyPackedInstall(profile+'/node_modules/'+name,artifacts+'/packed-files.json');
   console.log('PRIVATE_PROFILE_OFFLINE_UPGRADE_MATCH');
 }catch{

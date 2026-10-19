@@ -32,8 +32,9 @@ function disabled(value){
   };
   visit(value);assert.equal(count,1);
 }
-export function verifyExistingProfileUpgrade(before,after){
-  assert.equal(before.version,'0.1.0-lab.4');assert.equal(after.version,'0.1.0-lab.5');
+export function verifyExistingProfileUpgrade(before,after,expectedVersion='0.1.0-lab.5'){
+  assert.equal(before.version,'0.1.0-lab.4');assert.match(expectedVersion,/^0\.1\.0-lab\.[0-9]+$/);
+  assert.equal(after.version,expectedVersion);
   assert.notEqual(before.manifest.dependencies[name],after.manifest.dependencies[name]);
   assert.deepEqual(manifest(before.manifest),manifest(after.manifest));
   assert.deepEqual(before.userPatch,after.userPatch);assert.deepEqual(before.homePatch,after.homePatch);

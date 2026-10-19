@@ -28,3 +28,9 @@ test('only existing lab4 to lab5 dependency may change; bundle/config/lock remai
   const missing=structuredClone(before);missing.manifest.dsh.profile.bundles=[];
   assert.throws(()=>verifyExistingProfileUpgrade(missing,after));
 });
+
+test('accepts the exact newly packed lab version while preserving all profile state',()=>{
+  const before=snapshot('0.1.0-lab.4'),after=snapshot('0.1.0-lab.7');
+  assert.equal(verifyExistingProfileUpgrade(before,after,'0.1.0-lab.7'),true);
+  assert.throws(()=>verifyExistingProfileUpgrade(before,after,'0.1.0-lab.6'));
+});

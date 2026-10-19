@@ -6,6 +6,11 @@ The bridge package is now `0.1.0-lab.7`. The operational image loads both bridge
 factories through explicit installed-package exports; no copied launcher imports
 adapter source by a repository-relative path. The disposable PostgreSQL probe
 also supplies the API-shaped SessionController fixture required by this host.
+The Stage D PostgreSQL primary job passed on the previous head, but its
+candidate job rejected lab.7 because the existing-profile preservation verifier
+was fixed to lab.5. The verifier now takes the exact version from the packed
+artifact manifest while continuing to require unchanged profile state; this
+correction is awaiting a fresh CI run.
 
 ## Implemented in this branch
 
