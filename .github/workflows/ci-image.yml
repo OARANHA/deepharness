@@ -80,6 +80,33 @@ jobs:
               console.log("Official profile host exports verified");
             '
 
+      - name: Verify installed official DSH semantic service surfaces offline
+        if: steps.state.outputs.ready == 'true'
+        shell: bash
+        run: |
+          docker run --rm --network none --read-only \
+            --security-opt no-new-privileges --cap-drop ALL \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=64m \
+            local/deepharness:ci node --input-type=module -e '
+              import {createRequire} from "node:module";
+              import {pathToFileURL} from "node:url";
+              const installed=createRequire("/opt/dsh/node_modules/@deepseek-ai/dsh/package.json");
+              const load=name=>import(pathToFileURL(installed.resolve(name)).href);
+              const [{SessionController},{WorkspaceRegistry},{TeamService}]=await Promise.all([
+                load("@deepseek-ai/dsh-api-session-controller"),
+                load("@deepseek-ai/dsh-workspace"),
+                load("@deepseek-ai/dsh-experimental-agent-team"),
+              ]);
+              for(const method of ["projections","page","prompt"]) {
+                if(typeof SessionController?.prototype?.[method]!=="function")
+                  throw Error("Installed SessionController missing "+method);
+              }
+              if(typeof WorkspaceRegistry?.prototype?.get!=="function"||
+                 typeof TeamService!=="function")
+                throw Error("Installed Workspace/Team host service contract mismatch");
+              console.log("Official installed SessionController/Workspace/Team service surfaces verified");
+            '
+
       - name: Native addon probe under container runtime restrictions
         if: steps.state.outputs.ready == 'true'
         run: |
