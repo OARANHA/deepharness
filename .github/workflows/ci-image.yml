@@ -124,7 +124,7 @@ jobs:
                 "@deepseek-ai/dsh-workspace"];
               for(const name of names) {
                 const version=JSON.parse(readFileSync(installed.resolve(name+"/package.json"),"utf8")).version;
-                const allowed=manifest.peerDependencies?.[name]?.split(/\\s*\\|\\|\\s*/);
+                const allowed=manifest.peerDependencies?.[name]?.split("||").map(item=>item.trim());
                 if(version!=="0.2.1-rc.2"||!allowed?.includes(version))
                   throw Error("Unreviewed host/connector peer mismatch: "+name);
               }
