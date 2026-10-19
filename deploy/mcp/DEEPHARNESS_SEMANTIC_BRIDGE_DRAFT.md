@@ -86,3 +86,18 @@ must still be reviewed and formally pinned before release; a new unpinned
 **Status: candidate submitted for CI, not yet GREEN.** Do not merge, publish,
 deploy, enable the semantic bridge, alter credentials, or message Leads on
 the basis of this candidate alone.
+
+## Remote VPS reachability prerequisite — verified 2026-10-19
+
+Read-only host status confirms `28server` (DeepHarness) and
+`wandora-vps-01` (Remote-Ops Wandora) are different machines. The DSH
+semantic listener's backend address and `deepharness-mcp-backend` name are
+internal to the local Docker network; the inspected DSH Web container has
+no published Docker ports. Consequently a remote Remote-Ops container
+cannot be assumed to reach this listener.
+
+Before operational qualification, provision a separately approved, tightly
+scoped inter-VPS private route or relay that preserves end-to-end mTLS and
+the existing DSH private host allowlist. Test the route from the **actual**
+Remote-Ops runtime and ensure no public DSH listener or broad Docker
+capability is created. No route, credentials or runtime config were changed.
