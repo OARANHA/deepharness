@@ -6,14 +6,17 @@ The bridge package is `0.1.0-lab.7`. The operational image loads both bridge
 factories through explicit installed-package exports; no copied launcher imports
 adapter source by a repository-relative path. The disposable PostgreSQL probe
 supplies the API-shaped SessionController fixture required by this host. At
-head `16b2787c562f68dcdb2d7425c39168cb043c2bf0`, Stage D #19 passed both the
-PostgreSQL authorization/revocation job and immutable candidate build/upload.
-Bootstrap CI #475 failed twice at Dockerfile npm install with
-`ETARGET No matching version found for @aws-sdk/core@^3.978.4`; subsequent
-native-addon, startup/ingress smoke, stack wiring and GHCR publication steps
-were skipped. No image was published. The profile-preservation verifier reads
-the exact package version from the packed artifact manifest. The package was
-not deployed or enabled.
+head `0f09add5c64d3b83fe0ad4683427d374d6d2cf7c`, Bootstrap #476 failed during
+Dockerfile npm install after requesting a missing
+`@aws-sdk/credential-provider-http-3.972.77.tgz` (HTTP 404); addon, Web/ingress
+smokes, stack validation and GHCR publication were skipped. On its parent head,
+Bootstrap #475 first failed resolving `@aws-sdk/core@^3.978.4`; the failed-job
+retry then failed resolving `@aws-sdk/credential-provider-http@^3.972.77`.
+No image was published. Stage D #19 passed both PostgreSQL authorization/
+revocation and candidate build/upload. On the current documentation head, Stage
+D #20 has passed `pg-primary`; `candidate` is still running at last check.
+The profile-preservation verifier reads the exact package version from the
+packed artifact manifest. The package was not deployed or enabled.
 
 ## Implemented in this branch
 
@@ -40,11 +43,12 @@ bridge service remains a fixture. It does not establish actual DSH Session
 persistence, agent response completion, the production private route, or
 production readiness.
 
-Bootstrap remains RED after retry: the pinned `@deepseek-ai/dsh@0.2.1-alpha.2`
-install resolves a transitive `@aws-sdk/core@^3.978.4` range that npm reported
-as unavailable in two CI attempts. No compatibility override has been applied;
-resolve this through a reviewed upstream runtime/package change, then rerun the
-full bootstrap gate.
+Bootstrap remains RED across three install attempts, with two distinct ETARGET
+dependency-resolution failures and one npm 404 for an AWS SDK tarball in the
+pinned `@deepseek-ai/dsh@0.2.1-alpha.2` install. The evidence does not justify
+a dependency override; resolve the published-runtime/package inconsistency
+through a reviewed and reproducible dependency update, then rerun the full
+bootstrap gate.
 
 ## Remaining gates
 
