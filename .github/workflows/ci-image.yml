@@ -197,6 +197,59 @@ jobs:
               console.log("Official rc.2 controller prompt/page/projections methods accepted synthetic bridge contract; no Agent/session persistence or model");
             '
 
+      - name: Verify official rc.2 JSONL durable replay of synthetic user message (no model)
+        if: steps.state.outputs.ready == 'true'
+        shell: bash
+        run: |
+          docker run --rm --network none --read-only \
+            --security-opt no-new-privileges --cap-drop ALL \
+            --tmpfs /tmp:rw,nosuid,nodev,mode=1777,size=128m \
+            local/deepharness:ci node --input-type=module -e '
+              import assert from "node:assert/strict";
+              import {createRequire} from "node:module";
+              import {pathToFileURL} from "node:url";
+              const installed=createRequire("/opt/dsh/node_modules/@deepseek-ai/dsh/package.json");
+              const load=name=>import(pathToFileURL(installed.resolve(name)).href);
+              const [{Context},{SessionStore},{default:JsonlSessionPersistence},{createUserMessage}]=
+                await Promise.all([
+                  load("@deepseek-ai/cordis"),load("@deepseek-ai/dsh-session"),
+                  load("@deepseek-ai/dsh-session-persistence-jsonl"),load("@deepseek-ai/dsh-llm"),
+                ]);
+              const root="/tmp/dsh-official-durable-check",id="lab-rc2-durable-lead";
+              const rpcId="4db3b83c-5abc-4aa3-9270-9715e3d34e38";
+              const first=new Context();
+              try {
+                await first.plugin(JsonlSessionPersistence,{root,compression:"none"});
+                await first.plugin(SessionStore);
+                const session=first.sessions.create(id,{meta:{cwd:root}});
+                const message=createUserMessage({
+                  content:[{type:"text",text:"CI synthetic admitted user message"}],
+                  source:{kind:"user",rpcId},
+                });
+                const event=session.append("user/message",message,{surfaceOp:"append"});
+                const writer=await first.sessionPersistence.create(session.header);
+                try{
+                  await writer.append([event]);
+                  await writer.flush();
+                }finally{await writer.close();}
+              }finally{await first.fiber.dispose();}
+              const second=new Context();
+              try {
+                await second.plugin(JsonlSessionPersistence,{root,compression:"none"});
+                const reader=await second.sessionPersistence.open(id,"read");
+                try {
+                  const {events,eventState}=await reader.read(0);
+                  assert.equal(events.length,1);
+                  assert.equal(events[0].type,"user/message");
+                  assert.equal(events[0].seq,0);
+                  assert.equal(events[0].data.source.rpcId,rpcId);
+                  assert.equal(events[0].data.content[0].text,"CI synthetic admitted user message");
+                  assert.ok(["detached","shared-frozen"].includes(eventState));
+                }finally{await reader.close();}
+              }finally{await second.fiber.dispose();}
+              console.log("Official rc.2 JSONL message flushed and cold-reopened across contexts; no Agent/model/Lead response");
+            '
+
       - name: Native addon probe under container runtime restrictions
         if: steps.state.outputs.ready == 'true'
         run: |
