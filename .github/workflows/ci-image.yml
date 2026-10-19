@@ -107,6 +107,39 @@ jobs:
               console.log("Official installed SessionController/Workspace/Team service surfaces verified");
             '
 
+      - name: Cross-check installed rc.2 with private semantic bundle (offline, no install)
+        if: steps.state.outputs.ready == 'true'
+        shell: bash
+        run: |
+          docker run --rm --network none --read-only \
+            --security-opt no-new-privileges --cap-drop ALL \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=64m \
+            --mount "type=bind,source=${GITHUB_WORKSPACE}/integrations/chatgpt-mcp,target=/candidate,readonly" \
+            local/deepharness:ci node --input-type=module -e '
+              import {readFileSync} from "node:fs";
+              import {createRequire} from "node:module";
+              const installed=createRequire("/opt/dsh/node_modules/@deepseek-ai/dsh/package.json");
+              const manifest=JSON.parse(readFileSync("/candidate/package.json","utf8"));
+              const names=["@deepseek-ai/dsh-session","@deepseek-ai/dsh-session-projection",
+                "@deepseek-ai/dsh-workspace"];
+              for(const name of names) {
+                const version=JSON.parse(readFileSync(installed.resolve(name+"/package.json"),"utf8")).version;
+                const allowed=manifest.peerDependencies?.[name]?.split(/\\s*\\|\\|\\s*/);
+                if(version!=="0.2.1-rc.2"||!allowed?.includes(version))
+                  throw Error("Unreviewed host/connector peer mismatch: "+name);
+              }
+              const [{createDshSemanticBridge},{createOfficialDshMcpReadRuntime},plugin]=
+                await Promise.all([
+                  import("/candidate/adapters/dsh-semantic-bridge.mjs"),
+                  import("/candidate/runtime.mjs"),import("/candidate/plugin.mjs"),
+                ]);
+              if(typeof createDshSemanticBridge!=="function"||
+                 typeof createOfficialDshMcpReadRuntime!=="function"||
+                 typeof plugin.apply!=="function")
+                throw Error("Private connector cannot load against installed rc.2 host");
+              console.log("Private semantic bundle loads with exact rc.2 host peer metadata");
+            '
+
       - name: Native addon probe under container runtime restrictions
         if: steps.state.outputs.ready == 'true'
         run: |
