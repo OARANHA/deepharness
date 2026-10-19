@@ -61,6 +61,25 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Verify official DSH profile-host exports without network
+        if: steps.state.outputs.ready == 'true'
+        shell: bash
+        run: |
+          docker run --rm --network none --read-only \
+            --security-opt no-new-privileges --cap-drop ALL \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=64m \
+            local/deepharness:ci node --input-type=module -e '
+              import {createRequire} from "node:module";
+              import {pathToFileURL} from "node:url";
+              const official=createRequire("/opt/dsh/node_modules/@deepseek-ai/dsh/package.json");
+              const load=name=>import(pathToFileURL(official.resolve(name)).href);
+              const profile=await load("@deepseek-ai/dsh/profile-boot");
+              const app=await load("@deepseek-ai/dsh-app-boot");
+              if(typeof profile.runProfile!=="function"||typeof app.loadLayeredEnv!=="function")
+                throw Error("DSH operational host export contract incompatible");
+              console.log("Official profile host exports verified");
+            '
+
       - name: Native addon probe under container runtime restrictions
         if: steps.state.outputs.ready == 'true'
         run: |
