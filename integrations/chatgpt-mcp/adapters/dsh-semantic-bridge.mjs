@@ -50,15 +50,22 @@ export function createDshSemanticBridge({workspaceRegistry,sessionController,che
 
   async function listTeams(input) {
     exact(input,['workspaceId']);
-    const workspace=workspaceFor(input.workspaceId),teams=[];
-    for(const sessionId of workspace.sessionIds) {
+    const workspace=workspaceFor(input.workspaceId),memberIds=[...workspace.sessionIds],teams=[];
+    // Freeze the enumerated membership, not merely the registry object reference:
+    // WorkspaceEntity can mutate its sessionIds in place during an async read.
+    const checkMembership=()=>{
+      const current=workspaceFor(input.workspaceId);
+      if(current!==workspace||current.sessionIds.length!==memberIds.length||
+         current.sessionIds.some((id,index)=>id!==memberIds[index]))deny();
+    };
+    for(const sessionId of memberIds) {
       const snapshot=await sessionController.projections({sessionId},new AbortController().signal);
-      checkHost();
+      checkMembership();
       if(snapshot?.kind==='sequenced'&&snapshot.values?.agentTeam) {
         teams.push(validatedTeam(sessionId,snapshot.values.agentTeam));
       }
     }
-    if(workspaceFor(input.workspaceId)!==workspace)deny();
+    checkMembership();
     return teams;
   }
 
