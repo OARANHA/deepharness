@@ -210,10 +210,11 @@ jobs:
               import {pathToFileURL} from "node:url";
               const installed=createRequire("/opt/dsh/node_modules/@deepseek-ai/dsh/package.json");
               const load=name=>import(pathToFileURL(installed.resolve(name)).href);
-              const [{Context},{SessionStore},JsonlSessionPersistence,{createUserMessage}]=
+              const [{Context},{SessionStore},JsonlSessionPersistence,{createUserMessage},{default:SqliteSessionQueryEngine}]=
                 await Promise.all([
                   load("@deepseek-ai/cordis"),load("@deepseek-ai/dsh-session"),
                   load("@deepseek-ai/dsh-session-persistence-jsonl"),load("@deepseek-ai/dsh-llm"),
+                  load("@deepseek-ai/dsh-session-query-sqlite"),
                 ]);
               const root="/tmp/dsh-official-durable-check",id="lab-rc2-durable-lead";
               const rpcId="4db3b83c-5abc-4aa3-9270-9715e3d34e38";
@@ -236,6 +237,8 @@ jobs:
               const second=new Context();
               try {
                 await second.plugin(JsonlSessionPersistence,{root,compression:"none"});
+                await second.plugin(SessionStore);
+                await second.plugin(SqliteSessionQueryEngine,{path:root+"/read-index.sqlite",openAt:"never"});
                 const reader=await second.sessionPersistence.open(id,"read");
                 try {
                   const {events,eventState}=await reader.read(0);
@@ -246,8 +249,17 @@ jobs:
                   assert.equal(events[0].data.content[0].text,"CI synthetic admitted user message");
                   assert.ok(["detached","shared-frozen"].includes(eventState));
                 }finally{await reader.close();}
+                const observed=await second.sessionQuery.observeSession(id,{projectionMode:"none"});
+                try {
+                  assert.equal(observed.source,"prepared");
+                  assert.equal(observed.header.id,id);
+                  assert.equal(observed.events.length,1);
+                  assert.equal(observed.events[0].data.source.rpcId,rpcId);
+                  assert.equal(observed.events[0].data.content[0].text,"CI synthetic admitted user message");
+                  assert.equal(second.sessions.get(id),undefined,"cold query must not activate an Agent");
+                }finally{observed[Symbol.dispose]();}
               }finally{await second.fiber.dispose();}
-              console.log("Official rc.2 JSONL message flushed and cold-reopened across contexts; no Agent/model/Lead response");
+              console.log("Official rc.2 JSONL flushed and cold SessionQuery restored without activating Agent or model");
             '
 
       - name: Native addon probe under container runtime restrictions
