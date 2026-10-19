@@ -18,3 +18,11 @@ from historical1500ms to750ms need a separately reviewed owner-approved gate.
 Read backend accepts only exact hash-parameterized grant/revocation SELECTs. It
 never exposes a revocation INSERT method. Default bundle/endpoint are disabled;
 this package is not an operational ChatGPT connection or deployment authorization.
+
+The lab.6 source additionally contains a separate internal semantic bridge
+adapter and fixed mTLS HTTP handler. The existing OAuth MCP route remains
+read-only; the semantic route is disabled unless a trusted operator config
+pins one client certificate fingerprint. The route accepts only Team listing,
+Team status/tasks, bounded text chat, and queued text instruction operations.
+It is not yet wired to the Remote-Ops caller, grants, or client certificate, and
+has not been deployed or tested against a live DSH session.

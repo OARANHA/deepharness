@@ -8,11 +8,23 @@ const resource='https://dsh-mcp.wandora.com.br/mcp';
 const origins=['https://chatgpt.com','https://chatgpt-mtls-proxy.invalid'];
 export function validateOperationalHostConfig(value){
   if(!value||typeof value!=='object'||Array.isArray(value)||
-      Object.keys(value).some(key=>!['version','enabled','issuer','resource','backendPort','allowedOrigins'].includes(key))||
+      Object.keys(value).some(key=>!['version','enabled','issuer','resource','backendPort','allowedOrigins','semanticBridge'].includes(key))||
       value.version!==1||value.enabled!==true||value.issuer!==issuer||value.resource!==resource||
       value.backendPort!==3443||!Array.isArray(value.allowedOrigins)||
       JSON.stringify(value.allowedOrigins)!==JSON.stringify(origins))throw Error('Operational MCP host disabled or invalid');
-  return Object.freeze({...value,allowedOrigins:Object.freeze([...value.allowedOrigins])});
+  let semanticBridge;
+  if(value.semanticBridge!==undefined){
+    const bridge=value.semanticBridge;
+    if(!bridge||typeof bridge!=='object'||Array.isArray(bridge)||
+       Object.keys(bridge).some(key=>!['enabled','clientFingerprintSha256'].includes(key))||
+       (bridge.enabled!==false&&bridge.enabled!==true)||
+       (bridge.enabled===false&&bridge.clientFingerprintSha256!==undefined)||
+       (bridge.enabled===true&&!/^(?:[0-9a-f]{2}:){31}[0-9a-f]{2}$/i.test(bridge.clientFingerprintSha256??'')))
+      throw Error('Operational MCP semantic bridge disabled or invalid');
+    semanticBridge=Object.freeze({...bridge});
+  }
+  return Object.freeze({...value,allowedOrigins:Object.freeze([...value.allowedOrigins]),
+    ...(semanticBridge===undefined?{}:{semanticBridge})});
 }
 export async function startOperationalReadHost(config,deps,{readFile=systemReadFile,lookup=systemLookup,
     boot=bootExistingProfileReadHost,listen=attachPrivateReadListener}={}){
@@ -52,7 +64,11 @@ export async function startOperationalReadHost(config,deps,{readFile=systemReadF
     const tls={key:await readFile('/run/secrets/backend-server-key.pem'),
       cert:await readFile('/run/secrets/backend-server-chain.pem'),ca:await readFile('/run/secrets/backend-ca.pem')};
     const listener=await listen({enabled:true,ctx:host.ctx,service:host.service,host:backendAddress,
-      port:settings.backendPort,tls,sdk:deps.sdk});
+      port:settings.backendPort,tls,sdk:deps.sdk,
+      ...(settings.semanticBridge?.enabled===true?{semanticBridge:{
+        bridge:host.semanticBridge,clientFingerprintSha256:settings.semanticBridge.clientFingerprintSha256,
+        audit:event=>host.ctx.logger?.info?.('private DSH semantic request',event),
+      }}:{})});
     return Object.freeze({...host,listener});
   }catch{
     await host?.ctx.fiber.dispose().catch(()=>{});

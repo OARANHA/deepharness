@@ -1,6 +1,6 @@
 {
   "name": "@wandora/deepharness-chatgpt-mcp-read",
-  "version": "0.1.0-lab.5",
+  "version": "0.1.0-lab.6",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -45,7 +45,9 @@
     "adapters/pinned-oidc-discovery.mjs",
     "adapters/pinned-oidc-metadata.mjs",
     "adapters/dns-pinned-oidc-fetcher.mjs",
-    "adapters/oidc-egress-address-policy.mjs"
+    "adapters/oidc-egress-address-policy.mjs",
+    "adapters/dsh-semantic-bridge.mjs",
+    "adapters/private-semantic-http-handler.mjs"
   ],
   "scripts": {
     "test": "node --test test/*.test.mjs"

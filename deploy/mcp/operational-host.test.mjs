@@ -35,6 +35,14 @@ test('unknown config including credential or mutable grant fields is rejected',(
   assert.throws(()=>validateOperationalHostConfig({...config,password:'not-accepted'}));
   assert.throws(()=>validateOperationalHostConfig({...config,grants:[]}));
 });
+test('semantic bridge remains opt-in and requires one exact client certificate pin',()=>{
+  assert.equal(validateOperationalHostConfig(config).semanticBridge,undefined);
+  assert.equal(validateOperationalHostConfig({...config,semanticBridge:{enabled:false}}).semanticBridge.enabled,false);
+  assert.throws(()=>validateOperationalHostConfig({...config,semanticBridge:{enabled:true}}));
+  assert.throws(()=>validateOperationalHostConfig({...config,semanticBridge:{enabled:true,clientFingerprintSha256:'00'}}));
+  assert.throws(()=>validateOperationalHostConfig({...config,semanticBridge:{enabled:true,
+    clientFingerprintSha256:'00:'.repeat(31)+'00',extra:true}}));
+});
 test('one official Web host, fixed read-only pool, pinned discovery and private listener',async()=>{
   const x=setup();const host=await startOperationalReadHost(config,x.deps,x.seams);
   assert.equal(host.ctx,x.ctx);assert.equal(x.state.poolOptions.user,'dsh_mcp_reader');
@@ -44,6 +52,17 @@ test('one official Web host, fixed read-only pool, pinned discovery and private 
   assert.equal(x.state.listener.host,'172.30.0.2');assert.equal(x.state.listener.port,3443);
   assert.equal(x.state.listener.enabled,true);assert.equal(x.state.discovery.issuer,config.issuer);
   await host.ctx.fiber.dispose();assert.equal(x.state.ended,1);
+});
+test('separate semantic route requires operator pin and binds the official host bridge',async()=>{
+  const x=setup(),fingerprint='aa:'.repeat(31)+'aa',semanticBridge={sendLeadInstruction(){}};
+  x.seams.boot=async options=>{
+    x.state.boot=options;await options.createPolicy(x.ctx);return {ctx:x.ctx,service:{},semanticBridge};
+  };
+  const host=await startOperationalReadHost({...config,semanticBridge:{enabled:true,clientFingerprintSha256:fingerprint}},x.deps,x.seams);
+  assert.equal(x.state.listener.semanticBridge.bridge,semanticBridge);
+  assert.equal(x.state.listener.semanticBridge.clientFingerprintSha256,fingerprint);
+  assert.equal(typeof x.state.listener.semanticBridge.audit,'function');
+  await host.ctx.fiber.dispose();
 });
 for(const field of ['replica','grants_write','revocations_write'])test(field+' prevents boot and listener',async()=>{
   const x=setup();x.state.role[field]=true;
