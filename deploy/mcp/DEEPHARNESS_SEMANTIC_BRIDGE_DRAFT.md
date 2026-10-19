@@ -2,15 +2,14 @@
 
 Status 2026-10-19: Draft engineering on top of DeepHarness PR #13; not merged, deployed, or enabled.
 
-The bridge package is now `0.1.0-lab.7`. The operational image loads both bridge
+The bridge package is `0.1.0-lab.7`. The operational image loads both bridge
 factories through explicit installed-package exports; no copied launcher imports
 adapter source by a repository-relative path. The disposable PostgreSQL probe
-also supplies the API-shaped SessionController fixture required by this host.
-The Stage D PostgreSQL primary job passed on the previous head, but its
-candidate job rejected lab.7 because the existing-profile preservation verifier
-was fixed to lab.5. The verifier now takes the exact version from the packed
-artifact manifest while continuing to require unchanged profile state; this
-correction is awaiting a fresh CI run.
+supplies the API-shaped SessionController fixture required by this host. At
+head `96a550f3fa5d4883c426b28799745fbb45b857ff`, bootstrap CI #474 and Stage D
+#18 both passed. The profile-preservation verifier now reads the exact package
+version from the packed artifact manifest. GHCR publication was skipped for
+this Draft; the package was not deployed or enabled.
 
 ## Implemented in this branch
 
@@ -23,15 +22,26 @@ correction is awaiting a fresh CI run.
 
 ## Tests
 
-The new focused unit tests cover workspace and Lead isolation, mismatched projections, unknown fields and operations, identity/certificate pin denial, body and response bounds, content-free auditing, text-only prompt construction, and retry request-id stability.
+Focused tests cover workspace and Lead isolation, mismatched projections,
+unknown fields and operations, identity/certificate pin denial, body and
+response bounds, content-free auditing, text-only prompt construction, and
+retry request-id stability. The handler now also has an isolated HTTPS test
+using ephemeral CA/server/client certificates: the pinned mTLS peer succeeds,
+another CA-trusted but unpinned peer is denied before bridge dispatch, and
+audits contain no message text or Lead identifier. The full package suite
+passes **75/75** locally; focused existing-host/upgrade tests pass **20/20**.
 
-These are adapter and handler tests with official service-shaped fixtures. They do not establish DSH session persistence, agent response completion, a working Remote-Ops network client, or production readiness.
+The HTTPS test exercises the real DSH handler over a local TLS socket, but its
+bridge service remains a fixture. It does not establish actual DSH Session
+persistence, agent response completion, the production private route, or
+production readiness.
 
 ## Remaining gates
 
-- Wire the Remote-Ops semantic tools to this endpoint using a fixed mTLS client and the existing persistent grant/idempotency gate.
+- The corresponding Remote-Ops tools and fixed mTLS client are implemented in Draft PR #71; neither PR is merged or live.
 - Add disposable-host tests that admit a message through the real DSH SessionController, restart/reopen the session, and verify the durable human message and subsequent Lead response.
-- Reconcile the dependency on DSH PR #13 and publish/verify the `lab.7` package artifact before runtime image construction; do not merge this branch independently of its required runtime source.
+- Create a separately reviewed, non-self-service path to provision and revoke exact client/session/workspace/Lead/action grants.
+- Reconcile the dependency stack: DSH PRs #8–#13 are open Draft and unmerged; PR #17 must not be merged independently. Publish/verify the `lab.7` artifact before runtime image construction.
 - Prepare separately reviewed certificate provisioning and runtime enablement, then a lab-only canary. No production Lead message is authorized by this draft.
 
 ## Rollback
