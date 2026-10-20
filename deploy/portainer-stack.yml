@@ -182,7 +182,7 @@ services:
 volumes:
   dsh_data:
     external: true
-    name: deepharness_dsh_data
+    name: deepharness_dsh_data_lab7
   dsh_workspace:
     external: true
     name: deepharness_dsh_workspace
