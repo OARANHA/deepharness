@@ -29,7 +29,7 @@ export function validateOperationalHostConfig(value){
 export async function startOperationalReadHost(config,deps,{readFile=systemReadFile,lookup=systemLookup,
     boot=bootExistingProfileReadHost,listen=attachPrivateReadListener}={}){
   const settings=validateOperationalHostConfig(config);
-  let pool,host,poolClosing;
+  let pool,host,poolClosing,phase='addresses';
   const closePool=()=>poolClosing??=Promise.resolve().then(()=>pool?.end());
   try{
     const address=async name=>{
@@ -41,6 +41,7 @@ export async function startOperationalReadHost(config,deps,{readFile=systemReadF
     const webAddress=await address('deepharness-web-edge');
     const backendAddress=await address('deepharness-mcp-backend');
     if(webAddress===backendAddress)throw Error('Separate operational networks required');
+    phase='db-secret';
     const password=(await readFile('/run/secrets/mcp-runtime-db-password','utf8')).trim();
     if(!/^[0-9a-f]{64}$/.test(password))throw Error('Invalid operational secret');
     pool=new deps.Pool({host:'mcp-grants-db',port:5432,database:'dsh_mcp_grants',user:'dsh_mcp_reader',
@@ -48,21 +49,27 @@ export async function startOperationalReadHost(config,deps,{readFile=systemReadF
     pool.on('error',()=>{}); // Requests deny through their authoritative query; never log DB credentials.
     // Startup inspection is separate from the exact authorization SELECTs.
     // Each subsequent read rechecks authority on its own checked-out session.
+    phase='db-role';
     await deps.assertAuthoritativePgReadPool({pool});
     const query=deps.createAuthoritativePgReadQuery({pool});
     const discovery=deps.createDiscovery({issuer,discoveryUri:issuer+'/.well-known/openid-configuration',
       jwksUri:issuer+'/protocol/openid-connect/certs'});
+    phase='oidc-discovery';
     await discovery.get();
+    phase='profile-boot';
     host=await boot({runProfile:deps.runProfile,environment:deps.loadLayeredEnv('dsh'),
       args:['--no-open','--port','3080','--host',webAddress,'--public-url','https://deep.wandora.com.br/',
         '--trusted-host','deep.wandora.com.br'],plugin:deps.plugin,createSemanticBridge:deps.createSemanticBridge,
+      enableSemanticBridge:settings.semanticBridge?.enabled===true,
       createPolicy:async ctx=>{
         ctx.effect(()=>closePool);
         return deps.createPolicy({issuer,resource,discovery,query,allowedOrigins:settings.allowedOrigins,
           allowMissingNotBefore:true,revocationTimeoutMs:1000});
       }});
+    phase='tls-files';
     const tls={key:await readFile('/run/secrets/backend-server-key.pem'),
       cert:await readFile('/run/secrets/backend-server-chain.pem'),ca:await readFile('/run/secrets/backend-ca.pem')};
+    phase='tls-listener';
     const listener=await listen({enabled:true,ctx:host.ctx,service:host.service,host:backendAddress,
       port:settings.backendPort,tls,sdk:deps.sdk,
       ...(settings.semanticBridge?.enabled===true?{semanticBridge:{
@@ -73,6 +80,7 @@ export async function startOperationalReadHost(config,deps,{readFile=systemReadF
   }catch{
     await host?.ctx.fiber.dispose().catch(()=>{});
     await closePool().catch(()=>{});
-    throw Error('Operational MCP host initialization denied');
+    // Fixed stage labels only: never propagate token-bearing DNS, TLS, DB or profile errors.
+    throw Error('Operational MCP host initialization denied ('+phase+')');
   }
 }

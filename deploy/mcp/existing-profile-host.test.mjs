@@ -50,3 +50,24 @@ for(const replace of [false,true])test('fresh Cordis trace proxies '+(replace?'s
   if(replace)await assert.rejects(bootExistingProfileReadHost(x.opts),/denied/);
   else assert.equal((await bootExistingProfileReadHost(x.opts)).ctx,x.ctx);
 });
+
+test('disabled semantic bridge does not require SessionController or invoke semantic factory',async()=>{
+  const x=setup();delete x.ctx.sessionController;
+  x.opts.createSemanticBridge=()=>{throw Error('inactive semantic factory should not run');};
+  const host=await bootExistingProfileReadHost(x.opts);
+  assert.equal(host.service,x.service);
+  assert.equal(Object.hasOwn(host,'semanticBridge'),false);
+  assert.equal(x.events.includes('disposed'),false);
+});
+test('enabled semantic bridge refuses missing SessionController and disposes',async()=>{
+  const x=setup();delete x.ctx.sessionController;
+  x.opts.enableSemanticBridge=true;
+  await assert.rejects(bootExistingProfileReadHost(x.opts),/denied/);
+  assert.equal(x.events.at(-1),'disposed');
+});
+test('enabled semantic bridge mounts only against exact official session methods',async()=>{
+  const x=setup();x.opts.enableSemanticBridge=true;
+  const host=await bootExistingProfileReadHost(x.opts);
+  assert.equal(typeof host.semanticBridge.listTeams,'function');
+  assert.equal(typeof host.semanticBridge.sendLeadInstruction,'function');
+});

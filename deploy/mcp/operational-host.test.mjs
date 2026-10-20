@@ -53,6 +53,7 @@ test('one official Web host, fixed read-only pool, pinned discovery and private 
   assert.ok(x.state.boot.args.includes('172.19.0.12'));
   assert.equal(x.state.listener.host,'172.30.0.2');assert.equal(x.state.listener.port,3443);
   assert.equal(x.state.listener.enabled,true);assert.equal(x.state.discovery.issuer,config.issuer);
+  assert.equal(x.state.boot.enableSemanticBridge,false);
   await host.ctx.fiber.dispose();assert.equal(x.state.ended,1);
 });
 test('separate semantic route requires operator pin and binds the official host bridge',async()=>{
@@ -61,6 +62,7 @@ test('separate semantic route requires operator pin and binds the official host 
     x.state.boot=options;await options.createPolicy(x.ctx);return {ctx:x.ctx,service:{},semanticBridge};
   };
   const host=await startOperationalReadHost({...config,semanticBridge:{enabled:true,clientFingerprintSha256:fingerprint}},x.deps,x.seams);
+  assert.equal(x.state.boot.enableSemanticBridge,true);
   assert.equal(x.state.listener.semanticBridge.bridge,semanticBridge);
   assert.equal(x.state.listener.semanticBridge.clientFingerprintSha256,fingerprint);
   assert.equal(typeof x.state.listener.createSemanticHttpHandler,'function');
@@ -79,7 +81,7 @@ test('ambiguous Docker alias refuses before opening the pool',async()=>{
 });
 test('listener startup failure disposes the actual host and closes its pool once',async()=>{
   const x=setup();x.seams.listen=async()=>{throw Error('private key details must not escape');};
-  await assert.rejects(startOperationalReadHost(config,x.deps,x.seams),/^Error: Operational MCP host initialization denied$/);
+  await assert.rejects(startOperationalReadHost(config,x.deps,x.seams),/^Error: Operational MCP host initialization denied \\(tls-listener\\)$/);
   assert.equal(x.state.disposed,1);assert.equal(x.state.ended,1);
 });
 
