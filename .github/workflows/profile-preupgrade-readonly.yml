@@ -1,0 +1,32 @@
+name: DeepHarness profile preupgrade readonly
+on:
+  push:
+    branches:
+      - feat/semantic-preupgrade-preflight-20261020
+    paths:
+      - 'deploy/mcp/profile-preupgrade-readonly.review.sh'
+      - 'deploy/mcp/profile-preupgrade-readonly.test.mjs'
+      - 'deploy/mcp/SEMANTIC_PROFILE_PREUPGRADE_GATES.md'
+      - '.github/workflows/profile-preupgrade-readonly.yml'
+  pull_request:
+    paths:
+      - 'deploy/mcp/profile-preupgrade-readonly.review.sh'
+      - 'deploy/mcp/profile-preupgrade-readonly.test.mjs'
+      - '.github/workflows/profile-preupgrade-readonly.yml'
+permissions:
+  contents: read
+jobs:
+  read-only-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate shell syntax without executing it
+        run: bash -n deploy/mcp/profile-preupgrade-readonly.review.sh
+      - name: Run synthetic Node tests without Docker or network
+        run: node --test deploy/mcp/profile-preupgrade-readonly.test.mjs
