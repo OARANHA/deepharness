@@ -7,7 +7,7 @@ services:
   web:
     # Explicit nonroot identity required for owner-only backend TLS key (UID 1000).
     user: 1000:1000
-    image: ${DSH_MCP_HOST_IMAGE:?Provide tested immutable MCP host digest}
+    image: ghcr.io/oaranha/deepharness-mcp@sha256:27d5784af8a472c305d1665a62944dc8508501e1d900f4e0eb2751d42c31b624
     command:
     - node
     - /opt/wandora-mcp-verifier/mcp/run-operational.mjs
@@ -182,7 +182,7 @@ services:
 volumes:
   dsh_data:
     external: true
-    name: deepharness_dsh_data
+    name: deepharness_dsh_data_lab7
   dsh_workspace:
     external: true
     name: deepharness_dsh_workspace
