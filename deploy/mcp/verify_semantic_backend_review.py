@@ -124,7 +124,10 @@ def validate_review(root: Path, source_sha: str, tree_sha: str):
     config = mcp.get("Config", {})
     require(config.get("Labels", {}).get("org.opencontainers.image.revision") == source_sha)
     require(config.get("User") == "node")
-    require(config.get("ExposedPorts") in ({}, None))
+    # The reviewed parent image already declares 3080/tcp as metadata.
+    # Dockerfile EXPOSE does not publish ports. Reject newly introduced
+    # exposed-port metadata (especially 3443), not this inherited value.
+    require(config.get("ExposedPorts") in ({}, None, {"3080/tcp": {}}))
     cmd = config.get("Cmd")
     require(isinstance(cmd, list) and "MCP_CANDIDATE_DISABLED" in " ".join(cmd))
     require("run-operational.mjs" not in " ".join(cmd))
