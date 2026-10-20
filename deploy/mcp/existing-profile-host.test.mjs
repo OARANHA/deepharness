@@ -1,14 +1,17 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {bootExistingProfileReadHost} from './existing-profile-host.mjs';
+import {createDshSemanticBridge} from '../../integrations/chatgpt-mcp/adapters/dsh-semantic-bridge.mjs';
 function setup(){
   const map=new Map(),events=[],service={createPrivateTransport(){throw Error('must stay closed');}};
-  const ctx={workspaceRegistry:{},sessions:{},sessionProjections:{},
+  const ctx={workspaceRegistry:{get(){}},sessions:{},sessionProjections:{},
+    sessionController:{projections(){},page(){},prompt(){}},
     get:key=>map.get(key),provide:(key,value)=>map.set(key,value),
     fiber:{dispose:async()=>events.push('disposed')},
     plugin:async(plugin,config)=>{events.push(config);map.set('chatgptMcpRead',service);}};
   const opts={runProfile:async value=>{events.push(value);return {ctx,shutdown:{}};},
-    environment:{},args:['--no-open','--host','127.0.0.1'],plugin:{apply(){}},createPolicy:async host=>{assert.equal(host,ctx);return {};}};
+    environment:{},args:['--no-open','--host','127.0.0.1'],plugin:{apply(){}},createSemanticBridge:createDshSemanticBridge,
+    createPolicy:async host=>{assert.equal(host,ctx);return {};}};
   return {ctx,opts,events,map,service};
 }
 test('boots Web once, forwards arguments and mounts on the identical context without transport',async()=>{
@@ -38,7 +41,7 @@ test('no read service means composition fails closed',async()=>{
   assert.equal(x.events.at(-1),'disposed');
 });
 for(const replace of [false,true])test('fresh Cordis trace proxies '+(replace?'still deny replaced implementation':'keep the same implementation'),async()=>{
-  const x=setup(),impl={workspaceRegistry:{},sessions:{},sessionProjections:{}};
+  const x=setup(),impl={workspaceRegistry:{get(){}},sessions:{},sessionProjections:{},sessionController:{projections(){},page(){},prompt(){}}};
   const original=Symbol.for('cordis.original');
   for(const key of Object.keys(impl))Object.defineProperty(x.ctx,key,{get:()=>new Proxy(impl[key],{
     get:(target,property)=>property===original?target:Reflect.get(target,property),
@@ -46,4 +49,25 @@ for(const replace of [false,true])test('fresh Cordis trace proxies '+(replace?'s
   x.opts.createPolicy=async()=>{if(replace)impl.sessions={};return {};};
   if(replace)await assert.rejects(bootExistingProfileReadHost(x.opts),/denied/);
   else assert.equal((await bootExistingProfileReadHost(x.opts)).ctx,x.ctx);
+});
+
+test('disabled semantic bridge does not require SessionController or invoke semantic factory',async()=>{
+  const x=setup();delete x.ctx.sessionController;
+  x.opts.createSemanticBridge=()=>{throw Error('inactive semantic factory should not run');};
+  const host=await bootExistingProfileReadHost(x.opts);
+  assert.equal(host.service,x.service);
+  assert.equal(Object.hasOwn(host,'semanticBridge'),false);
+  assert.equal(x.events.includes('disposed'),false);
+});
+test('enabled semantic bridge refuses missing SessionController and disposes',async()=>{
+  const x=setup();delete x.ctx.sessionController;
+  x.opts.enableSemanticBridge=true;
+  await assert.rejects(bootExistingProfileReadHost(x.opts),/denied/);
+  assert.equal(x.events.at(-1),'disposed');
+});
+test('enabled semantic bridge mounts only against exact official session methods',async()=>{
+  const x=setup();x.opts.enableSemanticBridge=true;
+  const host=await bootExistingProfileReadHost(x.opts);
+  assert.equal(typeof host.semanticBridge.listTeams,'function');
+  assert.equal(typeof host.semanticBridge.sendLeadInstruction,'function');
 });

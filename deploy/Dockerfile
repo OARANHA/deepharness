@@ -1,6 +1,7 @@
 # Bootstrap image: pinned official npm distribution, until source-build packaging is validated.
 FROM node:22-bookworm-slim
-ARG DSH_VERSION=0.2.1-alpha.2
+# Draft PR compatibility candidate. Promotion requires successful isolated CI and API review.
+ARG DSH_VERSION=0.2.1-rc.2
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends bash git ca-certificates curl \

@@ -8,16 +8,28 @@ const resource='https://dsh-mcp.wandora.com.br/mcp';
 const origins=['https://chatgpt.com','https://chatgpt-mtls-proxy.invalid'];
 export function validateOperationalHostConfig(value){
   if(!value||typeof value!=='object'||Array.isArray(value)||
-      Object.keys(value).some(key=>!['version','enabled','issuer','resource','backendPort','allowedOrigins'].includes(key))||
+      Object.keys(value).some(key=>!['version','enabled','issuer','resource','backendPort','allowedOrigins','semanticBridge'].includes(key))||
       value.version!==1||value.enabled!==true||value.issuer!==issuer||value.resource!==resource||
       value.backendPort!==3443||!Array.isArray(value.allowedOrigins)||
       JSON.stringify(value.allowedOrigins)!==JSON.stringify(origins))throw Error('Operational MCP host disabled or invalid');
-  return Object.freeze({...value,allowedOrigins:Object.freeze([...value.allowedOrigins])});
+  let semanticBridge;
+  if(value.semanticBridge!==undefined){
+    const bridge=value.semanticBridge;
+    if(!bridge||typeof bridge!=='object'||Array.isArray(bridge)||
+       Object.keys(bridge).some(key=>!['enabled','clientFingerprintSha256'].includes(key))||
+       (bridge.enabled!==false&&bridge.enabled!==true)||
+       (bridge.enabled===false&&bridge.clientFingerprintSha256!==undefined)||
+       (bridge.enabled===true&&!/^(?:[0-9a-f]{2}:){31}[0-9a-f]{2}$/i.test(bridge.clientFingerprintSha256??'')))
+      throw Error('Operational MCP semantic bridge disabled or invalid');
+    semanticBridge=Object.freeze({...bridge});
+  }
+  return Object.freeze({...value,allowedOrigins:Object.freeze([...value.allowedOrigins]),
+    ...(semanticBridge===undefined?{}:{semanticBridge})});
 }
 export async function startOperationalReadHost(config,deps,{readFile=systemReadFile,lookup=systemLookup,
     boot=bootExistingProfileReadHost,listen=attachPrivateReadListener}={}){
   const settings=validateOperationalHostConfig(config);
-  let pool,host,poolClosing;
+  let pool,host,poolClosing,phase='addresses';
   const closePool=()=>poolClosing??=Promise.resolve().then(()=>pool?.end());
   try{
     const address=async name=>{
@@ -29,6 +41,7 @@ export async function startOperationalReadHost(config,deps,{readFile=systemReadF
     const webAddress=await address('deepharness-web-edge');
     const backendAddress=await address('deepharness-mcp-backend');
     if(webAddress===backendAddress)throw Error('Separate operational networks required');
+    phase='db-secret';
     const password=(await readFile('/run/secrets/mcp-runtime-db-password','utf8')).trim();
     if(!/^[0-9a-f]{64}$/.test(password))throw Error('Invalid operational secret');
     pool=new deps.Pool({host:'mcp-grants-db',port:5432,database:'dsh_mcp_grants',user:'dsh_mcp_reader',
@@ -36,27 +49,38 @@ export async function startOperationalReadHost(config,deps,{readFile=systemReadF
     pool.on('error',()=>{}); // Requests deny through their authoritative query; never log DB credentials.
     // Startup inspection is separate from the exact authorization SELECTs.
     // Each subsequent read rechecks authority on its own checked-out session.
+    phase='db-role';
     await deps.assertAuthoritativePgReadPool({pool});
     const query=deps.createAuthoritativePgReadQuery({pool});
     const discovery=deps.createDiscovery({issuer,discoveryUri:issuer+'/.well-known/openid-configuration',
       jwksUri:issuer+'/protocol/openid-connect/certs'});
+    phase='oidc-discovery';
     await discovery.get();
+    phase='profile-boot';
     host=await boot({runProfile:deps.runProfile,environment:deps.loadLayeredEnv('dsh'),
       args:['--no-open','--port','3080','--host',webAddress,'--public-url','https://deep.wandora.com.br/',
-        '--trusted-host','deep.wandora.com.br'],plugin:deps.plugin,
+        '--trusted-host','deep.wandora.com.br'],plugin:deps.plugin,createSemanticBridge:deps.createSemanticBridge,
+      enableSemanticBridge:settings.semanticBridge?.enabled===true,
       createPolicy:async ctx=>{
         ctx.effect(()=>closePool);
         return deps.createPolicy({issuer,resource,discovery,query,allowedOrigins:settings.allowedOrigins,
           allowMissingNotBefore:true,revocationTimeoutMs:1000});
       }});
+    phase='tls-files';
     const tls={key:await readFile('/run/secrets/backend-server-key.pem'),
       cert:await readFile('/run/secrets/backend-server-chain.pem'),ca:await readFile('/run/secrets/backend-ca.pem')};
+    phase='tls-listener';
     const listener=await listen({enabled:true,ctx:host.ctx,service:host.service,host:backendAddress,
-      port:settings.backendPort,tls,sdk:deps.sdk});
+      port:settings.backendPort,tls,sdk:deps.sdk,
+      ...(settings.semanticBridge?.enabled===true?{semanticBridge:{
+        bridge:host.semanticBridge,clientFingerprintSha256:settings.semanticBridge.clientFingerprintSha256,
+        audit:event=>host.ctx.logger?.info?.('private DSH semantic request',event),
+      },createSemanticHttpHandler:deps.createSemanticHttpHandler}:{})});
     return Object.freeze({...host,listener});
   }catch{
     await host?.ctx.fiber.dispose().catch(()=>{});
     await closePool().catch(()=>{});
-    throw Error('Operational MCP host initialization denied');
+    // Fixed stage labels only: never propagate token-bearing DNS, TLS, DB or profile errors.
+    throw Error('Operational MCP host initialization denied ('+phase+')');
   }
 }

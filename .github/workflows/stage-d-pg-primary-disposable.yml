@@ -44,6 +44,7 @@ jobs:
         run: |
           python3 .github/scripts/test_verify_reviewed_stage_d.py
           python3 deploy/mcp/verify-candidate-image.test.py
+          python3 -m unittest discover -s deploy/mcp -p test_verify_semantic_backend_review.py
       - name: Install exact pg@8.16.3 without lifecycle scripts
         working-directory: integrations/chatgpt-mcp/pg-disposable-probe
         run: npm ci --ignore-scripts --no-audit --no-fund
@@ -162,6 +163,10 @@ jobs:
             '
           docker save local/stage-d-mcp:tested local/stage-d-grants:tested | gzip -n > .artifacts/stage-d/candidate-images.tar.gz
           (cd .artifacts/stage-d && sha256sum candidate-images.tar.gz images.json packed-files.json source-head.txt source-tree.txt > EVIDENCE_SHA256SUMS)
+          # Release PREPARATION ONLY: offline package tarball, exact SHA,
+          # candidate image and source provenance. Never publish or deploy.
+          python3 deploy/mcp/verify_semantic_backend_review.py \
+            .artifacts/stage-d "$sha" "$(git rev-parse HEAD^{tree})"
       - uses: actions/upload-artifact@v4
         with:
           name: stage-d-integrated-candidates-${{ github.event.pull_request.head.sha || github.sha }}

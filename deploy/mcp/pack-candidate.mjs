@@ -12,5 +12,5 @@ for(const file of packed.files){
   files.push({path:file.path,sha256});
 }
 const tarSha256=createHash('sha256').update(await readFile(join(destination,packed.filename))).digest('hex');
-await writeFile(join(destination,'packed-files.json'),JSON.stringify({version:1,sourceSha,tarball:packed.filename,tarSha256,files},null,2)+'\n');
+await writeFile(join(destination,'packed-files.json'),JSON.stringify({version:1,sourceSha,packageVersion:packed.version,tarball:packed.filename,tarSha256,files},null,2)+'\n');
 await writeFile(join(destination,'SHA256SUMS'),tarSha256+'  '+packed.filename+'\n');

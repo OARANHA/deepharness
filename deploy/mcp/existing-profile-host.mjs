@@ -4,8 +4,9 @@
 // Cordis 4 trace wrappers expose their implementation with this shared symbol.
 // Use it solely for identity comparison; all calls retain their traced facade.
 const implementation=value=>value?.[Symbol.for('cordis.original')]??value;
-export async function bootExistingProfileReadHost({runProfile,environment,args,patchFiles=[],plugin,createPolicy}={}) {
+export async function bootExistingProfileReadHost({runProfile,environment,args,patchFiles=[],plugin,createPolicy,createSemanticBridge,enableSemanticBridge=false}={}) {
   if(typeof runProfile!=='function'||typeof createPolicy!=='function'||typeof plugin?.apply!=='function'||
+      typeof enableSemanticBridge!=='boolean'||(enableSemanticBridge&&typeof createSemanticBridge!=='function')||
       !environment||typeof environment!=='object'||!Array.isArray(args)||!args.every(x=>typeof x==='string')||
       !Array.isArray(patchFiles)||!patchFiles.every(x=>typeof x==='string'))throw Error('Existing DSH host configuration denied');
   const booted=await runProfile({environment,profile:'web',args:[...args],patchFiles:[...patchFiles]});
@@ -16,8 +17,11 @@ export async function bootExistingProfileReadHost({runProfile,environment,args,p
         typeof ctx?.fiber?.dispose!=='function')throw Error('Existing DSH host unavailable');
     const services=['workspaceRegistry','sessions','sessionProjections'];
     const original=services.map(key=>implementation(ctx[key]));
+    const sessionController=ctx.sessionController;
     phase='services-'+original.map(value=>value?'present':'absent').join('-');
-    if(original.some(value=>!value)||ctx.get('chatgptMcpRead')!==undefined||
+    if(original.some(value=>!value)||(enableSemanticBridge&&(
+        typeof sessionController?.projections!=='function'||typeof sessionController?.page!=='function'||
+        typeof sessionController?.prompt!=='function'))||ctx.get('chatgptMcpRead')!==undefined||
         ctx.get('chatgptMcpReadPolicy')!==undefined)throw Error('Existing DSH host unavailable');
     const unchanged=()=>services.every((key,i)=>implementation(ctx[key])===original[i]);
     phase='policy';
@@ -30,7 +34,12 @@ export async function bootExistingProfileReadHost({runProfile,environment,args,p
     phase='read-service';
     const service=ctx.get('chatgptMcpRead');
     if(!unchanged()||typeof service?.createPrivateTransport!=='function')throw Error('Existing DSH read service unavailable');
-    return Object.freeze({...booted,service});
+    // Never require the semantic SessionController API for the ordinary read host.
+    // Opt-in preserves the strict official service contract and fail-closed behavior.
+    const semanticBridge=enableSemanticBridge?createSemanticBridge({
+      workspaceRegistry:ctx.workspaceRegistry,sessionController,checkHost:unchanged,
+    }):undefined;
+    return Object.freeze({...booted,service,...(enableSemanticBridge?{semanticBridge}:{})});
   } catch {
     await ctx?.fiber?.dispose?.().catch(()=>{});
     throw Error('Existing DSH read host composition denied ('+phase+')');

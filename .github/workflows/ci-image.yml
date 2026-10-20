@@ -30,6 +30,238 @@ jobs:
       - name: Build pinned image in CI (never on 28server)
         if: steps.state.outputs.ready == 'true'
         run: docker build --pull -f deploy/Dockerfile -t local/deepharness:ci .
+      - name: Verify the exact npm release and collect candidate dependency lock
+        if: steps.state.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          image=local/deepharness:ci
+          cid="$(docker create "$image")"
+          trap 'docker rm "$cid" >/dev/null 2>&1 || true' EXIT
+          docker cp "$cid:/opt/dsh/package-lock.json" ./dsh-bootstrap-lockfile.candidate.json
+          node -e '
+            const lock=require("./dsh-bootstrap-lockfile.candidate.json");
+            const expected="0.2.1-rc.2";
+            const actual=lock.packages?.["node_modules/@deepseek-ai/dsh"]?.version;
+            if(actual!==expected)throw Error("DSH candidate version mismatch");
+            if(!lock.packages?.["node_modules/@deepseek-ai/dsh"]?.integrity)
+              throw Error("DSH candidate package integrity missing");
+            if(!lock.packages?.["node_modules/node-addon-require-builtin"]?.version)
+              throw Error("Native addon lock missing");
+            console.log("Exact candidate version/integrity locked:",expected);
+          '
+          sha256sum dsh-bootstrap-lockfile.candidate.json
+
+      - name: Retain candidate lockfile for review (not an approved release)
+        if: steps.state.outputs.ready == 'true' && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsh-bootstrap-lockfile-candidate
+          path: dsh-bootstrap-lockfile.candidate.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Verify official DSH profile-host exports without network
+        if: steps.state.outputs.ready == 'true'
+        shell: bash
+        run: |
+          docker run --rm --network none --read-only \
+            --security-opt no-new-privileges --cap-drop ALL \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=64m \
+            local/deepharness:ci node --input-type=module -e '
+              import {createRequire} from "node:module";
+              import {pathToFileURL} from "node:url";
+              const official=createRequire("/opt/dsh/node_modules/@deepseek-ai/dsh/package.json");
+              const load=name=>import(pathToFileURL(official.resolve(name)).href);
+              const profile=await load("@deepseek-ai/dsh/profile-boot");
+              const app=await load("@deepseek-ai/dsh-app-boot");
+              if(typeof profile.runProfile!=="function"||typeof app.loadLayeredEnv!=="function")
+                throw Error("DSH operational host export contract incompatible");
+              console.log("Official profile host exports verified");
+            '
+
+      - name: Verify installed official DSH semantic service surfaces offline
+        if: steps.state.outputs.ready == 'true'
+        shell: bash
+        run: |
+          docker run --rm --network none --read-only \
+            --security-opt no-new-privileges --cap-drop ALL \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=64m \
+            local/deepharness:ci node --input-type=module -e '
+              import {createRequire} from "node:module";
+              import {pathToFileURL} from "node:url";
+              const installed=createRequire("/opt/dsh/node_modules/@deepseek-ai/dsh/package.json");
+              const load=name=>import(pathToFileURL(installed.resolve(name)).href);
+              const [{SessionController},{WorkspaceRegistry},{TeamService}]=await Promise.all([
+                load("@deepseek-ai/dsh-api-session-controller"),
+                load("@deepseek-ai/dsh-workspace"),
+                load("@deepseek-ai/dsh-experimental-agent-team"),
+              ]);
+              for(const method of ["projections","page","prompt"]) {
+                if(typeof SessionController?.prototype?.[method]!=="function")
+                  throw Error("Installed SessionController missing "+method);
+              }
+              if(typeof WorkspaceRegistry?.prototype?.get!=="function"||
+                 typeof TeamService!=="function")
+                throw Error("Installed Workspace/Team host service contract mismatch");
+              console.log("Official installed SessionController/Workspace/Team service surfaces verified");
+            '
+
+      - name: Cross-check installed rc.2 with private semantic bundle (offline, no install)
+        if: steps.state.outputs.ready == 'true'
+        shell: bash
+        run: |
+          docker run --rm --network none --read-only \
+            --security-opt no-new-privileges --cap-drop ALL \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=64m \
+            --mount "type=bind,source=${GITHUB_WORKSPACE}/integrations/chatgpt-mcp,target=/candidate,readonly" \
+            local/deepharness:ci node --input-type=module -e '
+              import {readFileSync} from "node:fs";
+              import {createRequire} from "node:module";
+              const installed=createRequire("/opt/dsh/node_modules/@deepseek-ai/dsh/package.json");
+              const manifest=JSON.parse(readFileSync("/candidate/package.json","utf8"));
+              const names=["@deepseek-ai/dsh-session","@deepseek-ai/dsh-session-projection",
+                "@deepseek-ai/dsh-workspace"];
+              for(const name of names) {
+                const version=JSON.parse(readFileSync(installed.resolve(name+"/package.json"),"utf8")).version;
+                const allowed=manifest.peerDependencies?.[name]?.split("||").map(item=>item.trim());
+                if(version!=="0.2.1-rc.2"||!allowed?.includes(version))
+                  throw Error("Unreviewed host/connector peer mismatch: "+name);
+              }
+              const [{createDshSemanticBridge},{createOfficialDshMcpReadRuntime},plugin]=
+                await Promise.all([
+                  import("/candidate/adapters/dsh-semantic-bridge.mjs"),
+                  import("/candidate/runtime.mjs"),import("/candidate/plugin.mjs"),
+                ]);
+              if(typeof createDshSemanticBridge!=="function"||
+                 typeof createOfficialDshMcpReadRuntime!=="function"||
+                 typeof plugin.apply!=="function")
+                throw Error("Private connector cannot load against installed rc.2 host");
+              console.log("Private semantic bundle loads with exact rc.2 host peer metadata");
+            '
+
+      - name: Exercise official SessionController methods through private bridge (synthetic only)
+        if: steps.state.outputs.ready == 'true'
+        shell: bash
+        run: |
+          docker run --rm --network none --read-only \
+            --security-opt no-new-privileges --cap-drop ALL \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=64m \
+            --mount "type=bind,source=${GITHUB_WORKSPACE}/integrations/chatgpt-mcp,target=/candidate,readonly" \
+            local/deepharness:ci node --input-type=module -e '
+              import assert from "node:assert/strict";
+              import {createRequire} from "node:module";
+              import {pathToFileURL} from "node:url";
+              const installed=createRequire("/opt/dsh/node_modules/@deepseek-ai/dsh/package.json");
+              const official=await import(pathToFileURL(installed.resolve("@deepseek-ai/dsh-api-session-controller")).href);
+              const {createDshSemanticBridge}=await import("/candidate/adapters/dsh-semantic-bridge.mjs");
+              const leadId="lead-disposable",workspaceId="workspace-disposable";
+              const requestId="4db3b83c-5abc-4aa3-9270-9715e3d34e38";
+              const projection={kind:"sequenced",asOfSeq:1,values:{agentTeam:{
+                members:[{id:leadId,name:"Lead",role:"lead",phase:"active"}],tasks:[]}}};
+              const workspace={id:workspaceId,sessionIds:[leadId]};
+              let admitted,read;
+              const controller=Object.create(official.SessionController.prototype);
+              Object.assign(controller,{
+                ctx:{invocation:undefined},
+                liveProjections:()=>projection,
+                commands:{prompt:async(request,source)=>{
+                  admitted={request,source};return {accepted:true};
+                }},
+                history:{page:async(request)=>{
+                  read=request;
+                  return {records:[{type:"event",event:{type:"user/message",seq:1,time:0,
+                    data:{role:"user",content:[{type:"text",text:"synthetic lab record"}]}}}],hasMore:false};
+                }},
+              });
+              const bridge=createDshSemanticBridge({
+                workspaceRegistry:{get:id=>id===workspaceId?workspace:undefined},
+                sessionController:controller,
+              });
+              const receipt=await bridge.sendLeadInstruction({
+                workspaceId,leadSessionId:leadId,requestId,text:"synthetic lab instruction",
+              });
+              assert.deepEqual(receipt,{accepted:true,requestId});
+              assert.equal(admitted.request.sessionId,leadId);
+              assert.equal(admitted.request.mode,"queue");
+              assert.equal(admitted.request.requestId,requestId);
+              assert.deepEqual(admitted.request.content,[{type:"text",text:"synthetic lab instruction"}]);
+              assert.equal(admitted.source.kind,"user");
+              assert.equal(admitted.source.rpcId,requestId);
+              const history=await bridge.readLeadChat({workspaceId,leadSessionId:leadId,maxMessages:5});
+              assert.deepEqual(read,{address:{kind:"session",sessionId:leadId},throughSeq:1,maxMessages:5});
+              assert.deepEqual(history,{messages:[{role:"user",text:"synthetic lab record"}],hasMore:false});
+              await assert.rejects(controller.prompt({
+                sessionId:leadId,requestId,mode:"queue",content:[{type:"text",text:"   "}]
+              },new AbortController().signal),/prompt content must include/);
+              console.log("Official rc.2 controller prompt/page/projections methods accepted synthetic bridge contract; no Agent/session persistence or model");
+            '
+
+      - name: Verify official rc.2 JSONL durable replay of synthetic user message (no model)
+        if: steps.state.outputs.ready == 'true'
+        shell: bash
+        run: |
+          docker run --rm --network none --read-only \
+            --security-opt no-new-privileges --cap-drop ALL \
+            --tmpfs /tmp:rw,nosuid,nodev,mode=1777,size=128m \
+            local/deepharness:ci node --input-type=module -e '
+              import assert from "node:assert/strict";
+              import {createRequire} from "node:module";
+              import {pathToFileURL} from "node:url";
+              const installed=createRequire("/opt/dsh/node_modules/@deepseek-ai/dsh/package.json");
+              const load=name=>import(pathToFileURL(installed.resolve(name)).href);
+              const [{Context},{SessionStore},JsonlSessionPersistence,{createUserMessage},{default:SqliteSessionQueryEngine}]=
+                await Promise.all([
+                  load("@deepseek-ai/cordis"),load("@deepseek-ai/dsh-session"),
+                  load("@deepseek-ai/dsh-session-persistence-jsonl"),load("@deepseek-ai/dsh-llm"),
+                  load("@deepseek-ai/dsh-session-query-sqlite"),
+                ]);
+              const root="/tmp/dsh-official-durable-check",id="lab-rc2-durable-lead";
+              const rpcId="4db3b83c-5abc-4aa3-9270-9715e3d34e38";
+              const first=new Context();
+              try {
+                await first.plugin(JsonlSessionPersistence,{root,compression:"none"});
+                await first.plugin(SessionStore);
+                const session=first.sessions.create(id,{meta:{cwd:root}});
+                const message=createUserMessage({
+                  content:[{type:"text",text:"CI synthetic admitted user message"}],
+                  source:{kind:"user",rpcId},
+                });
+                const event=session.append("user/message",message,{surfaceOp:"append"});
+                const writer=await first.sessionPersistence.create(session.header);
+                try{
+                  await writer.append([event]);
+                  await writer.flush();
+                }finally{await writer.close();}
+              }finally{await first.fiber.dispose();}
+              const second=new Context();
+              try {
+                await second.plugin(JsonlSessionPersistence,{root,compression:"none"});
+                await second.plugin(SessionStore);
+                await second.plugin(SqliteSessionQueryEngine,{path:root+"/read-index.sqlite",openAt:"never"});
+                const reader=await second.sessionPersistence.open(id,"read");
+                try {
+                  const {events,eventState}=await reader.read(0);
+                  assert.equal(events.length,1);
+                  assert.equal(events[0].type,"user/message");
+                  assert.equal(events[0].seq,0);
+                  assert.equal(events[0].data.source.rpcId,rpcId);
+                  assert.equal(events[0].data.content[0].text,"CI synthetic admitted user message");
+                  assert.ok(["detached","shared-frozen"].includes(eventState));
+                }finally{await reader.close();}
+                const observed=await second.sessionQuery.observeSession(id,{projectionMode:"none"});
+                try {
+                  assert.equal(observed.source,"prepared");
+                  assert.equal(observed.header.id,id);
+                  assert.equal(observed.events.length,1);
+                  assert.equal(observed.events[0].data.source.rpcId,rpcId);
+                  assert.equal(observed.events[0].data.content[0].text,"CI synthetic admitted user message");
+                  assert.equal(second.sessions.get(id),undefined,"cold query must not activate an Agent");
+                }finally{observed[Symbol.dispose]();}
+              }finally{await second.fiber.dispose();}
+              console.log("Official rc.2 JSONL flushed and cold SessionQuery restored without activating Agent or model");
+            '
+
       - name: Native addon probe under container runtime restrictions
         if: steps.state.outputs.ready == 'true'
         run: |

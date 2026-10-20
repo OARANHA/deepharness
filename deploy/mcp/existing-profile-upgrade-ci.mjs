@@ -29,6 +29,8 @@ try{
   assert.equal(oldFiles.length,1);
   const oldTar='/opt/wandora-mcp-previous/'+oldFiles[0];
   const proof=JSON.parse(await readFile('/opt/wandora-mcp-artifacts/packed-files.json','utf8'));
+  const expectedVersion=proof.packageVersion;
+  assert.match(expectedVersion,/^0\.1\.0-lab\.[0-9]+$/);
   const newTar='/opt/wandora-mcp-artifacts/'+proof.tarball;
   const snapshot=async()=>({
     manifest:JSON.parse(await readFile(join(profile,'package.json'),'utf8')),
@@ -50,14 +52,14 @@ try{
     phase='baseline';const before=await snapshot();
     assert.equal(before.version,'0.1.0-lab.4');
     assert.ok(before.manifest.dsh.profile.bundles.includes('@deepseek-ai/dsh-experimental-agent-team-profile'));
-    await writeFile(stateFile,serialize({home,before}),{flag:'wx'});
+    await writeFile(stateFile,serialize({home,before,expectedVersion}),{flag:'wx'});
     console.log('EXISTING_PROFILE_UPGRADE_FIXTURE_PREPARED');
   }else{
     phase='official offline upgrade';
     // Workflow runs this second container with --network none.
     await run(['plugin','--profile','web','add','--offline','--ignore-scripts',newTar]);
     phase='preservation';const after=await snapshot();
-    verifyExistingProfileUpgrade(state.before,after);
+    verifyExistingProfileUpgrade(state.before,after,state.expectedVersion);
     await verifyPackedInstall(join(profile,'node_modules',name),'/opt/wandora-mcp-artifacts/packed-files.json');
     console.log('EXISTING_PROFILE_LAB4_LAB5_OFFICIAL_UPGRADE_MATCH');
   }
