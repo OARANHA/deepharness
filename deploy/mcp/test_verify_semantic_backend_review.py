@@ -57,6 +57,7 @@ def sample(root):
          "Config": {
              "Labels": {"org.opencontainers.image.revision": SOURCE},
              "User": "node",
+             "ExposedPorts": {"3080/tcp": {}},
              "Cmd": ["node", "--input-type=module", "-e",
                      "console.log('MCP_CANDIDATE_DISABLED');"],
          }},
@@ -112,6 +113,17 @@ class EvidenceGate(unittest.TestCase):
         proof["files"] = [f for f in proof["files"] if
                            f["path"] != "adapters/private-semantic-http-handler.mjs"]
         put(self.root, "packed-files.json", json.dumps(proof))
+        resign(self.root)
+        with self.assertRaises(ValueError):
+            self.verify()
+    def test_accept_inherited_web_expose_without_port_publication(self):
+        images = json.loads((self.root / "images.json").read_text())
+        self.assertEqual(images[0]["Config"]["ExposedPorts"], {"3080/tcp": {}})
+        self.assertEqual(self.verify()["status"], "PREPARE_ONLY")
+    def test_reject_additional_semantic_port_exposure(self):
+        images = json.loads((self.root / "images.json").read_text())
+        images[0]["Config"]["ExposedPorts"]["3443/tcp"] = {}
+        put(self.root, "images.json", json.dumps(images))
         resign(self.root)
         with self.assertRaises(ValueError):
             self.verify()
