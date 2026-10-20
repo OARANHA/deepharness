@@ -81,7 +81,7 @@ test('ambiguous Docker alias refuses before opening the pool',async()=>{
 });
 test('listener startup failure disposes the actual host and closes its pool once',async()=>{
   const x=setup();x.seams.listen=async()=>{throw Error('private key details must not escape');};
-  await assert.rejects(startOperationalReadHost(config,x.deps,x.seams),/^Error: Operational MCP host initialization denied \\(tls-listener\\)$/);
+  await assert.rejects(startOperationalReadHost(config,x.deps,x.seams),/^Error: Operational MCP host initialization denied \(tls-listener\)$/);
   assert.equal(x.state.disposed,1);assert.equal(x.state.ended,1);
 });
 
