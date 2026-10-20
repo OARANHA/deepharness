@@ -41,7 +41,7 @@ function sum(location) {
 }
 function safeVersion(value) {
   return typeof value === "string" &&
-    /^[0-9]+[.][0-9]+[.][0-9]+(?:-(?:alpha|beta|rc)[.][0-9]+)?$/.test(value)
+    /^[0-9]+[.][0-9]+[.][0-9]+(?:-(?:alpha|beta|rc|lab)[.][0-9]+)?$/.test(value)
     ? value : "UNKNOWN";
 }
 function existsFile(location) {
