@@ -1,0 +1,20 @@
+name: MCP Stage C - safe effective Compose
+on:
+  pull_request:
+    paths:
+      - 'deploy/mcp/verify-effective-compose-safe.py'
+      - 'deploy/mcp/portainer-stack.stage-c.review.yml'
+      - '.github/workflows/mcp-stage-c-effective-compose.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  safe-compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Stage C with dummy-only environment and no runtime
+        run: python3 deploy/mcp/verify-effective-compose-safe.py

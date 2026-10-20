@@ -1,0 +1,47 @@
+# REVIEW ONLY. Apply to the existing deepharness stack on 28server, not identity.
+# One new named volume stores authorization state. Existing DSH volumes unchanged.
+services:
+  mcp-grants-db:
+    profiles: ["mcp-review-only"]
+    image: ${DSH_MCP_GRANTS_IMAGE:?Provide tested immutable grants image digest}
+    user: "999:999"
+    restart: "no"
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 128
+    command: ["postgres", "-c", "max_connections=20", "-c", "shared_buffers=32MB", "-c", "password_encryption=scram-sha-256"]
+    environment:
+      POSTGRES_DB: dsh_mcp_grants
+      POSTGRES_USER: dsh_mcp_owner
+      POSTGRES_PASSWORD_FILE: /run/secrets/mcp-admin-db-password
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    secrets: ["mcp-admin-db-password", "mcp-runtime-db-password"]
+    volumes:
+      - mcp_grants_data:/var/lib/postgresql/data
+    tmpfs:
+      - /var/run/postgresql:rw,nosuid,nodev,noexec,size=8m,mode=0770,uid=999,gid=999
+      - /tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777
+    networks: ["mcp-private"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dsh_mcp_owner -d dsh_mcp_grants"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    logging:
+      driver: local
+      options: {max-size: "10m", max-file: "3"}
+
+volumes:
+  mcp_grants_data:
+networks:
+  mcp-private:
+    internal: true
+secrets:
+  mcp-admin-db-password:
+    file: /opt/wandora/data/deepharness-mcp/secrets/admin-db-password
+  mcp-runtime-db-password:
+    file: /opt/wandora/data/deepharness-mcp/secrets/runtime-db-password

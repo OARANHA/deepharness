@@ -1,0 +1,16 @@
+# REVIEW ONLY — not installed in Traefik's watched directory.
+# Uses the observed file provider, websecure and letsencrypt resolver.
+http:
+  routers:
+    wandora-identity-public:
+      rule: "Host(`id.wandora.com.br`) && (PathPrefix(`/realms/`) || PathPrefix(`/resources/`) || PathPrefix(`/.well-known/`))"
+      entryPoints: ["websecure"]
+      service: wandora-identity
+      tls:
+        certResolver: letsencrypt
+  services:
+    wandora-identity:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: "http://wandora-identity-keycloak:8080"

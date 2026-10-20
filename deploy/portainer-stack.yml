@@ -28,6 +28,9 @@ services:
       - /tmp:rw,nosuid,nodev,noexec,size=128m,mode=1777
     environment:
       NARB_DISABLE_NATIVE_CACHE: "1"
+      NPM_CONFIG_CACHE: /data/dsh/.npm-cache
+      NPM_CONFIG_PREFIX: /data/dsh/.npm-global
+      XDG_CACHE_HOME: /data/dsh/.cache
     volumes:
       - dsh_data:/data/dsh
       - dsh_workspace:/workspace
