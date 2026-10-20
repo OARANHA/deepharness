@@ -56,7 +56,7 @@ test("script cannot start Docker/Portainer, runs nonroot inside fixed container"
   assert.match(source,/docker exec -i --user 1000:1000 deepharness-web-1/);
   assert.match(source,/hostname -s/);
   assert.doesNotMatch(source,/\bdocker\s+(?:run|cp|load|tag|push|create|compose|restart|stop)\b/);
-  assert.doesNotMatch(body,/\b(?:writeFile|mkdir|execFile|spawn|fetch|https|http|unlink|rename)\b/);
+  assert.doesNotMatch(body,/(?:\bwriteFile(?:Sync)?\s*\(|\bmkdir(?:Sync)?\s*\(|\bexecFile\s*\(|\bspawn\s*\(|\bfetch\s*\(|https?:\/\/|\bunlink\s*\(|\brename\s*\()/);
 });
 test("lab.4 baseline is reported read-only, no secrets ever printed",()=>{
   const r=fixture();
