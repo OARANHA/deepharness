@@ -67,7 +67,7 @@ def validate_review(root: Path, source_sha: str, tree_sha: str):
     require(proof.get("packageVersion") == "0.1.0-lab.7")
     tarball = proof.get("tarball")
     require(isinstance(tarball, str) and re.fullmatch(
-        r"wandora-deepharness-chatgpt-mcp-read-0\\.1\\.0-lab\\.7\\.tgz", tarball))
+        r"wandora-deepharness-chatgpt-mcp-read-0\.1\.0-lab\.7\.tgz", tarball))
     require(isinstance(proof.get("tarSha256"), str)
             and HEX64.fullmatch(proof["tarSha256"]))
     verify_checksums(root, "SHA256SUMS", frozenset({tarball}))
@@ -100,7 +100,6 @@ def validate_review(root: Path, source_sha: str, tree_sha: str):
             seen.add(path)
         require(seen == set(expected))
 
-    package = json.loads(tar.extractfile("package/package.json").read()) if False else None
     # Inspect package.json from the already validated archive without extraction.
     with tarfile.open(fileobj=io.BytesIO(archive), mode="r:gz") as tar:
         manifest = json.loads(tar.extractfile("package/package.json").read())
