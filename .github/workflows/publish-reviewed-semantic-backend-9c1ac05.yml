@@ -1,0 +1,139 @@
+name: Publish reviewed semantic backend 9c1ac05 (one-time)
+on:
+  push:
+    branches:
+      - release/semantic-backend-9c1ac05-20261020
+    paths:
+      - .github/workflows/publish-reviewed-semantic-backend-9c1ac05.yml
+
+permissions:
+  contents: read
+  actions: read
+  packages: write
+
+concurrency:
+  group: publish-reviewed-semantic-backend-9c1ac05-20261020
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: >-
+      github.repository == 'OARANHA/deepharness' &&
+      github.ref == 'refs/heads/release/semantic-backend-9c1ac05-20261020' &&
+      github.event.head_commit.message == 'release(semantic-backend): publish exact approved 9c1ac05 artifact without build or deploy'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout only the reviewed source SHA
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: 9c1ac05bf9a0a3fa2ef9f95a3248f156c3fa5d15
+
+      - name: Require green gates and immutable Stage D artifact digest
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 9c1ac05bf9a0a3fa2ef9f95a3248f156c3fa5d15
+          test "$(git rev-parse HEAD^{tree})" = 68afbfcfdef0cc3042c5248f0fe87c1b4d8f2550
+          for run in 39493820604 39493820321; do
+            gh api "repos/OARANHA/deepharness/actions/runs/$run" > "$RUNNER_TEMP/gate-$run.json"
+            python3 - "$RUNNER_TEMP/gate-$run.json" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1]))
+          assert d["head_sha"] == "9c1ac05bf9a0a3fa2ef9f95a3248f156c3fa5d15"
+          assert d["repository"]["full_name"] == "OARANHA/deepharness"
+          assert d["event"] == "pull_request"
+          assert d["status"] == "completed" and d["conclusion"] == "success"
+          PY
+          done
+          gh api repos/OARANHA/deepharness/actions/artifacts/12297445838 > "$RUNNER_TEMP/artifact.json"
+          python3 - "$RUNNER_TEMP/artifact.json" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1]))
+          assert d["id"]==12297445838 and d["expired"] is False
+          assert d["name"]=="stage-d-integrated-candidates-9c1ac05bf9a0a3fa2ef9f95a3248f156c3fa5d15"
+          assert d["digest"]=="sha256:3312b222797ae00c76a51a39ec1116397a0f26855f701f65bab43b7094054caa"
+          assert d["workflow_run"]["id"]==39493820604
+          assert d["workflow_run"]["head_sha"]=="9c1ac05bf9a0a3fa2ef9f95a3248f156c3fa5d15"
+          PY
+          gh api repos/OARANHA/deepharness/actions/artifacts/12297445838/zip > "$RUNNER_TEMP/reviewed.zip"
+          echo "3312b222797ae00c76a51a39ec1116397a0f26855f701f65bab43b7094054caa  $RUNNER_TEMP/reviewed.zip" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/reviewed"
+          unzip -q "$RUNNER_TEMP/reviewed.zip" -d "$RUNNER_TEMP/reviewed"
+          python3 deploy/mcp/verify_semantic_backend_review.py "$RUNNER_TEMP/reviewed" \
+            9c1ac05bf9a0a3fa2ef9f95a3248f156c3fa5d15 \
+            68afbfcfdef0cc3042c5248f0fe87c1b4d8f2550
+          echo SEMANTIC_PUBLISH_SOURCE=GREEN
+
+      - name: Verify saved image against artifact, without rebuilding
+        shell: bash
+        run: |
+          set -euo pipefail
+          gzip -dc "$RUNNER_TEMP/reviewed/candidate-images.tar.gz" | docker load
+          docker image inspect local/stage-d-mcp:tested > "$RUNNER_TEMP/backend-image.json"
+          python3 - "$RUNNER_TEMP/backend-image.json" "$RUNNER_TEMP/reviewed/images.json" <<'PY'
+          import json,sys
+          actual=json.load(open(sys.argv[1]))[0]
+          all_images=json.load(open(sys.argv[2]))
+          matching=[im for im in all_images if "local/stage-d-mcp:tested" in im.get("RepoTags",[])]
+          assert len(matching)==1
+          expected=matching[0]
+          assert actual["Id"]==expected["Id"]
+          assert actual["Os"]=="linux" and actual["Architecture"]=="amd64"
+          conf=actual["Config"]
+          assert conf["User"]=="node"
+          assert conf.get("ExposedPorts") in (None,{},{"3080/tcp":{}})
+          assert conf.get("Labels",{}).get("org.opencontainers.image.revision")=="9c1ac05bf9a0a3fa2ef9f95a3248f156c3fa5d15"
+          assert "MCP_CANDIDATE_DISABLED" in " ".join(conf.get("Cmd") or [])
+          PY
+          echo SEMANTIC_PUBLISH_IMAGE=GREEN
+
+      - name: GHCR authentication via temporary workflow token
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish only the verified backend image at a unique immutable tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag=ghcr.io/oaranha/deepharness-mcp:semantic-9c1ac05bf9a0a3fa2ef9f95a3248f156c3fa5d15
+          if docker manifest inspect "$tag" >/dev/null 2>&1; then
+            echo SEMANTIC_PUBLISH=NO_GO_TAG_ALREADY_EXISTS
+            exit 1
+          fi
+          docker tag local/stage-d-mcp:tested "$tag"
+          docker push "$tag" > "$RUNNER_TEMP/push.txt"
+          digest="$(python3 - "$RUNNER_TEMP/push.txt" <<'PY'
+          import re,sys
+          found=re.findall(r"digest:\s*(sha256:[a-f0-9]{64})",open(sys.argv[1]).read())
+          assert len(found)==1
+          print(found[0])
+          PY
+          )"
+          docker buildx imagetools inspect --raw "$tag" > "$RUNNER_TEMP/registry.json"
+          python3 - "$RUNNER_TEMP/registry.json" "$RUNNER_TEMP/backend-image.json" <<'PY'
+          import json,sys
+          m=json.load(open(sys.argv[1]));i=json.load(open(sys.argv[2]))[0]
+          assert m["schemaVersion"]==2
+          assert m["config"]["digest"]==i["Id"]
+          PY
+          mkdir -p "$RUNNER_TEMP/semantic-release"
+          echo "ghcr.io/oaranha/deepharness-mcp@$digest" > "$RUNNER_TEMP/semantic-release/backend-manifest.txt"
+          echo "9c1ac05bf9a0a3fa2ef9f95a3248f156c3fa5d15" > "$RUNNER_TEMP/semantic-release/source.txt"
+          echo "12297445838" > "$RUNNER_TEMP/semantic-release/artifact-id.txt"
+          echo SEMANTIC_PUBLISH=GREEN
+          echo "GHCR image: ghcr.io/oaranha/deepharness-mcp@$digest" >> "$GITHUB_STEP_SUMMARY"
+          echo "Reviewed source 9c1ac05, Stage D 39493820604, exact artifact 12297445838; no rebuild or deploy" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Retain published digest as release proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: semantic-backend-9c1ac05-published-${{ github.run_id }}
+          path: ${{ runner.temp }}/semantic-release
+          retention-days: 30
