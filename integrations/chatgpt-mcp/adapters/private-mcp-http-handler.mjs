@@ -29,7 +29,9 @@ export function createPrivateMcpHttpHandler({
    if(req.rawHeaders?.filter((v,i)=>i%2===0&&v.toLowerCase()===name).length>1)return reply(res,400);
   }
   if(req.headers?.host!==url.host)return reply(res,421);
-  if(typeof req.headers.origin!=='string'||!origins.has(req.headers.origin))return reply(res,403);
+  // Non-browser MCP clients may omit Origin. Reject every present Origin not on the exact allowlist.
+  if(req.headers.origin!==undefined&&
+   (typeof req.headers.origin!=='string'||!origins.has(req.headers.origin)))return reply(res,403);
   if(req.url!=='/mcp'&&req.url!=='/.well-known/oauth-protected-resource/mcp')return reply(res,404);
   if(req.headers['mcp-session-id']!==undefined)return reply(res,400);
   if(busy)return reply(res,429);
