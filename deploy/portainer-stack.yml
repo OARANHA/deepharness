@@ -7,7 +7,7 @@ services:
   web:
     # Explicit nonroot identity required for owner-only backend TLS key (UID 1000).
     user: 1000:1000
-    image: ghcr.io/oaranha/remote-ops-mcp-dsh-platform-candidate@sha256:b83128762a01e2c59bfa03126a34d126cf8850a71adcdecf24d08a7116ffcd4c
+    image: ${DSH_MCP_HOST_IMAGE:?Provide tested immutable MCP host digest}
     command:
     - node
     - /opt/wandora-mcp-verifier/mcp/run-operational.mjs
